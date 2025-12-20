@@ -80,8 +80,8 @@ const Card: React.FC<CardProps> = ({ card, faceDown, onClick, selectable, select
       border: 'border-teal-900',
       dark: 'rgba(0, 100, 100, 0.4)',
     },
-  };
-  const colorScheme = deckColorMap[card?.deckColor || 'red'];
+  } as const;
+  const colorScheme = deckColorMap[card.deckColor as keyof typeof deckColorMap] || deckColorMap.red;
 
   if (faceDown) {
     return (
@@ -179,6 +179,7 @@ export default function ShitheadGame() {
   const [screen, setScreen] = useState<'menu' | 'lobby' | 'game'>('menu');
   const [roomCode, setRoomCode] = useState('');
   const [playerName, setPlayerName] = useState('');
+  // @ts-expect-error - playerId setter used in non-test mode
   const [playerId, setPlayerId] = useState('');
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [selectedCards, setSelectedCards] = useState<CardSelection[]>([]);
@@ -208,11 +209,11 @@ export default function ShitheadGame() {
       faceDown: deck.splice(0, 3),
     }));
 
-    const newGameState = {
+    const newGameState: GameState = {
       roomCode: 'TEST',
       host: 'test_player_0',
       players: dealtPlayers,
-      phase: 'setup',
+      phase: 'setup' as const,
       currentTurn: 0,
       deck,
       discardPile: [],
@@ -226,13 +227,14 @@ export default function ShitheadGame() {
   const createRoom = async () => {
     if (!playerName.trim()) return alert('Please enter your name');
 
+    const code = Math.random().toString(36).substr(2, 6).toUpperCase();
     const newGameState: GameState = {
       roomCode: code,
       host: playerId,
       players: [
         { id: playerId, name: playerName, hand: [], faceUp: [], faceDown: [], isReady: false },
       ],
-      phase: 'lobby',
+      phase: 'lobby' as const,
       currentTurn: 0,
       deck: [],
       discardPile: [],
@@ -279,7 +281,7 @@ export default function ShitheadGame() {
   };
 
   const startGame = async () => {
-    if (gameState.host !== playerId || gameState.players.length < 2) return;
+    if (!gameState || gameState.host !== playerId || gameState.players.length < 2) return;
 
     const numDecks = Math.ceil(gameState.players.length / 4);
     let deck = shuffleDeck(createDeck(numDecks));
@@ -292,11 +294,14 @@ export default function ShitheadGame() {
       isReady: false,
     }));
 
-    const updatedState = {
-      ...gameState,
+    const updatedState: GameState = {
+      roomCode,
+      host: gameState.host,
       players: updatedPlayers,
       deck,
       phase: 'setup',
+      currentTurn: gameState.currentTurn,
+      discardPile: gameState.discardPile,
       lastAction: `Game started with ${numDecks} deck${numDecks > 1 ? 's' : ''}! Swap cards then ready up.`,
     };
 
@@ -335,6 +340,7 @@ export default function ShitheadGame() {
   }, [screen, roomCode, testMode]);
 
   const swapCards = (handIndex: number, faceUpIndex: number): void => {
+    if (!gameState) return;
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
     const player = gameState.players.find((p) => p.id === currentPlayerId);
     if (!player || gameState.phase !== 'setup') return;
@@ -362,6 +368,7 @@ export default function ShitheadGame() {
   };
 
   const setReady = () => {
+    if (!gameState) return;
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
     const player = gameState.players.find((p) => p.id === currentPlayerId);
     if (!player || gameState.phase !== 'setup') return;
@@ -404,6 +411,7 @@ export default function ShitheadGame() {
    * Play selected cards from the current player's hand/face-up/face-down
    */
   const playCards = () => {
+    if (!gameState) return;
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
     const playerIndex = gameState.players.findIndex((p) => p.id === currentPlayerId);
     const player = gameState.players[playerIndex];
@@ -447,7 +455,7 @@ export default function ShitheadGame() {
         if (selection.type === 'faceDown') return player.faceDown[selection.index];
         return null;
       })
-      .filter(Boolean);
+      .filter((card): card is Card => card !== null);
 
     // First turn validation - pile is empty, must play starting card(s)
     const isFirstTurn = gameState.discardPile.length === 0;
@@ -583,7 +591,7 @@ export default function ShitheadGame() {
       lastAction = `Game Over! ${losers[0].name} is the Sh!thead! 💩`;
     }
 
-    const updatedState = {
+    const updatedState: GameState = {
       ...gameState,
       players: updatedPlayers,
       discardPile: newDiscardPile,
@@ -598,6 +606,7 @@ export default function ShitheadGame() {
   };
 
   const pickUpPile = () => {
+    if (!gameState) return;
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
     const playerIndex = gameState.players.findIndex((p) => p.id === currentPlayerId);
     const player = gameState.players[playerIndex];
@@ -953,8 +962,8 @@ export default function ShitheadGame() {
               if (
                 isSetupPhase &&
                 (e.target === e.currentTarget ||
-                  e.target.classList.contains('text-slate-400') ||
-                  e.target.classList.contains('text-white'))
+                  (e.target instanceof HTMLElement && e.target.classList.contains('text-slate-400')) ||
+                  (e.target instanceof HTMLElement && e.target.classList.contains('text-white')))
               ) {
                 setSelectedCards([]);
               }

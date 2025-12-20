@@ -37,7 +37,7 @@ export interface CardSelection {
 }
 
 export interface CardProps {
-  card?: Card;
+  card: Card;
   faceDown?: boolean;
   onClick?: () => void;
   selectable?: boolean;
