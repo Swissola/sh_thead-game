@@ -1250,184 +1250,185 @@ export default function ShitheadGame() {
                 <div className="border-t-2 border-slate-700 pt-6">
                   <h3 className="text-white font-bold mb-3">{currentPlayer.name}'s Cards</h3>
 
-                  {/* Two column layout: Face cards on left, Piles on right */}
+                  {/* Two column layout: Table on left, Piles on right */}
                   <div className="grid grid-cols-[auto_1fr] gap-8 mb-4">
-                    {/* Left column: Face Down and Face Up */}
+                    {/* Left column: Table (Face Down underneath Face Up) */}
                     <div className="space-y-4">
                       <div>
-                        <p className="text-slate-400 text-sm mb-2">Face Down</p>
-                        <div className="flex gap-2">
-                          {currentPlayer.faceDown.map((card, i) => (
-                            <Card
-                              key={i}
-                              card={card}
-                              faceDown
-                              small
-                              selectable={
-                                !isSetupPhase &&
-                                isMyTurn &&
-                                GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
-                              }
-                              selected={selectedCards.some((s) => s.type === 'faceDown' && s.index === i)}
-                              onClick={() => {
-                                if (
+                        <p className="text-slate-400 text-sm mb-2">Table</p>
+                        <div className="relative h-32 flex items-start">
+                          {/* Face Down cards - offset to left and underneath */}
+                          <div className="absolute left-0 top-0 flex gap-2 z-0">
+                            {currentPlayer.faceDown.map((card, i) => (
+                              <Card
+                                key={`faceDown-${i}`}
+                                card={card}
+                                faceDown
+                                small
+                                selectable={
                                   !isSetupPhase &&
                                   isMyTurn &&
                                   GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
-                                ) {
-                                  setSelectedCards([{ type: 'faceDown', index: i }]);
                                 }
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-slate-400 text-sm mb-2">Face Up</p>
-                        <div className="flex gap-2">
-                          {currentPlayer.faceUp.map((card, i) => {
-                            // Check if we can select face-up cards alongside hand cards
-                            const deckEmpty = gameState.deck.length === 0;
-                            const currentSource = GameLogic.getAvailableCardSource(currentPlayer);
-                            const canCombineWithHand =
-                              deckEmpty &&
-                              currentSource === 'hand' &&
-                              selectedCards.length > 0 &&
-                              selectedCards[0].type === 'hand';
-
-                            // During gameplay, check if this card is playable
-                            let isPlayable = true;
-                            if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
-                              // Check if this single card can be played on the current pile
-                              isPlayable = GameLogic.canPlayMultipleCards([card], gameState.discardPile);
-
-                              // Also check if it matches already selected cards
-                              if (selectedCards.length > 0 && selectedCards[0].type === 'faceUp') {
-                                const firstSelectedCard = currentPlayer.faceUp[selectedCards[0].index];
-                                if (card.rank !== firstSelectedCard.rank) {
-                                  isPlayable = false;
-                                }
-                              }
-                            }
-
-                            // Face-up cards are selectable if:
-                            // 1. Setup phase (for swapping)
-                            // 2. Normal play when face-up is the active source AND card is playable
-                            // 3. When deck is empty and playing final hand cards of matching rank
-                            const faceUpSelectable =
-                              isSetupPhase ||
-                              (!isSetupPhase && isMyTurn && currentSource === 'faceUp' && isPlayable) ||
-                              (!isSetupPhase && isMyTurn && canCombineWithHand);
-
-                            return (
-                              <Card
-                                key={card.id}
-                                card={card}
-                                small
-                                selectable={faceUpSelectable}
-                                selected={selectedCards.some((s) => s.type === 'faceUp' && s.index === i)}
+                                selected={selectedCards.some((s) => s.type === 'faceDown' && s.index === i)}
                                 onClick={() => {
-                                  if (isSetupPhase) {
-                                    // Setup phase: allow selection and swapping
-                                    const alreadySelected = selectedCards.findIndex(
-                                      (s) => s.type === 'faceUp' && s.index === i
-                                    );
-
-                                    if (alreadySelected >= 0) {
-                                      // Clicking same face-up card - deselect it
-                                      setSelectedCards([]);
-                                    } else if (
-                                      selectedCards.length === 1 &&
-                                      selectedCards[0].type === 'hand'
-                                    ) {
-                                      // Hand card selected, clicking face-up - swap them
-                                      swapCards(selectedCards[0].index, i);
-                                      setSelectedCards([]);
-                                    } else if (
-                                      selectedCards.length === 1 &&
-                                      selectedCards[0].type === 'faceUp'
-                                    ) {
-                                      // Different face-up card selected, clicking another face-up - swap them
-                                      const temp = currentPlayer.faceUp[selectedCards[0].index];
-                                      const newFaceUp = [...currentPlayer.faceUp];
-                                      newFaceUp[selectedCards[0].index] = currentPlayer.faceUp[i];
-                                      newFaceUp[i] = temp;
-
-                                      const updatedPlayers = gameState.players.map((p) =>
-                                        p.id === currentPlayerId ? { ...p, faceUp: newFaceUp } : p
-                                      );
-
-                                      const updatedState = {
-                                        ...gameState,
-                                        players: updatedPlayers,
-                                        lastAction: `${currentPlayer.name} swapped face-up cards`,
-                                      };
-
-                                      if (testMode) {
-                                        setGameState(updatedState);
-                                      } else {
-                                        window.storage.set(
-                                          `game:${roomCode}`,
-                                          JSON.stringify(updatedState),
-                                          true
-                                        );
-                                        setGameState(updatedState);
-                                      }
-                                      setSelectedCards([]);
-                                    } else {
-                                      // Nothing selected - select this face-up card
-                                      setSelectedCards([{ type: 'faceUp', index: i }]);
-                                    }
-                                  } else if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
-                                    // Normal face-up selection
-                                    const alreadySelected = selectedCards.findIndex(
-                                      (s) => s.type === 'faceUp' && s.index === i
-                                    );
-                                    if (alreadySelected >= 0) {
-                                      setSelectedCards(
-                                        selectedCards.filter((_, idx) => idx !== alreadySelected)
-                                      );
-                                    } else {
-                                      const clickedCard = currentPlayer.faceUp[i];
-                                      if (
-                                        selectedCards.length === 0 ||
-                                        selectedCards.every((s) => {
-                                          const existingCard = currentPlayer.faceUp[s.index];
-                                          return existingCard.rank === clickedCard.rank;
-                                        })
-                                      ) {
-                                        setSelectedCards([
-                                          ...selectedCards,
-                                          { type: 'faceUp', index: i },
-                                        ]);
-                                      }
-                                    }
-                                  } else if (!isSetupPhase && isMyTurn && canCombineWithHand) {
-                                    // Combining face-up with final hand cards
-                                    const alreadySelected = selectedCards.findIndex(
-                                      (s) => s.type === 'faceUp' && s.index === i
-                                    );
-                                    if (alreadySelected >= 0) {
-                                      setSelectedCards(
-                                        selectedCards.filter((_, idx) => idx !== alreadySelected)
-                                      );
-                                    } else {
-                                      // Must match rank of selected hand cards
-                                      const clickedCard = currentPlayer.faceUp[i];
-                                      const handCard = currentPlayer.hand[selectedCards[0].index];
-                                      if (handCard && clickedCard.rank === handCard.rank) {
-                                        setSelectedCards([
-                                          ...selectedCards,
-                                          { type: 'faceUp', index: i },
-                                        ]);
-                                      }
-                                    }
+                                  if (
+                                    !isSetupPhase &&
+                                    isMyTurn &&
+                                    GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
+                                  ) {
+                                    setSelectedCards([{ type: 'faceDown', index: i }]);
                                   }
                                 }}
                               />
-                            );
-                          })}
+                            ))}
+                          </div>
+
+                          {/* Face Up cards - on top, offset right */}
+                          <div className="relative left-12 flex gap-2 z-10">
+                            {currentPlayer.faceUp.map((card, i) => {
+                              // Check if we can select face-up cards alongside hand cards
+                              const deckEmpty = gameState.deck.length === 0;
+                              const currentSource = GameLogic.getAvailableCardSource(currentPlayer);
+                              const canCombineWithHand =
+                                deckEmpty &&
+                                currentSource === 'hand' &&
+                                selectedCards.length > 0 &&
+                                selectedCards[0].type === 'hand';
+
+                              // During gameplay, check if this card is playable
+                              let isPlayable = true;
+                              if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
+                                // Check if this single card can be played on the current pile
+                                isPlayable = GameLogic.canPlayMultipleCards([card], gameState.discardPile);
+
+                                // Also check if it matches already selected cards
+                                if (selectedCards.length > 0 && selectedCards[0].type === 'faceUp') {
+                                  const firstSelectedCard = currentPlayer.faceUp[selectedCards[0].index];
+                                  if (card.rank !== firstSelectedCard.rank) {
+                                    isPlayable = false;
+                                  }
+                                }
+                              }
+
+                              // Face-up cards are selectable if:
+                              // 1. Setup phase (for swapping)
+                              // 2. Normal play when face-up is the active source AND card is playable
+                              // 3. When deck is empty and playing final hand cards of matching rank
+                              const faceUpSelectable =
+                                isSetupPhase ||
+                                (!isSetupPhase && isMyTurn && currentSource === 'faceUp' && isPlayable) ||
+                                (!isSetupPhase && isMyTurn && canCombineWithHand);
+
+                              return (
+                                <Card
+                                  key={card.id}
+                                  card={card}
+                                  small
+                                  selectable={faceUpSelectable}
+                                  selected={selectedCards.some((s) => s.type === 'faceUp' && s.index === i)}
+                                  onClick={() => {
+                                    if (isSetupPhase) {
+                                      // Setup phase: allow selection and swapping
+                                      const alreadySelected = selectedCards.findIndex(
+                                        (s) => s.type === 'faceUp' && s.index === i
+                                      );
+
+                                      if (alreadySelected >= 0) {
+                                        // Clicking same face-up card - deselect it
+                                        setSelectedCards([]);
+                                      } else if (
+                                        selectedCards.length === 1 &&
+                                        selectedCards[0].type === 'hand'
+                                      ) {
+                                        // Hand card selected, clicking face-up - swap them
+                                        swapCards(selectedCards[0].index, i);
+                                        setSelectedCards([]);
+                                      } else if (
+                                        selectedCards.length === 1 &&
+                                        selectedCards[0].type === 'faceUp'
+                                      ) {
+                                        // Different face-up card selected, clicking another face-up - swap them
+                                        const temp = currentPlayer.faceUp[selectedCards[0].index];
+                                        const newFaceUp = [...currentPlayer.faceUp];
+                                        newFaceUp[selectedCards[0].index] = currentPlayer.faceUp[i];
+                                        newFaceUp[i] = temp;
+
+                                        const updatedPlayers = gameState.players.map((p) =>
+                                          p.id === currentPlayerId ? { ...p, faceUp: newFaceUp } : p
+                                        );
+
+                                        const updatedState = {
+                                          ...gameState,
+                                          players: updatedPlayers,
+                                          lastAction: `${currentPlayer.name} swapped face-up cards`,
+                                        };
+
+                                        if (testMode) {
+                                          setGameState(updatedState);
+                                        } else {
+                                          window.storage.set(
+                                            `game:${roomCode}`,
+                                            JSON.stringify(updatedState),
+                                            true
+                                          );
+                                          setGameState(updatedState);
+                                        }
+                                        setSelectedCards([]);
+                                      } else {
+                                        // Nothing selected - select this face-up card
+                                        setSelectedCards([{ type: 'faceUp', index: i }]);
+                                      }
+                                    } else if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
+                                      // Normal face-up selection
+                                      const alreadySelected = selectedCards.findIndex(
+                                        (s) => s.type === 'faceUp' && s.index === i
+                                      );
+                                      if (alreadySelected >= 0) {
+                                        setSelectedCards(
+                                          selectedCards.filter((_, idx) => idx !== alreadySelected)
+                                        );
+                                      } else {
+                                        const clickedCard = currentPlayer.faceUp[i];
+                                        if (
+                                          selectedCards.length === 0 ||
+                                          selectedCards.every((s) => {
+                                            const existingCard = currentPlayer.faceUp[s.index];
+                                            return existingCard.rank === clickedCard.rank;
+                                          })
+                                        ) {
+                                          setSelectedCards([
+                                            ...selectedCards,
+                                            { type: 'faceUp', index: i },
+                                          ]);
+                                        }
+                                      }
+                                    } else if (!isSetupPhase && isMyTurn && canCombineWithHand) {
+                                      // Combining face-up with final hand cards
+                                      const alreadySelected = selectedCards.findIndex(
+                                        (s) => s.type === 'faceUp' && s.index === i
+                                      );
+                                      if (alreadySelected >= 0) {
+                                        setSelectedCards(
+                                          selectedCards.filter((_, idx) => idx !== alreadySelected)
+                                        );
+                                      } else {
+                                        // Must match rank of selected hand cards
+                                        const clickedCard = currentPlayer.faceUp[i];
+                                        const handCard = currentPlayer.hand[selectedCards[0].index];
+                                        if (handCard && clickedCard.rank === handCard.rank) {
+                                          setSelectedCards([
+                                            ...selectedCards,
+                                            { type: 'faceUp', index: i },
+                                          ]);
+                                        }
+                                      }
+                                    }
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     </div>
