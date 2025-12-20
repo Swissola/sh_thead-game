@@ -1761,12 +1761,12 @@ export default function ShitheadGame() {
                     </button>
                   )}
 
-                  {!isSetupPhase && isMyTurn && (
+                  {!isSetupPhase && (
                     <div className="flex gap-3">
                       <button
                         onClick={playCards}
-                        disabled={selectedCards.length === 0}
-                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={selectedCards.length === 0 || !isMyTurn}
+                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-500 disabled:hover:to-emerald-500"
                       >
                         Play{' '}
                         {selectedCards.length > 0
@@ -1775,8 +1775,8 @@ export default function ShitheadGame() {
                       </button>
                       <button
                         onClick={pickUpPile}
-                        disabled={gameState.discardPile.length === 0}
-                        className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:from-red-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={gameState.discardPile.length === 0 || !isMyTurn}
+                        className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:from-red-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-red-500 disabled:hover:to-pink-500"
                       >
                         Pick Up Pile ({gameState.discardPile.length})
                       </button>
