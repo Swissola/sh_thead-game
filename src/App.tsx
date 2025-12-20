@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, Copy, Check, Crown, ArrowRight, HelpCircle, X } from 'lucide-react';
 import * as GameLogic from './gameLogic';
 import type { GameState, Card, CardProps, CardSelection } from './types';
@@ -10,8 +10,8 @@ const createDeck = (numDecks = 1) => {
   const deck = [];
   const deckColors = ['red', 'blue', 'green', 'purple', 'orange', 'teal'];
   for (let d = 0; d < numDecks; d++) {
-    for (let suit of SUITS) {
-      for (let rank of RANKS) {
+    for (const suit of SUITS) {
+      for (const rank of RANKS) {
         deck.push({
           suit,
           rank,
@@ -179,7 +179,8 @@ export default function ShitheadGame() {
   const [screen, setScreen] = useState<'menu' | 'lobby' | 'game'>('menu');
   const [roomCode, setRoomCode] = useState('');
   const [playerName, setPlayerName] = useState('');
-  // @ts-expect-error - playerId setter used in non-test mode
+  // @ts-expect-error - used in non-test mode
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [playerId, setPlayerId] = useState('');
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [selectedCards, setSelectedCards] = useState<CardSelection[]>([]);
@@ -200,7 +201,7 @@ export default function ShitheadGame() {
     }));
 
     const numDecks = Math.ceil(testPlayers.length / 4);
-    let deck = shuffleDeck(createDeck(numDecks));
+    const deck = shuffleDeck(createDeck(numDecks));
 
     const dealtPlayers = testPlayers.map((player) => ({
       ...player,
@@ -246,7 +247,7 @@ export default function ShitheadGame() {
       setRoomCode(code);
       setGameState(newGameState);
       setScreen('lobby');
-    } catch (error) {
+    } catch {
       alert('Failed to create room');
     }
   };
@@ -275,7 +276,7 @@ export default function ShitheadGame() {
       await window.storage.set(`game:${roomCode.toUpperCase()}`, JSON.stringify(state), true);
       setGameState(state);
       setScreen('lobby');
-    } catch (error) {
+    } catch {
       alert('Failed to join room');
     }
   };
@@ -284,7 +285,7 @@ export default function ShitheadGame() {
     if (!gameState || gameState.host !== playerId || gameState.players.length < 2) return;
 
     const numDecks = Math.ceil(gameState.players.length / 4);
-    let deck = shuffleDeck(createDeck(numDecks));
+    const deck = shuffleDeck(createDeck(numDecks));
 
     const updatedPlayers = gameState.players.map((player) => ({
       ...player,
@@ -315,7 +316,7 @@ export default function ShitheadGame() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const pollGameState = async () => {
+  const pollGameState = useCallback(async () => {
     if (!roomCode) return;
     try {
       const result = await window.storage.get(`game:${roomCode}`, true);
@@ -329,7 +330,7 @@ export default function ShitheadGame() {
     } catch (error) {
       console.error('Poll error:', error);
     }
-  };
+  }, [roomCode, screen]);
 
   useEffect(() => {
     if (screen === 'lobby' || screen === 'game') {
@@ -337,7 +338,7 @@ export default function ShitheadGame() {
       const interval = setInterval(pollGameState, 2000);
       return () => clearInterval(interval);
     }
-  }, [screen, roomCode, testMode]);
+  }, [screen, roomCode, testMode, pollGameState]);
 
   const swapCards = (handIndex: number, faceUpIndex: number): void => {
     if (!gameState) return;
@@ -491,7 +492,7 @@ export default function ShitheadGame() {
     }
 
     // Remove cards from player's sources
-    let updatedPlayer = { ...player };
+    const updatedPlayer = { ...player };
 
     // Separate hand and face-up indices for proper removal
     const handIndices = selectedCards
