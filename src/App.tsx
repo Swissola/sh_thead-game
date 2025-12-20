@@ -1589,6 +1589,9 @@ export default function ShitheadGame() {
                                       if (startingCard) {
                                         // On first turn, can play any card of the starting rank
                                         isPlayable = item.card.rank === startingCard.rank;
+                                      } else {
+                                        // If pile is empty and player doesn't have starting card, can play anything
+                                        isPlayable = true;
                                       }
                                     } else {
                                       isPlayable = GameLogic.canPlayMultipleCards([item.card], gameState.discardPile);
