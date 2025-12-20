@@ -1184,167 +1184,46 @@ export default function ShitheadGame() {
                 }
               }}
             >
-              <div className="flex justify-center gap-8 mb-8">
-                <div className="text-center">
-                  <p className="text-slate-400 text-sm mb-2">Draw Pile</p>
-                  {gameState.deck.length > 0 ? (
-                    <div className="draw-pile-card">
-                      <Card card={gameState.deck[0]} faceDown small />
-                    </div>
-                  ) : (
-                    <div className="w-16 h-24 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center text-slate-600 text-sm">
-                      Empty
-                    </div>
-                  )}
-                  <p className="text-base text-white font-bold mt-2">{gameState.deck.length} cards</p>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-slate-400 text-sm mb-2">Discard Pile</p>
-                  {gameState.discardPile.length > 0 ? (
-                    <div className="relative w-16 h-24">
-                      {/* Show last 5 cards with offset */}
-                      {gameState.discardPile.slice(-5).map((card, index) => (
-                        <div
-                          key={card.id}
-                          className="absolute"
-                          style={{
-                            left: `${index * 3}px`,
-                            top: `${index * 2}px`,
-                            zIndex: index,
-                          }}
-                        >
-                          <Card card={card} small />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="w-16 h-24 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center text-slate-600 text-sm">
-                      Empty
-                    </div>
-                  )}
-                  <p className="text-base text-white font-bold mt-2">
-                    {gameState.discardPile.length} cards
-                  </p>
-                  {gameState.discardPile.length > 0 && (() => {
-                    const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-                    
-                    // If top is a 3, we need to show what we're playing on
-                    if (topCard.rank === '3') {
-                      // Count the 3s from the top
-                      let threeCount = 0;
-                      for (let i = gameState.discardPile.length - 1; i >= 0 && gameState.discardPile[i].rank === '3'; i--) {
-                        threeCount++;
-                      }
-                      
-                      // Find the non-3 card underneath
-                      let actualTopIndex = -1;
-                      let baseRank = '';
-                      for (let i = gameState.discardPile.length - threeCount - 1; i >= 0; i--) {
-                        if (gameState.discardPile[i].rank !== '3') {
-                          actualTopIndex = i;
-                          baseRank = gameState.discardPile[i].rank;
-                          break;
-                        }
-                      }
-                      
-                      if (actualTopIndex >= 0) {
-                        // Count the base cards (non-3s) of this rank
-                        let baseCount = 0;
-                        for (let i = actualTopIndex; i >= 0 && gameState.discardPile[i].rank === baseRank; i--) {
-                          baseCount++;
-                        }
-                        
-                        const actualTop = gameState.discardPile[actualTopIndex];
-                        const suitColor = actualTop.suit === '♥' || actualTop.suit === '♦' ? 'text-red-400' : 'text-gray-300';
-                        
-                        return (
-                          <p className="text-xs text-yellow-400 mt-1">
-                            Play on: {baseCount}× {actualTop.rank}
-                            <span className={suitColor}>{actualTop.suit}</span>
-                            {threeCount > 0 && ` + ${threeCount}× 3`}
-                            <br />
-                            <span className="text-xs text-purple-300">
-                              ({baseCount === 3 ? 'Play 1× ' + baseRank + ' or ' : ''}{threeCount === 3 ? 'Play 1× 3' : ''}{baseCount === 3 && threeCount === 3 ? ' to burn!' : ''})
-                            </span>
-                          </p>
-                        );
-                      }
-                    }
-                    
-                    return null;
-                  })()}
-                </div>
-
-                {/* Burn Pile - positioned to the right */}
-                <div className="text-center ml-12">
-                  <p className="text-slate-400 text-sm mb-2">Burn Pile</p>
-                  {gameState.burnPile.length > 0 ? (
-                    <div className="relative w-16 h-24">
-                      {/* Show last 8 cards in messy pile */}
-                      {gameState.burnPile.slice(-8).map((card, index) => (
-                        <div
-                          key={card.id}
-                          className="absolute"
-                          style={{
-                            left: `${index * 2}px`,
-                            top: `${index * 1.5}px`,
-                            transform: `rotate(${(index % 3 - 1) * 8}deg)`,
-                            zIndex: index,
-                          }}
-                        >
-                          <Card card={card} small />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="w-16 h-24 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center text-slate-600 text-xs">
-                      Empty
-                    </div>
-                  )}
-                  <p className="text-base text-white font-bold mt-2">
-                    {gameState.burnPile.length} cards
-                  </p>
-                </div>
-              </div>
-
               {currentPlayer && (
                 <div className="border-t-2 border-slate-700 pt-6">
                   <h3 className="text-white font-bold mb-3">{currentPlayer.name}'s Cards</h3>
 
-                  <div className="mb-4">
-                    <p className="text-slate-400 text-sm mb-2">Face Down</p>
-                    <div className="flex gap-2">
-                      {currentPlayer.faceDown.map((card, i) => (
-                        <Card
-                          key={i}
-                          card={card}
-                          faceDown
-                          small
-                          selectable={
-                            !isSetupPhase &&
-                            isMyTurn &&
-                            GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
-                          }
-                          selected={selectedCards.some((s) => s.type === 'faceDown' && s.index === i)}
-                          onClick={() => {
-                            if (
-                              !isSetupPhase &&
-                              isMyTurn &&
-                              GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
-                            ) {
-                              // For face-down, only allow single card selection
-                              setSelectedCards([{ type: 'faceDown', index: i }]);
-                            }
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                  {/* Two column layout: Face cards on left, Piles on right */}
+                  <div className="grid grid-cols-[auto_1fr] gap-8 mb-4">
+                    {/* Left column: Face Down and Face Up */}
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-slate-400 text-sm mb-2">Face Down</p>
+                        <div className="flex gap-2">
+                          {currentPlayer.faceDown.map((card, i) => (
+                            <Card
+                              key={i}
+                              card={card}
+                              faceDown
+                              small
+                              selectable={
+                                !isSetupPhase &&
+                                isMyTurn &&
+                                GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
+                              }
+                              selected={selectedCards.some((s) => s.type === 'faceDown' && s.index === i)}
+                              onClick={() => {
+                                if (
+                                  !isSetupPhase &&
+                                  isMyTurn &&
+                                  GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
+                                ) {
+                                  setSelectedCards([{ type: 'faceDown', index: i }]);
+                                }
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
 
-                  <div className="mb-4">
-                    <p className="text-slate-400 text-sm mb-2">Face Up</p>
-                    <div className="flex gap-2">
+                      <div>
+                        <p className="text-slate-400 text-sm mb-2">Face Up</p>
+                        <div className="flex gap-2">
                       {currentPlayer.faceUp.map((card, i) => {
                         // Check if we can select face-up cards alongside hand cards
                         const deckEmpty = gameState.deck.length === 0;
@@ -1488,6 +1367,91 @@ export default function ShitheadGame() {
                         );
                       })}
                     </div>
+                      </div>
+                    </div>
+
+                    {/* Right column: Piles - Fixed grid layout to prevent shifting */}
+                    <div className="grid grid-cols-[160px_100px_1fr] gap-12 items-start">
+                      {/* Discard Pile */}
+                      <div className="text-center">
+                        <p className="text-slate-400 text-sm mb-2 font-bold">Discard Pile</p>
+                        {gameState.discardPile.length > 0 ? (
+                          <div className="relative h-28" style={{ width: '160px', margin: '0 auto' }}>
+                            {/* Show last 7 cards - centered with newest card in middle */}
+                            {gameState.discardPile.slice(-7).map((card, index, array) => {
+                              // Offset so the newest card (last in array) is centered
+                              const centerOffset = 48; // Half of (160-64) to center a 64px card
+                              const pileOffset = (array.length - 1) * 8; // Shift pile left by half the spacing
+                              return (
+                                <div
+                                  key={card.id}
+                                  className="absolute"
+                                  style={{
+                                    left: `${centerOffset - pileOffset + (index * 16)}px`,
+                                    top: `${index * 1}px`,
+                                    zIndex: index,
+                                  }}
+                                >
+                                  <Card card={card} small />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="w-16 h-24 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center text-slate-600 text-sm mx-auto">
+                            Empty
+                          </div>
+                        )}
+                        <p className="text-base text-white font-bold mt-2">
+                          {gameState.discardPile.length} cards
+                        </p>
+                      </div>
+
+                      {/* Draw Pile */}
+                      <div className="text-center">
+                        <p className="text-slate-400 text-sm mb-2 font-bold">Draw Pile</p>
+                        {gameState.deck.length > 0 ? (
+                          <div className="draw-pile-card w-16 h-24 mx-auto">
+                            <Card card={gameState.deck[0]} faceDown small />
+                          </div>
+                        ) : (
+                          <div className="w-16 h-24 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center text-slate-600 text-sm mx-auto">
+                            Empty
+                          </div>
+                        )}
+                        <p className="text-base text-white font-bold mt-2">{gameState.deck.length} cards</p>
+                      </div>
+
+                      {/* Burn Pile */}
+                      <div className="text-center">
+                        <p className="text-slate-400 text-sm mb-2 font-bold">Burn Pile</p>
+                        {gameState.burnPile.length > 0 ? (
+                          <div className="relative w-16 h-24 mx-auto">
+                            {gameState.burnPile.slice(-8).map((card, index) => (
+                              <div
+                                key={card.id}
+                                className="absolute"
+                                style={{
+                                  left: `${index * 2}px`,
+                                  top: `${index * 1.5}px`,
+                                  transform: `rotate(${(index % 3 - 1) * 8}deg)`,
+                                  zIndex: index,
+                                }}
+                              >
+                                <Card card={card} small />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="w-16 h-24 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center text-slate-600 text-xs mx-auto">
+                            Empty
+                          </div>
+                        )}
+                        <p className="text-base text-white font-bold mt-2">
+                          {gameState.burnPile.length} cards
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="mb-4">
@@ -1528,7 +1492,7 @@ export default function ShitheadGame() {
                         </div>
                       )}
                     </div>
-                    <div className="hand-area flex gap-2 flex-wrap">
+                    <div className="hand-area flex flex-wrap">
                       {(() => {
                         if (!currentPlayer || !currentPlayer.hand) {
                           return null;
@@ -1545,23 +1509,24 @@ export default function ShitheadGame() {
                                 <div
                                   key={`slot-${arrayIndex}`}
                                   data-empty-slot
-                                  className="w-20 h-28 border-2 border-dashed border-slate-600 rounded-lg bg-slate-900/60"
+                                  className="w-20 h-28 border-2 border-dashed border-slate-600 rounded-lg bg-slate-900/60 mr-2"
                                 />
                               );
                             }
                             return (
-                              <Card
-                                key={card.id}
-                                card={card}
-                                selectable={false}
-                                selected={false}
-                                onClick={() => {}}
-                              />
+                              <div key={card.id} className="mr-2">
+                                <Card
+                                  card={card}
+                                  selectable={false}
+                                  selected={false}
+                                  onClick={() => {}}
+                                />
+                              </div>
                             );
                           });
                         }
                         
-                        // NORMAL MODE: sorted compact view
+                        // NORMAL MODE: sorted compact view with overlapping groups
                         // Get compact hand (non-null cards) with their original array indices
                         const cardsWithIndices = currentPlayer.hand
                           .map((card, arrayIndex) => ({ card, arrayIndex }))
@@ -1591,9 +1556,26 @@ export default function ShitheadGame() {
                           });
                         }
                         
-                        return sortedCards.map((item) => {
+                        return sortedCards.map((item, index) => {
+                          // Check if next card is same rank/suit (depending on sort mode)
+                          const nextItem = sortedCards[index + 1];
+                          let sameGroup = false;
+                          
+                          if (nextItem) {
+                            if (handSortMode === 'rank') {
+                              sameGroup = item.card.rank === nextItem.card.rank;
+                            } else if (handSortMode === 'suit') {
+                              sameGroup = item.card.suit === nextItem.card.suit;
+                            }
+                          }
+                          
                           return (
-                            <div key={item.card.id} data-card-key={item.card.id}>
+                            <div 
+                              key={item.card.id} 
+                              data-card-key={item.card.id}
+                              className={sameGroup ? '-mr-12' : 'mr-2'}
+                              style={{ zIndex: index }}
+                            >
                               <Card
                                 card={item.card}
                                 selectable={
