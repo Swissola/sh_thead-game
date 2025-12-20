@@ -191,6 +191,7 @@ export default function ShitheadGame() {
   const [showRules, setShowRules] = useState(false);
   const [drawingCards, setDrawingCards] = useState<Array<{ card: Card; id: string; targetPos: { x: number; y: number }; startPos?: { x: number; y: number } }>>([]);
   const [handSortMode, setHandSortMode] = useState<'original' | 'rank' | 'suit'>('original');
+  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
 
   const createTestGame = () => {
     setTestMode(true);
@@ -386,6 +387,26 @@ export default function ShitheadGame() {
       return () => clearInterval(interval);
     }
   }, [screen, roomCode, testMode, pollGameState]);
+
+  // Intercept console.log in test mode
+  useEffect(() => {
+    if (!testMode) return;
+
+    const originalLog = console.log;
+    console.log = (...args: any[]) => {
+      originalLog(...args);
+      const message = args
+        .map((arg) =>
+          typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+        )
+        .join(' ');
+      setConsoleLogs((prev) => [...prev.slice(-49), message]); // Keep last 50 logs
+    };
+
+    return () => {
+      console.log = originalLog;
+    };
+  }, [testMode]);
 
   const swapCards = (handIndex: number, faceUpIndex: number): void => {
     if (!gameState) return;
@@ -1470,8 +1491,8 @@ export default function ShitheadGame() {
                             <button
                               onClick={() => setHandSortMode('original')}
                               className={`px-2 py-1 text-xs rounded ${handSortMode === 'original'
-                                  ? 'bg-purple-600 text-white'
-                                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
                                 }`}
                             >
                               Original
@@ -1479,8 +1500,8 @@ export default function ShitheadGame() {
                             <button
                               onClick={() => setHandSortMode('rank')}
                               className={`px-2 py-1 text-xs rounded ${handSortMode === 'rank'
-                                  ? 'bg-purple-600 text-white'
-                                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
                                 }`}
                             >
                               Rank
@@ -1488,8 +1509,8 @@ export default function ShitheadGame() {
                             <button
                               onClick={() => setHandSortMode('suit')}
                               className={`px-2 py-1 text-xs rounded ${handSortMode === 'suit'
-                                  ? 'bg-purple-600 text-white'
-                                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
                                 }`}
                             >
                               Suit
@@ -1752,8 +1773,8 @@ export default function ShitheadGame() {
                     }
                   }}
                   className={`rounded-lg p-3 border-2 transition-all ${isControlling
-                      ? 'bg-green-900 border-green-500 shadow-lg ring-2 ring-green-400'
-                      : 'bg-slate-800 border-slate-700'
+                    ? 'bg-green-900 border-green-500 shadow-lg ring-2 ring-green-400'
+                    : 'bg-slate-800 border-slate-700'
                     } ${isTheirTurn ? 'border-yellow-500 shadow-lg' : ''
                     } ${isClickable ? 'cursor-pointer hover:border-green-400' : ''
                     }`}
@@ -1776,6 +1797,19 @@ export default function ShitheadGame() {
               );
             })}
           </div>
+
+          {testMode && consoleLogs.length > 0 && (
+            <div className="mt-6 bg-slate-950 border-2 border-slate-700 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-slate-400 mb-2">Console Output</h3>
+              <div className="bg-black text-slate-300 text-xs font-mono rounded p-3 max-h-40 overflow-y-auto space-y-1">
+                {consoleLogs.map((log, i) => (
+                  <div key={i} className="text-cyan-400">
+                    &gt; {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {drawingCards.length > 0 &&

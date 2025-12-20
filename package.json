@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:force": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-kill-port.ps1",
     "build": "tsc -b && vite build",
     "lint": "eslint . --fix",
     "format": "prettier --write .",
