@@ -496,9 +496,11 @@ export default function ShitheadGame() {
       })
       .filter((card): card is Card => card !== null);
 
-    // First turn validation - pile is empty, must play starting card(s)
-    const isFirstTurn = gameState.discardPile.length === 0;
-    if (isFirstTurn) {
+    // First turn validation - pile is empty AND this is the very start of the game
+    // (not just empty because someone picked up)
+    const isVeryFirstTurn = gameState.discardPile.length === 0 && 
+                            !gameState.lastAction?.includes('picked up');
+    if (isVeryFirstTurn) {
       // Determine what the valid starting card should be
       const startingCard = GameLogic.getStartingCard(player);
       if (!startingCard) {
@@ -1583,8 +1585,9 @@ export default function ShitheadGame() {
                                   GameLogic.getAvailableCardSource(currentPlayer) === 'hand' &&
                                   (() => {
                                     let isPlayable = true;
-                                    const isFirstTurn = gameState.discardPile.length === 0;
-                                    if (isFirstTurn) {
+                                    const isVeryFirstTurn = gameState.discardPile.length === 0 && 
+                                                            !gameState.lastAction?.includes('picked up');
+                                    if (isVeryFirstTurn) {
                                       const startingCard = GameLogic.getStartingCard(currentPlayer);
                                       if (startingCard) {
                                         // On first turn, can play any card of the starting rank
