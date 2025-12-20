@@ -1,6 +1,6 @@
 /**
  * Shithead Game Logic Module
- * 
+ *
  * Contains all pure game logic functions for card validation,
  * special card effects, and game rules.
  */
@@ -37,10 +37,10 @@ export const RANK_VALUES: Record<string, number> = {
   '8': 8,
   '9': 9,
   '10': 10,
-  'J': 11,
-  'Q': 12,
-  'K': 13,
-  'A': 14
+  J: 11,
+  Q: 12,
+  K: 13,
+  A: 14,
 };
 
 // ============================================================================
@@ -126,7 +126,7 @@ export function canPlayMultipleCards(cards: Card[], discardPile: Card[]): boolea
   if (cards.length === 1) return canPlayCard(cards[0], discardPile);
 
   const firstRank = cards[0].rank;
-  const allSameRank = cards.every(card => card.rank === firstRank);
+  const allSameRank = cards.every((card) => card.rank === firstRank);
 
   if (!allSameRank) return false;
 
@@ -149,14 +149,14 @@ export function shouldBurnPile(discardPile: Card[]): boolean {
 export function isFourOfAKind(discardPile: Card[]): boolean {
   if (discardPile.length < 4) return false;
 
-  const nonInvisibleCards = discardPile.filter(card => !isInvisible(card));
+  const nonInvisibleCards = discardPile.filter((card) => !isInvisible(card));
 
   if (nonInvisibleCards.length < 4) return false;
 
   const lastFour = nonInvisibleCards.slice(-4);
   const firstRank = lastFour[0].rank;
 
-  return lastFour.every(card => card.rank === firstRank);
+  return lastFour.every((card) => card.rank === firstRank);
 }
 
 export interface PlayResult {
@@ -173,13 +173,13 @@ export function getPlayResult(cardsPlayed: Card[], discardPile: Card[]): PlayRes
       return {
         burned: true,
         cardsPlayed: cardsPlayed.length,
-        message: `Burned the pile with ${cardsPlayed.length} ${cardsPlayed.length > 1 ? '10s' : '10'}!`
+        message: `Burned the pile with ${cardsPlayed.length} ${cardsPlayed.length > 1 ? '10s' : '10'}!`,
       };
     } else {
       return {
         burned: true,
         cardsPlayed: cardsPlayed.length,
-        message: 'Four of a kind! Pile burned!'
+        message: 'Four of a kind! Pile burned!',
       };
     }
   }
@@ -188,7 +188,7 @@ export function getPlayResult(cardsPlayed: Card[], discardPile: Card[]): PlayRes
     return {
       burned: false,
       cardsPlayed: cardsPlayed.length,
-      message: `Reset with ${cardsPlayed.length} ${cardsPlayed.length > 1 ? '2s' : '2'}!`
+      message: `Reset with ${cardsPlayed.length} ${cardsPlayed.length > 1 ? '2s' : '2'}!`,
     };
   }
 
@@ -196,14 +196,14 @@ export function getPlayResult(cardsPlayed: Card[], discardPile: Card[]): PlayRes
     return {
       burned: false,
       cardsPlayed: cardsPlayed.length,
-      message: `Invisible ${cardsPlayed.length} ${cardsPlayed.length > 1 ? '3s' : '3'}!`
+      message: `Invisible ${cardsPlayed.length} ${cardsPlayed.length > 1 ? '3s' : '3'}!`,
     };
   }
 
   return {
     burned: false,
     cardsPlayed: cardsPlayed.length,
-    message: `Played ${cardsPlayed.length} ${cardsPlayed[0].rank}${cardsPlayed.length > 1 ? 's' : ''}`
+    message: `Played ${cardsPlayed.length} ${cardsPlayed[0].rank}${cardsPlayed.length > 1 ? 's' : ''}`,
   };
 }
 
@@ -221,11 +221,11 @@ export function canPlayerPlay(player: Player, discardPile: Card[]): boolean {
   const source = getAvailableCardSource(player);
 
   if (source === 'hand') {
-    return player.hand.some(card => canPlayCard(card, discardPile));
+    return player.hand.some((card) => canPlayCard(card, discardPile));
   }
 
   if (source === 'faceUp') {
-    return player.faceUp.some(card => canPlayCard(card, discardPile));
+    return player.faceUp.some((card) => canPlayCard(card, discardPile));
   }
 
   return player.faceDown.length > 0;
@@ -245,9 +245,7 @@ export function getCardsToDrawCount(player: Player, deckSize: number): number {
 // ============================================================================
 
 export function hasPlayerWon(player: Player): boolean {
-  return player.hand.length === 0
-    && player.faceUp.length === 0
-    && player.faceDown.length === 0;
+  return player.hand.length === 0 && player.faceUp.length === 0 && player.faceDown.length === 0;
 }
 
 export function getFinishedPlayers(players: Player[]): Player[] {
@@ -255,7 +253,7 @@ export function getFinishedPlayers(players: Player[]): Player[] {
 }
 
 export function isGameOver(players: Player[]): boolean {
-  const playersWithCards = players.filter(p => !hasPlayerWon(p));
+  const playersWithCards = players.filter((p) => !hasPlayerWon(p));
   return playersWithCards.length <= 1;
 }
 
@@ -288,7 +286,7 @@ export function getStartingPlayer(players: Player[]): number {
   for (const targetCard of startOrder) {
     for (let i = 0; i < players.length; i++) {
       const hasCard = players[i].hand.some(
-        card => card.rank === targetCard.rank && card.suit === targetCard.suit
+        (card) => card.rank === targetCard.rank && card.suit === targetCard.suit
       );
       if (hasCard) {
         return i;
@@ -297,4 +295,26 @@ export function getStartingPlayer(players: Player[]): number {
   }
 
   return 0;
+}
+
+export function getStartingCard(player: Player): Card | null {
+  const startOrder = [
+    { rank: '4', suit: '♥' },
+    { rank: '4', suit: '♦' },
+    { rank: '4', suit: '♠' },
+    { rank: '4', suit: '♣' },
+    { rank: '5', suit: '♥' },
+    { rank: '5', suit: '♦' },
+  ];
+
+  for (const targetCard of startOrder) {
+    const foundCard = player.hand.find(
+      (card) => card.rank === targetCard.rank && card.suit === targetCard.suit
+    );
+    if (foundCard) {
+      return foundCard;
+    }
+  }
+
+  return null;
 }

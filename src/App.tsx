@@ -4,7 +4,21 @@ import * as GameLogic from './gameLogic';
 
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-const RANK_VALUES = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+const RANK_VALUES = {
+  '2': 2,
+  '3': 3,
+  '4': 4,
+  '5': 5,
+  '6': 6,
+  '7': 7,
+  '8': 8,
+  '9': 9,
+  '10': 10,
+  J: 11,
+  Q: 12,
+  K: 13,
+  A: 14,
+};
 
 const createDeck = (numDecks = 1) => {
   const deck = [];
@@ -12,7 +26,12 @@ const createDeck = (numDecks = 1) => {
   for (let d = 0; d < numDecks; d++) {
     for (let suit of SUITS) {
       for (let rank of RANKS) {
-        deck.push({ suit, rank, id: `${rank}${suit}-${d}`, deckColor: deckColors[d % deckColors.length] });
+        deck.push({
+          suit,
+          rank,
+          id: `${rank}${suit}-${d}`,
+          deckColor: deckColors[d % deckColors.length],
+        });
       }
     }
   }
@@ -30,18 +49,54 @@ const shuffleDeck = (deck) => {
 
 const Card = ({ card, faceDown, onClick, selectable, selected, small }) => {
   const isRed = card?.suit === '♥' || card?.suit === '♦';
-  
+
   // Get deck color for card backs
   const deckColorMap = {
-    red: { from: 'from-red-600', via: 'via-red-700', to: 'to-red-800', border: 'border-red-900', dark: 'rgba(139, 0, 0, 0.4)' },
-    blue: { from: 'from-blue-600', via: 'via-blue-700', to: 'to-blue-800', border: 'border-blue-900', dark: 'rgba(0, 0, 139, 0.4)' },
-    green: { from: 'from-green-600', via: 'via-green-700', to: 'to-green-800', border: 'border-green-900', dark: 'rgba(0, 100, 0, 0.4)' },
-    purple: { from: 'from-purple-600', via: 'via-purple-700', to: 'to-purple-800', border: 'border-purple-900', dark: 'rgba(75, 0, 130, 0.4)' },
-    orange: { from: 'from-orange-600', via: 'via-orange-700', to: 'to-orange-800', border: 'border-orange-900', dark: 'rgba(139, 69, 0, 0.4)' },
-    teal: { from: 'from-teal-600', via: 'via-teal-700', to: 'to-teal-800', border: 'border-teal-900', dark: 'rgba(0, 100, 100, 0.4)' }
+    red: {
+      from: 'from-red-600',
+      via: 'via-red-700',
+      to: 'to-red-800',
+      border: 'border-red-900',
+      dark: 'rgba(139, 0, 0, 0.4)',
+    },
+    blue: {
+      from: 'from-blue-600',
+      via: 'via-blue-700',
+      to: 'to-blue-800',
+      border: 'border-blue-900',
+      dark: 'rgba(0, 0, 139, 0.4)',
+    },
+    green: {
+      from: 'from-green-600',
+      via: 'via-green-700',
+      to: 'to-green-800',
+      border: 'border-green-900',
+      dark: 'rgba(0, 100, 0, 0.4)',
+    },
+    purple: {
+      from: 'from-purple-600',
+      via: 'via-purple-700',
+      to: 'to-purple-800',
+      border: 'border-purple-900',
+      dark: 'rgba(75, 0, 130, 0.4)',
+    },
+    orange: {
+      from: 'from-orange-600',
+      via: 'via-orange-700',
+      to: 'to-orange-800',
+      border: 'border-orange-900',
+      dark: 'rgba(139, 69, 0, 0.4)',
+    },
+    teal: {
+      from: 'from-teal-600',
+      via: 'via-teal-700',
+      to: 'to-teal-800',
+      border: 'border-teal-900',
+      dark: 'rgba(0, 100, 100, 0.4)',
+    },
   };
   const colorScheme = deckColorMap[card?.deckColor || 'red'];
-  
+
   if (faceDown) {
     return (
       <div
@@ -57,19 +112,25 @@ const Card = ({ card, faceDown, onClick, selectable, selected, small }) => {
         `}
       >
         <div className="w-full h-full flex items-center justify-center relative p-1">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `
               repeating-linear-gradient(45deg, transparent, transparent 6px, ${colorScheme.dark} 6px, ${colorScheme.dark} 12px),
               repeating-linear-gradient(-45deg, transparent, transparent 6px, ${colorScheme.dark} 6px, ${colorScheme.dark} 12px)
-            `
-          }}></div>
-          <div className="absolute inset-0" style={{
-            backgroundImage: `radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 2px, transparent 2px),
+            `,
+            }}
+          ></div>
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 2px, transparent 2px),
                              radial-gradient(circle at 75% 25%, rgba(255, 255, 255, 0.1) 2px, transparent 2px),
                              radial-gradient(circle at 25% 75%, rgba(255, 255, 255, 0.1) 2px, transparent 2px),
                              radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.1) 2px, transparent 2px)`,
-            backgroundSize: '20px 20px'
-          }}></div>
+              backgroundSize: '20px 20px',
+            }}
+          ></div>
           <div className="absolute inset-1 border-2 border-white opacity-50 rounded"></div>
           <div className="absolute inset-2 border border-white opacity-30 rounded"></div>
           <div className="relative flex items-center justify-center">
@@ -84,7 +145,7 @@ const Card = ({ card, faceDown, onClick, selectable, selected, small }) => {
       </div>
     );
   }
-  
+
   return (
     <div
       onClick={onClick}
@@ -101,17 +162,27 @@ const Card = ({ card, faceDown, onClick, selectable, selected, small }) => {
     >
       <div className={`w-full h-full flex flex-col ${small ? 'p-1' : 'p-2'}`}>
         <div className={`flex items-start ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-          <span className={`font-bold leading-none ${small ? 'text-xs' : 'text-sm'}`}>{card.rank}</span>
-          <span className={`leading-none ml-0.5 ${small ? 'text-sm' : 'text-base'}`}>{card.suit}</span>
+          <span className={`font-bold leading-none ${small ? 'text-xs' : 'text-sm'}`}>
+            {card.rank}
+          </span>
+          <span className={`leading-none ml-0.5 ${small ? 'text-sm' : 'text-base'}`}>
+            {card.suit}
+          </span>
         </div>
-        
-        <div className={`flex-1 flex items-center justify-center ${isRed ? 'text-red-600' : 'text-gray-900'} ${small ? 'text-2xl' : 'text-3xl'}`}>
+
+        <div
+          className={`flex-1 flex items-center justify-center ${isRed ? 'text-red-600' : 'text-gray-900'} ${small ? 'text-2xl' : 'text-3xl'}`}
+        >
           {card.suit}
         </div>
-        
+
         <div className={`flex items-end justify-end ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-          <span className={`leading-none mr-0.5 ${small ? 'text-sm' : 'text-base'}`}>{card.suit}</span>
-          <span className={`font-bold leading-none ${small ? 'text-xs' : 'text-sm'}`}>{card.rank}</span>
+          <span className={`leading-none mr-0.5 ${small ? 'text-sm' : 'text-base'}`}>
+            {card.suit}
+          </span>
+          <span className={`font-bold leading-none ${small ? 'text-xs' : 'text-sm'}`}>
+            {card.rank}
+          </span>
         </div>
       </div>
     </div>
@@ -142,17 +213,17 @@ export default function ShitheadGame() {
       hand: [],
       faceUp: [],
       faceDown: [],
-      isReady: false
+      isReady: false,
     }));
 
     const numDecks = Math.ceil(testPlayers.length / 4);
     let deck = shuffleDeck(createDeck(numDecks));
 
-    const dealtPlayers = testPlayers.map(player => ({
+    const dealtPlayers = testPlayers.map((player) => ({
       ...player,
       hand: deck.splice(0, 3),
       faceUp: deck.splice(0, 3),
-      faceDown: deck.splice(0, 3)
+      faceDown: deck.splice(0, 3),
     }));
 
     const newGameState = {
@@ -163,7 +234,7 @@ export default function ShitheadGame() {
       currentTurn: 0,
       deck,
       discardPile: [],
-      lastAction: 'Test game created! Use the green dropdown to switch players.'
+      lastAction: 'Test game created! Use the green dropdown to switch players.',
     };
 
     setGameState(newGameState);
@@ -172,17 +243,19 @@ export default function ShitheadGame() {
 
   const createRoom = async () => {
     if (!playerName.trim()) return alert('Please enter your name');
-    
+
     const code = Math.random().toString(36).substr(2, 6).toUpperCase();
     const newGameState = {
       roomCode: code,
       host: playerId,
-      players: [{ id: playerId, name: playerName, hand: [], faceUp: [], faceDown: [], isReady: false }],
+      players: [
+        { id: playerId, name: playerName, hand: [], faceUp: [], faceDown: [], isReady: false },
+      ],
       phase: 'lobby',
       currentTurn: 0,
       deck: [],
       discardPile: [],
-      lastAction: `${playerName} created the room`
+      lastAction: `${playerName} created the room`,
     };
 
     try {
@@ -196,7 +269,8 @@ export default function ShitheadGame() {
   };
 
   const joinRoom = async () => {
-    if (!playerName.trim() || !roomCode.trim()) return alert('Please enter your name and room code');
+    if (!playerName.trim() || !roomCode.trim())
+      return alert('Please enter your name and room code');
 
     try {
       const result = await window.storage.get(`game:${roomCode.toUpperCase()}`, true);
@@ -205,7 +279,14 @@ export default function ShitheadGame() {
       const state = JSON.parse(result.value);
       if (state.phase !== 'lobby') return alert('Game has already started');
 
-      state.players.push({ id: playerId, name: playerName, hand: [], faceUp: [], faceDown: [], isReady: false });
+      state.players.push({
+        id: playerId,
+        name: playerName,
+        hand: [],
+        faceUp: [],
+        faceDown: [],
+        isReady: false,
+      });
       state.lastAction = `${playerName} joined the room`;
 
       await window.storage.set(`game:${roomCode.toUpperCase()}`, JSON.stringify(state), true);
@@ -222,12 +303,12 @@ export default function ShitheadGame() {
     const numDecks = Math.ceil(gameState.players.length / 4);
     let deck = shuffleDeck(createDeck(numDecks));
 
-    const updatedPlayers = gameState.players.map(player => ({
+    const updatedPlayers = gameState.players.map((player) => ({
       ...player,
       hand: deck.splice(0, 3),
       faceUp: deck.splice(0, 3),
       faceDown: deck.splice(0, 3),
-      isReady: false
+      isReady: false,
     }));
 
     const updatedState = {
@@ -235,7 +316,7 @@ export default function ShitheadGame() {
       players: updatedPlayers,
       deck,
       phase: 'setup',
-      lastAction: `Game started with ${numDecks} deck${numDecks > 1 ? 's' : ''}! Swap cards then ready up.`
+      lastAction: `Game started with ${numDecks} deck${numDecks > 1 ? 's' : ''}! Swap cards then ready up.`,
     };
 
     await window.storage.set(`game:${roomCode}`, JSON.stringify(updatedState), true);
@@ -256,7 +337,8 @@ export default function ShitheadGame() {
         const state = JSON.parse(result.value);
         setGameState(state);
         if (state.phase === 'lobby' && screen !== 'lobby') setScreen('lobby');
-        else if ((state.phase === 'setup' || state.phase === 'playing') && screen !== 'game') setScreen('game');
+        else if ((state.phase === 'setup' || state.phase === 'playing') && screen !== 'game')
+          setScreen('game');
       }
     } catch (error) {
       console.error('Poll error:', error);
@@ -273,21 +355,21 @@ export default function ShitheadGame() {
 
   const swapCards = (handIndex, faceUpIndex) => {
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
-    const player = gameState.players.find(p => p.id === currentPlayerId);
+    const player = gameState.players.find((p) => p.id === currentPlayerId);
     if (!player || gameState.phase !== 'setup') return;
 
     const newHand = [...player.hand];
     const newFaceUp = [...player.faceUp];
     [newHand[handIndex], newFaceUp[faceUpIndex]] = [newFaceUp[faceUpIndex], newHand[handIndex]];
 
-    const updatedPlayers = gameState.players.map(p => 
+    const updatedPlayers = gameState.players.map((p) =>
       p.id === currentPlayerId ? { ...p, hand: newHand, faceUp: newFaceUp } : p
     );
 
     const updatedState = {
       ...gameState,
       players: updatedPlayers,
-      lastAction: `${player.name} swapped cards`
+      lastAction: `${player.name} swapped cards`,
     };
 
     if (testMode) {
@@ -300,20 +382,20 @@ export default function ShitheadGame() {
 
   const setReady = () => {
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
-    const player = gameState.players.find(p => p.id === currentPlayerId);
+    const player = gameState.players.find((p) => p.id === currentPlayerId);
     if (!player || gameState.phase !== 'setup') return;
 
-    const updatedPlayers = gameState.players.map(p => 
+    const updatedPlayers = gameState.players.map((p) =>
       p.id === currentPlayerId ? { ...p, isReady: true } : p
     );
 
     let updatedState = {
       ...gameState,
       players: updatedPlayers,
-      lastAction: `${player.name} is ready`
+      lastAction: `${player.name} is ready`,
     };
 
-    if (updatedPlayers.every(p => p.isReady)) {
+    if (updatedPlayers.every((p) => p.isReady)) {
       // Use game logic to determine starting player
       const startPlayer = GameLogic.getStartingPlayer(updatedPlayers);
 
@@ -321,7 +403,7 @@ export default function ShitheadGame() {
         ...updatedState,
         phase: 'playing',
         currentTurn: startPlayer,
-        lastAction: `${updatedPlayers[startPlayer].name} starts!`
+        lastAction: `${updatedPlayers[startPlayer].name} starts!`,
       };
     }
 
@@ -342,9 +424,9 @@ export default function ShitheadGame() {
    */
   const playCards = () => {
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
-    const playerIndex = gameState.players.findIndex(p => p.id === currentPlayerId);
+    const playerIndex = gameState.players.findIndex((p) => p.id === currentPlayerId);
     const player = gameState.players[playerIndex];
-    
+
     if (!player || gameState.phase !== 'playing' || gameState.currentTurn !== playerIndex) {
       return;
     }
@@ -355,10 +437,12 @@ export default function ShitheadGame() {
 
     // Determine which source we're playing from
     const cardSource = GameLogic.getAvailableCardSource(player);
-    
+
     // Check if this is a mixed hand+face-up play (final hand cards with matching face-up)
-    const hasMixedSelection = selectedCards.some(s => s.type === 'hand') && selectedCards.some(s => s.type === 'faceUp');
-    
+    const hasMixedSelection =
+      selectedCards.some((s) => s.type === 'hand') &&
+      selectedCards.some((s) => s.type === 'faceUp');
+
     // Validate mixed plays only happen when deck is empty and emptying hand
     if (hasMixedSelection) {
       if (gameState.deck.length > 0) {
@@ -368,19 +452,46 @@ export default function ShitheadGame() {
         return alert('You can only combine hand and face-up cards when playing from your hand');
       }
       // Check if this empties the hand
-      const handCardsPlayed = selectedCards.filter(s => s.type === 'hand').length;
+      const handCardsPlayed = selectedCards.filter((s) => s.type === 'hand').length;
       if (handCardsPlayed !== player.hand.length) {
         return alert('You can only combine face-up cards with your final hand cards');
       }
     }
-    
+
     // Get the actual card objects based on selection
-    const cardsToPlay = selectedCards.map(selection => {
-      if (selection.type === 'hand') return player.hand[selection.index];
-      if (selection.type === 'faceUp') return player.faceUp[selection.index];
-      if (selection.type === 'faceDown') return player.faceDown[selection.index];
-      return null;
-    }).filter(Boolean);
+    const cardsToPlay = selectedCards
+      .map((selection) => {
+        if (selection.type === 'hand') return player.hand[selection.index];
+        if (selection.type === 'faceUp') return player.faceUp[selection.index];
+        if (selection.type === 'faceDown') return player.faceDown[selection.index];
+        return null;
+      })
+      .filter(Boolean);
+
+    // First turn validation - pile is empty, must play starting card(s)
+    const isFirstTurn = gameState.discardPile.length === 0;
+    if (isFirstTurn) {
+      // Determine what the valid starting card should be
+      const startingCard = GameLogic.getStartingCard(player);
+      if (!startingCard) {
+        return alert('You must have the starting card to play first');
+      }
+
+      // All cards played must match the starting card rank and suit pattern
+      const allCardsMatch = cardsToPlay.every(
+        (card) =>
+          card.rank === startingCard.rank &&
+          (startingCard.suit === '♥' || startingCard.suit === '♦'
+            ? card.suit === '♥' || card.suit === '♦'
+            : card.suit === '♠' || card.suit === '♣')
+      );
+
+      if (!allCardsMatch) {
+        return alert(
+          `First turn: you can only play ${startingCard.rank} (${startingCard.suit === '♥' || startingCard.suit === '♦' ? 'red' : 'black'})`
+        );
+      }
+    }
 
     // For face-down cards, we play blind
     const isBlindPlay = selectedCards[0].type === 'faceDown';
@@ -392,22 +503,31 @@ export default function ShitheadGame() {
 
     // Remove cards from player's sources
     let updatedPlayer = { ...player };
-    
+
     // Separate hand and face-up indices for proper removal
-    const handIndices = selectedCards.filter(s => s.type === 'hand').map(s => s.index).sort((a, b) => b - a);
-    const faceUpIndices = selectedCards.filter(s => s.type === 'faceUp').map(s => s.index).sort((a, b) => b - a);
-    const faceDownIndices = selectedCards.filter(s => s.type === 'faceDown').map(s => s.index).sort((a, b) => b - a);
-    
+    const handIndices = selectedCards
+      .filter((s) => s.type === 'hand')
+      .map((s) => s.index)
+      .sort((a, b) => b - a);
+    const faceUpIndices = selectedCards
+      .filter((s) => s.type === 'faceUp')
+      .map((s) => s.index)
+      .sort((a, b) => b - a);
+    const faceDownIndices = selectedCards
+      .filter((s) => s.type === 'faceDown')
+      .map((s) => s.index)
+      .sort((a, b) => b - a);
+
     // Remove from hand
     for (const index of handIndices) {
       updatedPlayer.hand.splice(index, 1);
     }
-    
+
     // Remove from face-up
     for (const index of faceUpIndices) {
       updatedPlayer.faceUp.splice(index, 1);
     }
-    
+
     // Remove from face-down
     for (const index of faceDownIndices) {
       updatedPlayer.faceDown.splice(index, 1);
@@ -418,7 +538,7 @@ export default function ShitheadGame() {
       if (!GameLogic.canPlayMultipleCards(cardsToPlay, gameState.discardPile)) {
         // Invalid blind play - pick up the pile plus the cards played
         updatedPlayer.hand = [...updatedPlayer.hand, ...cardsToPlay, ...gameState.discardPile];
-        
+
         const updatedPlayers = gameState.players.map((p, i) =>
           i === playerIndex ? updatedPlayer : p
         );
@@ -430,7 +550,7 @@ export default function ShitheadGame() {
           players: updatedPlayers,
           discardPile: [],
           currentTurn: nextTurn,
-          lastAction: `${player.name} played ${cardsToPlay[0].rank} blind - invalid! Picked up pile.`
+          lastAction: `${player.name} played ${cardsToPlay[0].rank} blind - invalid! Picked up pile.`,
         };
 
         updateGameState(updatedState);
@@ -441,7 +561,7 @@ export default function ShitheadGame() {
 
     // Valid play - add cards to discard pile
     let newDiscardPile = [...gameState.discardPile, ...cardsToPlay];
-    
+
     // Check if pile should burn
     const burned = GameLogic.shouldBurnPile(newDiscardPile);
     const playResult = GameLogic.getPlayResult(cardsToPlay, newDiscardPile);
@@ -462,9 +582,7 @@ export default function ShitheadGame() {
     const playerWon = GameLogic.hasPlayerWon(updatedPlayer);
 
     // Update players array
-    const updatedPlayers = gameState.players.map((p, i) =>
-      i === playerIndex ? updatedPlayer : p
-    );
+    const updatedPlayers = gameState.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
 
     // Determine next turn (same player if burned, otherwise next)
     const nextTurn = burned ? playerIndex : GameLogic.getNextPlayer(playerIndex, updatedPlayers);
@@ -480,7 +598,7 @@ export default function ShitheadGame() {
       lastAction += ` ${player.name} has finished!`;
     }
     if (gameOver) {
-      const losers = updatedPlayers.filter(p => !GameLogic.hasPlayerWon(p));
+      const losers = updatedPlayers.filter((p) => !GameLogic.hasPlayerWon(p));
       lastAction = `Game Over! ${losers[0].name} is the Sh!thead! 💩`;
     }
 
@@ -491,7 +609,7 @@ export default function ShitheadGame() {
       deck: gameState.deck.slice(cardsToDraw),
       currentTurn: nextTurn,
       phase: gameOver ? 'finished' : 'playing',
-      lastAction
+      lastAction,
     };
 
     updateGameState(updatedState);
@@ -500,9 +618,9 @@ export default function ShitheadGame() {
 
   const pickUpPile = () => {
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
-    const playerIndex = gameState.players.findIndex(p => p.id === currentPlayerId);
+    const playerIndex = gameState.players.findIndex((p) => p.id === currentPlayerId);
     const player = gameState.players[playerIndex];
-    
+
     if (!player || gameState.phase !== 'playing' || gameState.currentTurn !== playerIndex) {
       return;
     }
@@ -514,12 +632,10 @@ export default function ShitheadGame() {
     // Add all discard pile cards to player's hand
     const updatedPlayer = {
       ...player,
-      hand: [...player.hand, ...gameState.discardPile]
+      hand: [...player.hand, ...gameState.discardPile],
     };
 
-    const updatedPlayers = gameState.players.map((p, i) =>
-      i === playerIndex ? updatedPlayer : p
-    );
+    const updatedPlayers = gameState.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
 
     const nextTurn = GameLogic.getNextPlayer(playerIndex, updatedPlayers);
 
@@ -528,7 +644,7 @@ export default function ShitheadGame() {
       players: updatedPlayers,
       discardPile: [],
       currentTurn: nextTurn,
-      lastAction: `${player.name} picked up ${gameState.discardPile.length} cards from the pile`
+      lastAction: `${player.name} picked up ${gameState.discardPile.length} cards from the pile`,
     };
 
     updateGameState(updatedState);
@@ -577,7 +693,7 @@ export default function ShitheadGame() {
               <Plus size={20} />
               Create Room
             </button>
-            
+
             <button
               onClick={createTestGame}
               className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all flex items-center justify-center gap-2"
@@ -611,7 +727,7 @@ export default function ShitheadGame() {
 
   if (screen === 'lobby') {
     const isHost = gameState?.host === playerId;
-    
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
         <div className="max-w-2xl w-full bg-slate-800 rounded-2xl shadow-2xl p-8 border-2 border-purple-500">
@@ -622,8 +738,15 @@ export default function ShitheadGame() {
             <div className="flex items-center justify-center gap-2 mb-2">
               <span className="text-slate-400">Room Code:</span>
               <span className="text-2xl font-mono font-bold text-purple-400">{roomCode}</span>
-              <button onClick={copyRoomCode} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                {copied ? <Check size={20} className="text-green-400" /> : <Copy size={20} className="text-slate-400" />}
+              <button
+                onClick={copyRoomCode}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                {copied ? (
+                  <Check size={20} className="text-green-400" />
+                ) : (
+                  <Copy size={20} className="text-slate-400" />
+                )}
               </button>
             </div>
             <p className="text-slate-400 text-sm">Share this code with your friends!</p>
@@ -631,14 +754,21 @@ export default function ShitheadGame() {
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <Users size={20} className="text-purple-400" />
-              <h2 className="text-xl font-bold text-white">Players ({gameState?.players.length})</h2>
+              <h2 className="text-xl font-bold text-white">
+                Players ({gameState?.players.length})
+              </h2>
             </div>
             <div className="space-y-2">
               {gameState?.players.map((player) => (
-                <div key={player.id} className="flex items-center gap-3 bg-slate-700 rounded-lg p-3">
+                <div
+                  key={player.id}
+                  className="flex items-center gap-3 bg-slate-700 rounded-lg p-3"
+                >
                   {player.id === gameState.host && <Crown size={20} className="text-yellow-400" />}
                   <span className="text-white font-semibold flex-1">{player.name}</span>
-                  {player.id === playerId && <span className="text-xs bg-purple-600 px-2 py-1 rounded">You</span>}
+                  {player.id === playerId && (
+                    <span className="text-xs bg-purple-600 px-2 py-1 rounded">You</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -652,7 +782,9 @@ export default function ShitheadGame() {
               {gameState?.players.length < 2 ? 'Waiting for players...' : 'Start Game'}
             </button>
           ) : (
-            <div className="text-center text-slate-400 py-4">Waiting for host to start the game...</div>
+            <div className="text-center text-slate-400 py-4">
+              Waiting for host to start the game...
+            </div>
           )}
         </div>
       </div>
@@ -661,12 +793,30 @@ export default function ShitheadGame() {
 
   if (screen === 'game' && gameState) {
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
-    const currentPlayer = gameState.players.find(p => p.id === currentPlayerId);
-    const isMyTurn = gameState.phase === 'playing' && gameState.players[gameState.currentTurn]?.id === currentPlayerId;
+    const currentPlayer = gameState.players.find((p) => p.id === currentPlayerId);
+    const isMyTurn =
+      gameState.phase === 'playing' &&
+      gameState.players[gameState.currentTurn]?.id === currentPlayerId;
     const isSetupPhase = gameState.phase === 'setup';
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+      <div
+        className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4"
+        onClick={(e) => {
+          // Deselect cards when clicking anywhere outside of cards during setup phase
+          if (isSetupPhase) {
+            const target = e.target as HTMLElement;
+            // Check if click is NOT on a card (cards have specific class names or are inside card containers)
+            if (
+              !target.closest('.w-16, .w-20') &&
+              !target.classList.contains('font-bold') &&
+              !target.classList.contains('leading-none')
+            ) {
+              setSelectedCards([]);
+            }
+          }
+        }}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="bg-slate-800 rounded-xl p-4 mb-4 border-2 border-purple-500">
             <div className="flex items-center justify-between mb-2">
@@ -686,21 +836,25 @@ export default function ShitheadGame() {
                 </button>
                 <div className="text-right">
                   <p className="text-sm text-slate-400">
-                    {isSetupPhase ? 'Setup Phase' : `Turn: ${gameState.players[gameState.currentTurn]?.name}`}
+                    {isSetupPhase
+                      ? 'Setup Phase'
+                      : `Turn: ${gameState.players[gameState.currentTurn]?.name}`}
                   </p>
                   {isMyTurn && <p className="text-green-400 font-bold">Your Turn!</p>}
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-2 text-sm text-purple-300 bg-slate-700 rounded p-2">
               {gameState.lastAction}
             </div>
-            
+
             {testMode && (
               <div className="mt-3 bg-green-900 border-2 border-green-500 rounded p-4">
-                <label className="text-white text-base font-bold mr-3 block mb-2">🎮 CONTROL PLAYER:</label>
-                <select 
+                <label className="text-white text-base font-bold mr-3 block mb-2">
+                  🎮 CONTROL PLAYER:
+                </label>
+                <select
                   value={controllingPlayer}
                   onChange={(e) => {
                     setControllingPlayer(Number(e.target.value));
@@ -709,7 +863,9 @@ export default function ShitheadGame() {
                   className="w-full bg-slate-600 text-white px-4 py-3 rounded border-2 border-green-400 font-bold text-lg"
                 >
                   {gameState.players.map((p, i) => (
-                    <option key={p.id} value={i}>{p.name}</option>
+                    <option key={p.id} value={i}>
+                      {p.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -718,41 +874,90 @@ export default function ShitheadGame() {
 
           {/* Rules Panel */}
           {showRules && (
-            <div className="fixed inset-0 bg-black bg-opacity-75 flex items-start justify-center p-4 z-50 overflow-y-auto" onClick={() => setShowRules(false)}>
-              <div className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl my-8 border-2 border-purple-500" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="fixed inset-0 bg-black bg-opacity-75 flex items-start justify-center p-4 z-50 overflow-y-auto"
+              onClick={() => setShowRules(false)}
+            >
+              <div
+                className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl my-8 border-2 border-purple-500"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">
                     SH!THEAD RULES
                   </h2>
-                  <button onClick={() => setShowRules(false)} className="p-2 hover:bg-slate-700 rounded-lg">
+                  <button
+                    onClick={() => setShowRules(false)}
+                    className="p-2 hover:bg-slate-700 rounded-lg"
+                  >
                     <X size={24} className="text-white" />
                   </button>
                 </div>
-                
+
                 <div className="space-y-4 text-white">
                   <div className="bg-slate-700 p-4 rounded-lg">
                     <h3 className="text-lg font-bold text-pink-400 mb-3">BASIC RULES</h3>
                     <ul className="space-y-2 text-sm">
-                      <li><strong className="text-pink-400">SETUP:</strong> 3 face-down, 3 face-up on top, 3 in hand. You may swap any hand cards with face-up before play.</li>
-                      <li><strong className="text-pink-400">WHO STARTS:</strong> Red 4, then black 4, then red 5, black 5, etc. Left of dealer takes preference.</li>
-                      <li><strong className="text-pink-400">BASIC RULE:</strong> Play equal or higher.</li>
-                      <li><strong className="text-pink-400">MULTIPLE CARDS:</strong> You can play 1 or more cards of the same rank in one turn.</li>
-                      <li><strong className="text-pink-400">CAN'T PLAY?</strong> Pick up the pile.</li>
-                      <li><strong className="text-pink-400">PLAYING ORDER:</strong> Hand → Face-up → Face-down.</li>
-                      <li><strong className="text-pink-400">DRAW RULE:</strong> Draw back to 3 cards (while deck lasts).</li>
-                      <li><strong className="text-pink-400">BURN BONUS:</strong> If you clear the pile (10s or four-of-a-kind), you play again.</li>
-                      <li><strong className="text-pink-400">FACE-DOWN CARDS:</strong> Play blind. If valid, it plays. If not, pick up pile without revealing.</li>
+                      <li>
+                        <strong className="text-pink-400">SETUP:</strong> 3 face-down, 3 face-up on
+                        top, 3 in hand. You may swap any hand cards with face-up before play.
+                      </li>
+                      <li>
+                        <strong className="text-pink-400">WHO STARTS:</strong> Red 4, then black 4,
+                        then red 5, black 5, etc. Left of dealer takes preference.
+                      </li>
+                      <li>
+                        <strong className="text-pink-400">BASIC RULE:</strong> Play equal or higher.
+                      </li>
+                      <li>
+                        <strong className="text-pink-400">MULTIPLE CARDS:</strong> You can play 1 or
+                        more cards of the same rank in one turn.
+                      </li>
+                      <li>
+                        <strong className="text-pink-400">CAN'T PLAY?</strong> Pick up the pile.
+                      </li>
+                      <li>
+                        <strong className="text-pink-400">PLAYING ORDER:</strong> Hand → Face-up →
+                        Face-down.
+                      </li>
+                      <li>
+                        <strong className="text-pink-400">DRAW RULE:</strong> Draw back to 3 cards
+                        (while deck lasts).
+                      </li>
+                      <li>
+                        <strong className="text-pink-400">BURN BONUS:</strong> If you clear the pile
+                        (10s or four-of-a-kind), you play again.
+                      </li>
+                      <li>
+                        <strong className="text-pink-400">FACE-DOWN CARDS:</strong> Play blind. If
+                        valid, it plays. If not, pick up pile without revealing.
+                      </li>
                     </ul>
                   </div>
 
                   <div className="bg-slate-700 p-4 rounded-lg">
                     <h3 className="text-lg font-bold text-pink-400 mb-3">SPECIAL CARDS</h3>
                     <ul className="space-y-2 text-sm">
-                      <li><strong className="text-red-400">2 - RESET:</strong> Play on anything. Next player plays anything.</li>
-                      <li><strong className="text-purple-400">3 - INVISIBLE:</strong> Play on anything. Doesn't change the pile. Can't mix with other cards.</li>
-                      <li><strong className="text-yellow-400">7 - LIMITER:</strong> Only 7 or lower can be played on it. Blocks 10s from burning.</li>
-                      <li><strong className="text-green-400">10 - BURN:</strong> Clears the pile (any number of 10s, including four). Can't play on 7s.</li>
-                      <li><strong className="text-blue-400">FOUR OF A KIND:</strong> Four matching cards clears the pile. 3s are invisible and don't break chains.</li>
+                      <li>
+                        <strong className="text-red-400">2 - RESET:</strong> Play on anything. Next
+                        player plays anything.
+                      </li>
+                      <li>
+                        <strong className="text-purple-400">3 - INVISIBLE:</strong> Play on
+                        anything. Doesn't change the pile. Can't mix with other cards.
+                      </li>
+                      <li>
+                        <strong className="text-yellow-400">7 - LIMITER:</strong> Only 7 or lower
+                        can be played on it. Blocks 10s from burning.
+                      </li>
+                      <li>
+                        <strong className="text-green-400">10 - BURN:</strong> Clears the pile (any
+                        number of 10s, including four). Can't play on 7s.
+                      </li>
+                      <li>
+                        <strong className="text-blue-400">FOUR OF A KIND:</strong> Four matching
+                        cards clears the pile. 3s are invisible and don't break chains.
+                      </li>
                     </ul>
                   </div>
                 </div>
@@ -760,7 +965,20 @@ export default function ShitheadGame() {
             </div>
           )}
 
-          <div className="bg-slate-800 rounded-xl p-6 mb-4 border-2 border-purple-500">
+          <div
+            className="bg-slate-800 rounded-xl p-6 mb-4 border-2 border-purple-500"
+            onClick={(e) => {
+              // Deselect cards when clicking anywhere on the board background (not on cards/buttons)
+              if (
+                isSetupPhase &&
+                (e.target === e.currentTarget ||
+                  e.target.classList.contains('text-slate-400') ||
+                  e.target.classList.contains('text-white'))
+              ) {
+                setSelectedCards([]);
+              }
+            }}
+          >
             <div className="flex justify-center gap-8 mb-8">
               <div className="text-center">
                 <p className="text-slate-400 text-sm mb-2">Draw Pile</p>
@@ -773,20 +991,20 @@ export default function ShitheadGame() {
                 )}
                 <p className="text-base text-white font-bold mt-2">{gameState.deck.length} cards</p>
               </div>
-              
+
               <div className="text-center">
                 <p className="text-slate-400 text-sm mb-2">Discard Pile</p>
                 {gameState.discardPile.length > 0 ? (
                   <div className="relative w-16 h-24">
                     {/* Show last 5 cards with offset */}
                     {gameState.discardPile.slice(-5).map((card, index) => (
-                      <div 
-                        key={card.id} 
-                        className="absolute" 
-                        style={{ 
-                          left: `${index * 3}px`, 
+                      <div
+                        key={card.id}
+                        className="absolute"
+                        style={{
+                          left: `${index * 3}px`,
                           top: `${index * 2}px`,
-                          zIndex: index 
+                          zIndex: index,
                         }}
                       >
                         <Card card={card} small />
@@ -798,27 +1016,37 @@ export default function ShitheadGame() {
                     Empty
                   </div>
                 )}
-                <p className="text-base text-white font-bold mt-2">{gameState.discardPile.length} cards</p>
+                <p className="text-base text-white font-bold mt-2">
+                  {gameState.discardPile.length} cards
+                </p>
               </div>
             </div>
 
             {currentPlayer && (
               <div className="border-t-2 border-slate-700 pt-6">
                 <h3 className="text-white font-bold mb-3">{currentPlayer.name}'s Cards</h3>
-                
+
                 <div className="mb-4">
                   <p className="text-slate-400 text-sm mb-2">Face Down</p>
                   <div className="flex gap-2">
                     {currentPlayer.faceDown.map((card, i) => (
-                      <Card 
-                        key={i} 
-                        card={card} 
-                        faceDown 
+                      <Card
+                        key={i}
+                        card={card}
+                        faceDown
                         small
-                        selectable={!isSetupPhase && isMyTurn && GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'}
-                        selected={selectedCards.some(s => s.type === 'faceDown' && s.index === i)}
+                        selectable={
+                          !isSetupPhase &&
+                          isMyTurn &&
+                          GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
+                        }
+                        selected={selectedCards.some((s) => s.type === 'faceDown' && s.index === i)}
                         onClick={() => {
-                          if (!isSetupPhase && isMyTurn && GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown') {
+                          if (
+                            !isSetupPhase &&
+                            isMyTurn &&
+                            GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
+                          ) {
                             // For face-down, only allow single card selection
                             setSelectedCards([{ type: 'faceDown', index: i }]);
                           }
@@ -835,52 +1063,137 @@ export default function ShitheadGame() {
                       // Check if we can select face-up cards alongside hand cards
                       const deckEmpty = gameState.deck.length === 0;
                       const currentSource = GameLogic.getAvailableCardSource(currentPlayer);
-                      const canCombineWithHand = deckEmpty && currentSource === 'hand' && selectedCards.length > 0 && selectedCards[0].type === 'hand';
-                      
+                      const canCombineWithHand =
+                        deckEmpty &&
+                        currentSource === 'hand' &&
+                        selectedCards.length > 0 &&
+                        selectedCards[0].type === 'hand';
+
+                      // During gameplay, check if this card is playable
+                      let isPlayable = true;
+                      if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
+                        // Check if this single card can be played on the current pile
+                        isPlayable = GameLogic.canPlayMultipleCards([card], gameState.discardPile);
+
+                        // Also check if it matches already selected cards
+                        if (selectedCards.length > 0 && selectedCards[0].type === 'faceUp') {
+                          const firstSelectedCard = currentPlayer.faceUp[selectedCards[0].index];
+                          if (card.rank !== firstSelectedCard.rank) {
+                            isPlayable = false;
+                          }
+                        }
+                      }
+
                       // Face-up cards are selectable if:
                       // 1. Setup phase (for swapping)
-                      // 2. Normal play when face-up is the active source
+                      // 2. Normal play when face-up is the active source AND card is playable
                       // 3. When deck is empty and we're playing final hand cards of matching rank
-                      const faceUpSelectable = isSetupPhase || 
-                        (!isSetupPhase && isMyTurn && currentSource === 'faceUp') ||
+                      const faceUpSelectable =
+                        isSetupPhase ||
+                        (!isSetupPhase && isMyTurn && currentSource === 'faceUp' && isPlayable) ||
                         (!isSetupPhase && isMyTurn && canCombineWithHand);
-                      
+
                       return (
-                        <Card 
-                          key={card.id} 
+                        <Card
+                          key={card.id}
                           card={card}
                           small
                           selectable={faceUpSelectable}
-                          selected={selectedCards.some(s => s.type === 'faceUp' && s.index === i)}
+                          selected={selectedCards.some((s) => s.type === 'faceUp' && s.index === i)}
                           onClick={() => {
-                            if (isSetupPhase && selectedCards.length === 1 && selectedCards[0].type === 'hand') {
-                              swapCards(selectedCards[0].index, i);
-                              setSelectedCards([]);
+                            if (isSetupPhase) {
+                              // Setup phase: allow selection and swapping
+                              const alreadySelected = selectedCards.findIndex(
+                                (s) => s.type === 'faceUp' && s.index === i
+                              );
+
+                              if (alreadySelected >= 0) {
+                                // Clicking same face-up card - deselect it
+                                setSelectedCards([]);
+                              } else if (
+                                selectedCards.length === 1 &&
+                                selectedCards[0].type === 'hand'
+                              ) {
+                                // Hand card selected, clicking face-up - swap them
+                                swapCards(selectedCards[0].index, i);
+                                setSelectedCards([]);
+                              } else if (
+                                selectedCards.length === 1 &&
+                                selectedCards[0].type === 'faceUp'
+                              ) {
+                                // Different face-up card selected, clicking another face-up - swap them
+                                const temp = currentPlayer.faceUp[selectedCards[0].index];
+                                const newFaceUp = [...currentPlayer.faceUp];
+                                newFaceUp[selectedCards[0].index] = currentPlayer.faceUp[i];
+                                newFaceUp[i] = temp;
+
+                                const updatedPlayers = gameState.players.map((p) =>
+                                  p.id === currentPlayerId ? { ...p, faceUp: newFaceUp } : p
+                                );
+
+                                const updatedState = {
+                                  ...gameState,
+                                  players: updatedPlayers,
+                                  lastAction: `${currentPlayer.name} swapped face-up cards`,
+                                };
+
+                                if (testMode) {
+                                  setGameState(updatedState);
+                                } else {
+                                  window.storage.set(
+                                    `game:${roomCode}`,
+                                    JSON.stringify(updatedState),
+                                    true
+                                  );
+                                  setGameState(updatedState);
+                                }
+                                setSelectedCards([]);
+                              } else {
+                                // Nothing selected - select this face-up card
+                                setSelectedCards([{ type: 'faceUp', index: i }]);
+                              }
                             } else if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
                               // Normal face-up selection
-                              const alreadySelected = selectedCards.findIndex(s => s.type === 'faceUp' && s.index === i);
+                              const alreadySelected = selectedCards.findIndex(
+                                (s) => s.type === 'faceUp' && s.index === i
+                              );
                               if (alreadySelected >= 0) {
-                                setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
+                                setSelectedCards(
+                                  selectedCards.filter((_, idx) => idx !== alreadySelected)
+                                );
                               } else {
                                 const clickedCard = currentPlayer.faceUp[i];
-                                if (selectedCards.length === 0 || selectedCards.every(s => {
-                                  const existingCard = currentPlayer.faceUp[s.index];
-                                  return existingCard.rank === clickedCard.rank;
-                                })) {
-                                  setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
+                                if (
+                                  selectedCards.length === 0 ||
+                                  selectedCards.every((s) => {
+                                    const existingCard = currentPlayer.faceUp[s.index];
+                                    return existingCard.rank === clickedCard.rank;
+                                  })
+                                ) {
+                                  setSelectedCards([
+                                    ...selectedCards,
+                                    { type: 'faceUp', index: i },
+                                  ]);
                                 }
                               }
                             } else if (!isSetupPhase && isMyTurn && canCombineWithHand) {
                               // Combining face-up with final hand cards
-                              const alreadySelected = selectedCards.findIndex(s => s.type === 'faceUp' && s.index === i);
+                              const alreadySelected = selectedCards.findIndex(
+                                (s) => s.type === 'faceUp' && s.index === i
+                              );
                               if (alreadySelected >= 0) {
-                                setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
+                                setSelectedCards(
+                                  selectedCards.filter((_, idx) => idx !== alreadySelected)
+                                );
                               } else {
                                 // Must match rank of selected hand cards
                                 const clickedCard = currentPlayer.faceUp[i];
                                 const handCard = currentPlayer.hand[selectedCards[0].index];
                                 if (clickedCard.rank === handCard.rank) {
-                                  setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
+                                  setSelectedCards([
+                                    ...selectedCards,
+                                    { type: 'faceUp', index: i },
+                                  ]);
                                 }
                               }
                             }
@@ -894,34 +1207,135 @@ export default function ShitheadGame() {
                 <div className="mb-4">
                   <p className="text-slate-400 text-sm mb-2">Hand</p>
                   <div className="flex gap-2 flex-wrap">
-                    {currentPlayer.hand.map((card, i) => (
-                      <Card 
-                        key={card.id} 
-                        card={card}
-                        selectable={isSetupPhase || (!isSetupPhase && isMyTurn && GameLogic.getAvailableCardSource(currentPlayer) === 'hand')}
-                        selected={selectedCards.some(s => s.type === 'hand' && s.index === i)}
-                        onClick={() => {
-                          if (isSetupPhase) {
-                            setSelectedCards([{ type: 'hand', index: i }]);
-                          } else if (!isSetupPhase && isMyTurn && GameLogic.getAvailableCardSource(currentPlayer) === 'hand') {
-                            // Toggle selection for multiple cards of same rank
-                            const alreadySelected = selectedCards.findIndex(s => s.type === 'hand' && s.index === i);
-                            if (alreadySelected >= 0) {
-                              setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
-                            } else {
-                              // Check if same rank as already selected cards
-                              const clickedCard = currentPlayer.hand[i];
-                              if (selectedCards.length === 0 || selectedCards.every(s => {
-                                const existingCard = currentPlayer.hand[s.index];
-                                return existingCard.rank === clickedCard.rank;
-                              })) {
-                                setSelectedCards([...selectedCards, { type: 'hand', index: i }]);
+                    {currentPlayer.hand.map((card, i) => {
+                      // During gameplay, check if this card is playable
+                      let isPlayable = true;
+                      if (
+                        !isSetupPhase &&
+                        isMyTurn &&
+                        GameLogic.getAvailableCardSource(currentPlayer) === 'hand'
+                      ) {
+                        // First turn - only allow starting cards
+                        const isFirstTurn = gameState.discardPile.length === 0;
+                        if (isFirstTurn) {
+                          const startingCard = GameLogic.getStartingCard(currentPlayer);
+                          if (startingCard) {
+                            // Card must match starting card rank and color
+                            const isRed = startingCard.suit === '♥' || startingCard.suit === '♦';
+                            const cardIsRed = card.suit === '♥' || card.suit === '♦';
+                            isPlayable = card.rank === startingCard.rank && isRed === cardIsRed;
+                          }
+                        } else {
+                          // Normal turn - check if this single card can be played on the current pile
+                          isPlayable = GameLogic.canPlayMultipleCards(
+                            [card],
+                            gameState.discardPile
+                          );
+                        }
+
+                        // Also check if it matches already selected cards
+                        if (selectedCards.length > 0 && selectedCards[0].type === 'hand') {
+                          const firstSelectedCard = currentPlayer.hand[selectedCards[0].index];
+                          if (card.rank !== firstSelectedCard.rank) {
+                            isPlayable = false;
+                          }
+                        }
+                      }
+
+                      return (
+                        <Card
+                          key={card.id}
+                          card={card}
+                          selectable={
+                            isSetupPhase ||
+                            (!isSetupPhase &&
+                              isMyTurn &&
+                              GameLogic.getAvailableCardSource(currentPlayer) === 'hand' &&
+                              isPlayable)
+                          }
+                          selected={selectedCards.some((s) => s.type === 'hand' && s.index === i)}
+                          onClick={() => {
+                            if (isSetupPhase) {
+                              const alreadySelected = selectedCards.findIndex(
+                                (s) => s.type === 'hand' && s.index === i
+                              );
+
+                              if (alreadySelected >= 0) {
+                                // Clicking same hand card - deselect it
+                                setSelectedCards([]);
+                              } else if (
+                                selectedCards.length === 1 &&
+                                selectedCards[0].type === 'faceUp'
+                              ) {
+                                // Face-up card selected, clicking hand - swap them
+                                swapCards(i, selectedCards[0].index);
+                                setSelectedCards([]);
+                              } else if (
+                                selectedCards.length === 1 &&
+                                selectedCards[0].type === 'hand'
+                              ) {
+                                // Different hand card selected, clicking another hand - swap them
+                                const temp = currentPlayer.hand[selectedCards[0].index];
+                                const newHand = [...currentPlayer.hand];
+                                newHand[selectedCards[0].index] = currentPlayer.hand[i];
+                                newHand[i] = temp;
+
+                                const updatedPlayers = gameState.players.map((p) =>
+                                  p.id === currentPlayerId ? { ...p, hand: newHand } : p
+                                );
+
+                                const updatedState = {
+                                  ...gameState,
+                                  players: updatedPlayers,
+                                  lastAction: `${currentPlayer.name} swapped hand cards`,
+                                };
+
+                                if (testMode) {
+                                  setGameState(updatedState);
+                                } else {
+                                  window.storage.set(
+                                    `game:${roomCode}`,
+                                    JSON.stringify(updatedState),
+                                    true
+                                  );
+                                  setGameState(updatedState);
+                                }
+                                setSelectedCards([]);
+                              } else {
+                                // Nothing selected - select this hand card
+                                setSelectedCards([{ type: 'hand', index: i }]);
+                              }
+                            } else if (
+                              !isSetupPhase &&
+                              isMyTurn &&
+                              GameLogic.getAvailableCardSource(currentPlayer) === 'hand'
+                            ) {
+                              // Toggle selection for multiple cards of same rank
+                              const alreadySelected = selectedCards.findIndex(
+                                (s) => s.type === 'hand' && s.index === i
+                              );
+                              if (alreadySelected >= 0) {
+                                setSelectedCards(
+                                  selectedCards.filter((_, idx) => idx !== alreadySelected)
+                                );
+                              } else {
+                                // Check if same rank as already selected cards
+                                const clickedCard = currentPlayer.hand[i];
+                                if (
+                                  selectedCards.length === 0 ||
+                                  selectedCards.every((s) => {
+                                    const existingCard = currentPlayer.hand[s.index];
+                                    return existingCard.rank === clickedCard.rank;
+                                  })
+                                ) {
+                                  setSelectedCards([...selectedCards, { type: 'hand', index: i }]);
+                                }
                               }
                             }
-                          }
-                        }}
-                      />
-                    ))}
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -942,7 +1356,10 @@ export default function ShitheadGame() {
                       disabled={selectedCards.length === 0}
                       className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Play {selectedCards.length > 0 ? `${selectedCards.length} Card${selectedCards.length > 1 ? 's' : ''}` : 'Cards'}
+                      Play{' '}
+                      {selectedCards.length > 0
+                        ? `${selectedCards.length} Card${selectedCards.length > 1 ? 's' : ''}`
+                        : 'Cards'}
                     </button>
                     <button
                       onClick={pickUpPile}
@@ -958,27 +1375,33 @@ export default function ShitheadGame() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {gameState.players.filter(p => p.id !== currentPlayerId).map((player) => {
-              const isTheirTurn = gameState.phase === 'playing' && gameState.players[gameState.currentTurn]?.id === player.id;
-              return (
-                <div 
-                  key={player.id} 
-                  className={`bg-slate-800 rounded-lg p-3 border-2 transition-all ${
-                    isTheirTurn ? 'border-green-500 shadow-lg' : 'border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-white font-semibold truncate">{player.name}</p>
-                    {isTheirTurn && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
+            {gameState.players
+              .filter((p) => p.id !== currentPlayerId)
+              .map((player) => {
+                const isTheirTurn =
+                  gameState.phase === 'playing' &&
+                  gameState.players[gameState.currentTurn]?.id === player.id;
+                return (
+                  <div
+                    key={player.id}
+                    className={`bg-slate-800 rounded-lg p-3 border-2 transition-all ${
+                      isTheirTurn ? 'border-green-500 shadow-lg' : 'border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-white font-semibold truncate">{player.name}</p>
+                      {isTheirTurn && (
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-400 space-y-1">
+                      <div>Hand: {player.hand.length}</div>
+                      <div>Face Up: {player.faceUp.length}</div>
+                      <div>Face Down: {player.faceDown.length}</div>
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-400 space-y-1">
-                    <div>Hand: {player.hand.length}</div>
-                    <div>Face Up: {player.faceUp.length}</div>
-                    <div>Face Down: {player.faceDown.length}</div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         </div>
       </div>
