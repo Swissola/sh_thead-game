@@ -156,3 +156,101 @@ describe('GameLogic - Available Card Source', () => {
         expect(GameLogic.getAvailableCardSource(player)).toBe('faceDown');
     });
 });
+
+describe('GameLogic - Can Player Play (Pickup Confirmation)', () => {
+    it('should return true when player has playable card in hand', () => {
+        const card5: Card = { suit: '♥', rank: '5', id: '5h', deckColor: 'red' };
+        const card5d: Card = { suit: '♦', rank: '5', id: '5d', deckColor: 'red' };
+        const player: Player = {
+            id: 'p1',
+            name: 'Alice',
+            hand: [card5, null, null],
+            faceUp: [],
+            faceDown: [],
+            isReady: false,
+        };
+        const discardPile = [card5d];
+
+        expect(GameLogic.canPlayerPlay(player, discardPile)).toBe(true);
+    });
+
+    it('should return false when player has no playable cards in hand', () => {
+        const card5: Card = { suit: '♥', rank: '5', id: '5h', deckColor: 'red' };
+        const cardK: Card = { suit: '♦', rank: 'K', id: 'Kd', deckColor: 'red' };
+        const player: Player = {
+            id: 'p1',
+            name: 'Alice',
+            hand: [card5, null, null],
+            faceUp: [],
+            faceDown: [],
+            isReady: false,
+        };
+        const discardPile = [cardK];
+
+        expect(GameLogic.canPlayerPlay(player, discardPile)).toBe(false);
+    });
+
+    it('should return true when player has playable card in faceUp (hand empty)', () => {
+        const card5: Card = { suit: '♥', rank: '5', id: '5h', deckColor: 'red' };
+        const card5d: Card = { suit: '♦', rank: '5', id: '5d', deckColor: 'red' };
+        const player: Player = {
+            id: 'p1',
+            name: 'Alice',
+            hand: [null, null, null],
+            faceUp: [card5],
+            faceDown: [],
+            isReady: false,
+        };
+        const discardPile = [card5d];
+
+        expect(GameLogic.canPlayerPlay(player, discardPile)).toBe(true);
+    });
+
+    it('should return false when player has no playable cards in faceUp (hand empty)', () => {
+        const card5: Card = { suit: '♥', rank: '5', id: '5h', deckColor: 'red' };
+        const cardK: Card = { suit: '♦', rank: 'K', id: 'Kd', deckColor: 'red' };
+        const player: Player = {
+            id: 'p1',
+            name: 'Alice',
+            hand: [null, null, null],
+            faceUp: [card5],
+            faceDown: [],
+            isReady: false,
+        };
+        const discardPile = [cardK];
+
+        expect(GameLogic.canPlayerPlay(player, discardPile)).toBe(false);
+    });
+
+    it('should return true when player has faceDown cards (can play anything from faceDown)', () => {
+        const cardK: Card = { suit: '♦', rank: 'K', id: 'Kd', deckColor: 'red' };
+        const faceDownCard: Card = { suit: '♠', rank: '2', id: '2s', deckColor: 'red' };
+        const player: Player = {
+            id: 'p1',
+            name: 'Alice',
+            hand: [null, null, null],
+            faceUp: [],
+            faceDown: [faceDownCard],
+            isReady: false,
+        };
+        const discardPile = [cardK];
+
+        expect(GameLogic.canPlayerPlay(player, discardPile)).toBe(true);
+    });
+
+    it('should return true when player has 2 (can play on anything)', () => {
+        const card2: Card = { suit: '♥', rank: '2', id: '2h', deckColor: 'red' };
+        const cardK: Card = { suit: '♦', rank: 'K', id: 'Kd', deckColor: 'red' };
+        const player: Player = {
+            id: 'p1',
+            name: 'Alice',
+            hand: [card2, null, null],
+            faceUp: [],
+            faceDown: [],
+            isReady: false,
+        };
+        const discardPile = [cardK];
+
+        expect(GameLogic.canPlayerPlay(player, discardPile)).toBe(true);
+    });
+});
