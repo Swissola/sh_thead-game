@@ -498,8 +498,9 @@ export default function ShitheadGame() {
 
     // First turn validation - pile is empty AND this is the very start of the game
     // (not just empty because someone picked up)
-    const isVeryFirstTurn = gameState.discardPile.length === 0 && 
-                            !gameState.lastAction?.includes('picked up');
+    const isVeryFirstTurn = gameState.discardPile.length === 0 &&
+                                                            gameState.burnPile.length === 0 &&
+                                                            !gameState.lastAction?.includes('picked up');
     if (isVeryFirstTurn) {
       // Determine what the valid starting card should be
       const startingCard = GameLogic.getStartingCard(player);
@@ -1729,23 +1730,40 @@ export default function ShitheadGame() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {gameState.players
-              .filter((p) => p.id !== currentPlayerId)
-              .map((player) => {
+          <div className="grid grid-cols-3 gap-4">
+            {gameState.players.map((player, index) => {
                 const isTheirTurn =
                   gameState.phase === 'playing' &&
                   gameState.players[gameState.currentTurn]?.id === player.id;
+                const isControlling = testMode && index === controllingPlayer;
+                const isClickable = testMode;
+                
                 return (
                   <div
                     key={player.id}
-                    className={`bg-slate-800 rounded-lg p-3 border-2 transition-all ${isTheirTurn ? 'border-green-500 shadow-lg' : 'border-slate-700'
-                      }`}
+                    onClick={() => {
+                      if (testMode) {
+                        setControllingPlayer(index);
+                        setSelectedCards([]);
+                      }
+                    }}
+                    className={`rounded-lg p-3 border-2 transition-all ${
+                      isControlling 
+                        ? 'bg-green-900 border-green-500 shadow-lg ring-2 ring-green-400' 
+                        : 'bg-slate-800 border-slate-700'
+                    } ${
+                      isTheirTurn ? 'border-yellow-500 shadow-lg' : ''
+                    } ${
+                      isClickable ? 'cursor-pointer hover:border-green-400' : ''
+                    }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-white font-semibold truncate">{player.name}</p>
+                      <p className="text-white font-semibold truncate">
+                        {player.name}
+                        {isControlling && <span className="ml-2 text-xs text-green-400">(You)</span>}
+                      </p>
                       {isTheirTurn && (
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
                       )}
                     </div>
                     <div className="text-xs text-slate-400 space-y-1">
