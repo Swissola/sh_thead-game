@@ -28,6 +28,7 @@ export interface GameState {
     discardPile: Card[];
     burnPile: Card[]; // Cards that have been burned/removed from game
     lastAction: string;
+    isFirstTurn: boolean; // True only for the very first card played in the game
 }
 
 export type CardSource = 'hand' | 'faceUp' | 'faceDown';

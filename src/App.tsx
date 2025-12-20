@@ -224,6 +224,7 @@ export default function ShitheadGame() {
       discardPile: [],
       burnPile: [],
       lastAction: 'Test game created! Use the green dropdown to switch players.',
+      isFirstTurn: true,
     };
 
     setGameState(newGameState);
@@ -264,6 +265,7 @@ export default function ShitheadGame() {
       discardPile: [],
       burnPile: [],
       lastAction: `Ready to play! ${dealtPlayers[startingPlayerIndex].name} starts.`,
+      isFirstTurn: true,
     };
 
     setGameState(newGameState);
@@ -287,6 +289,7 @@ export default function ShitheadGame() {
       discardPile: [],
       burnPile: [],
       lastAction: `${playerName} created the room`,
+      isFirstTurn: true,
     };
 
     try {
@@ -352,6 +355,7 @@ export default function ShitheadGame() {
       discardPile: gameState.discardPile,
       burnPile: gameState.burnPile,
       lastAction: `Game started with ${numDecks} deck${numDecks > 1 ? 's' : ''}! Swap cards then ready up.`,
+      isFirstTurn: true,
     };
 
     await window.storage.set(`game:${roomCode}`, JSON.stringify(updatedState), true);
@@ -480,6 +484,7 @@ export default function ShitheadGame() {
         phase: 'playing',
         currentTurn: startPlayer,
         lastAction: `${updatedPlayers[startPlayer].name} starts!`,
+        isFirstTurn: true,
       };
     }
 
@@ -539,9 +544,7 @@ export default function ShitheadGame() {
 
     // First turn validation - pile is empty AND this is the very start of the game
     // (not just empty because someone picked up)
-    const isVeryFirstTurn = gameState.discardPile.length === 0 &&
-      gameState.burnPile.length === 0 &&
-      !gameState.lastAction?.includes('picked up');
+    const isVeryFirstTurn = gameState.isFirstTurn;
     if (isVeryFirstTurn) {
       // Determine what the valid starting card should be
       const startingCard = GameLogic.getStartingCard(player);
@@ -762,6 +765,7 @@ export default function ShitheadGame() {
       currentTurn: nextTurn,
       phase: gameOver ? 'finished' : 'playing',
       lastAction,
+      isFirstTurn: false,
     };
 
     // If drawing cards, trigger animation
@@ -1625,8 +1629,7 @@ export default function ShitheadGame() {
                                       GameLogic.getAvailableCardSource(currentPlayer) === 'hand' &&
                                       (() => {
                                         let isPlayable = true;
-                                        const isVeryFirstTurn = gameState.discardPile.length === 0 &&
-                                          !gameState.lastAction?.includes('picked up');
+                                        const isVeryFirstTurn = gameState.isFirstTurn;
                                         if (isVeryFirstTurn) {
                                           const startingCard = GameLogic.getStartingCard(currentPlayer);
                                           if (startingCard) {
