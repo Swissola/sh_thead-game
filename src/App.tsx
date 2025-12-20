@@ -349,6 +349,7 @@ export default function ShitheadGame() {
       phase: 'setup',
       currentTurn: gameState.currentTurn,
       discardPile: gameState.discardPile,
+      burnPile: gameState.burnPile,
       lastAction: `Game started with ${numDecks} deck${numDecks > 1 ? 's' : ''}! Swap cards then ready up.`,
     };
 
@@ -394,7 +395,13 @@ export default function ShitheadGame() {
 
     const newHand = [...player.hand];
     const newFaceUp = [...player.faceUp];
-    [newHand[handIndex], newFaceUp[faceUpIndex]] = [newFaceUp[faceUpIndex], newHand[handIndex]];
+    const handCard = newHand[handIndex];
+    const faceUpCard = newFaceUp[faceUpIndex];
+    if (!handCard || !faceUpCard) {
+      return;
+    }
+    newHand[handIndex] = faceUpCard;
+    newFaceUp[faceUpIndex] = handCard;
 
     const updatedPlayers = gameState.players.map((p) =>
       p.id === currentPlayerId ? { ...p, hand: newHand, faceUp: newFaceUp } : p
@@ -499,8 +506,8 @@ export default function ShitheadGame() {
     // First turn validation - pile is empty AND this is the very start of the game
     // (not just empty because someone picked up)
     const isVeryFirstTurn = gameState.discardPile.length === 0 &&
-                                                            gameState.burnPile.length === 0 &&
-                                                            !gameState.lastAction?.includes('picked up');
+      gameState.burnPile.length === 0 &&
+      !gameState.lastAction?.includes('picked up');
     if (isVeryFirstTurn) {
       // Determine what the valid starting card should be
       const startingCard = GameLogic.getStartingCard(player);
@@ -530,9 +537,9 @@ export default function ShitheadGame() {
       const compactHand = player.hand
         .map((card, arrayIndex) => ({ card, arrayIndex }))
         .filter((item): item is { card: Card; arrayIndex: number } => item.card !== null);
-      
+
       let sortedHand = [...compactHand];
-      
+
       if (handSortMode === 'rank') {
         sortedHand.sort((a, b) => {
           const rankA = RANK_VALUES[a.card.rank] || 0;
@@ -551,10 +558,10 @@ export default function ShitheadGame() {
           return rankA - rankB;
         });
       }
-      
+
       // Rebuild hand array in sorted order
       player.hand = sortedHand.map(item => item.card);
-      
+
       // Update selected card indices to match new positions
       selectedCards.forEach(sel => {
         if (sel.type === 'hand') {
@@ -565,7 +572,7 @@ export default function ShitheadGame() {
           }
         }
       });
-      
+
       // Switch to original mode since we just made this the new baseline
       setHandSortMode('original');
     }
@@ -733,9 +740,9 @@ export default function ShitheadGame() {
       }
 
       // Set drawing cards to trigger empty slot rendering
-      setDrawingCards(drawnCards.map((card, i) => ({ 
-        card, 
-        id: `draw-${card.id}-${Date.now()}-${i}`, 
+      setDrawingCards(drawnCards.map((card, i) => ({
+        card,
+        id: `draw-${card.id}-${Date.now()}-${i}`,
         targetPos: { x: 0, y: 0 },
         startPos: deckPos
       })));
@@ -749,18 +756,18 @@ export default function ShitheadGame() {
       setTimeout(() => {
         const handContainer = document.querySelector('.hand-area');
         const slots = handContainer?.querySelectorAll('[data-empty-slot]');
-        
+
         const drawnCardsWithPositions = drawnCards.map((card, index) => {
           let targetPos = { x: window.innerWidth / 2, y: window.innerHeight - 200 };
-          
+
           if (slots && index < slots.length) {
             const slotRect = (slots[index] as HTMLElement).getBoundingClientRect();
             targetPos = { x: slotRect.left + slotRect.width / 2, y: slotRect.top + slotRect.height / 2 };
           }
-          
-          return { 
-            card, 
-            id: `draw-${card.id}-${Date.now()}-${index}`, 
+
+          return {
+            card,
+            id: `draw-${card.id}-${Date.now()}-${index}`,
             targetPos,
             startPos: deckPos
           };
@@ -777,7 +784,7 @@ export default function ShitheadGame() {
           for (let i = emptyIndices.length; i < drawnCards.length; i++) {
             updatedPlayer.hand.push(drawnCards[i]);
           }
-          
+
           const finalPlayers = gameState.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
           const finalState = { ...updatedState, players: finalPlayers };
 
@@ -811,7 +818,7 @@ export default function ShitheadGame() {
     // Fill null slots first, then extend array
     const updatedHand = [...player.hand];
     const cardsToAdd = [...gameState.discardPile];
-    
+
     let addIndex = 0;
     // Fill null slots
     for (let i = 0; i < updatedHand.length && addIndex < cardsToAdd.length; i++) {
@@ -1224,149 +1231,149 @@ export default function ShitheadGame() {
                       <div>
                         <p className="text-slate-400 text-sm mb-2">Face Up</p>
                         <div className="flex gap-2">
-                      {currentPlayer.faceUp.map((card, i) => {
-                        // Check if we can select face-up cards alongside hand cards
-                        const deckEmpty = gameState.deck.length === 0;
-                        const currentSource = GameLogic.getAvailableCardSource(currentPlayer);
-                        const canCombineWithHand =
-                          deckEmpty &&
-                          currentSource === 'hand' &&
-                          selectedCards.length > 0 &&
-                          selectedCards[0].type === 'hand';
+                          {currentPlayer.faceUp.map((card, i) => {
+                            // Check if we can select face-up cards alongside hand cards
+                            const deckEmpty = gameState.deck.length === 0;
+                            const currentSource = GameLogic.getAvailableCardSource(currentPlayer);
+                            const canCombineWithHand =
+                              deckEmpty &&
+                              currentSource === 'hand' &&
+                              selectedCards.length > 0 &&
+                              selectedCards[0].type === 'hand';
 
-                        // During gameplay, check if this card is playable
-                        let isPlayable = true;
-                        if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
-                          // Check if this single card can be played on the current pile
-                          isPlayable = GameLogic.canPlayMultipleCards([card], gameState.discardPile);
+                            // During gameplay, check if this card is playable
+                            let isPlayable = true;
+                            if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
+                              // Check if this single card can be played on the current pile
+                              isPlayable = GameLogic.canPlayMultipleCards([card], gameState.discardPile);
 
-                          // Also check if it matches already selected cards
-                          if (selectedCards.length > 0 && selectedCards[0].type === 'faceUp') {
-                            const firstSelectedCard = currentPlayer.faceUp[selectedCards[0].index];
-                            if (card.rank !== firstSelectedCard.rank) {
-                              isPlayable = false;
-                            }
-                          }
-                        }
-
-                        // Face-up cards are selectable if:
-                        // 1. Setup phase (for swapping)
-                        // 2. Normal play when face-up is the active source AND card is playable
-                        // 3. When deck is empty and playing final hand cards of matching rank
-                        const faceUpSelectable =
-                          isSetupPhase ||
-                          (!isSetupPhase && isMyTurn && currentSource === 'faceUp' && isPlayable) ||
-                          (!isSetupPhase && isMyTurn && canCombineWithHand);
-
-                        return (
-                          <Card
-                            key={card.id}
-                            card={card}
-                            small
-                            selectable={faceUpSelectable}
-                            selected={selectedCards.some((s) => s.type === 'faceUp' && s.index === i)}
-                            onClick={() => {
-                              if (isSetupPhase) {
-                                // Setup phase: allow selection and swapping
-                                const alreadySelected = selectedCards.findIndex(
-                                  (s) => s.type === 'faceUp' && s.index === i
-                                );
-
-                                if (alreadySelected >= 0) {
-                                  // Clicking same face-up card - deselect it
-                                  setSelectedCards([]);
-                                } else if (
-                                  selectedCards.length === 1 &&
-                                  selectedCards[0].type === 'hand'
-                                ) {
-                                  // Hand card selected, clicking face-up - swap them
-                                  swapCards(selectedCards[0].index, i);
-                                  setSelectedCards([]);
-                                } else if (
-                                  selectedCards.length === 1 &&
-                                  selectedCards[0].type === 'faceUp'
-                                ) {
-                                  // Different face-up card selected, clicking another face-up - swap them
-                                  const temp = currentPlayer.faceUp[selectedCards[0].index];
-                                  const newFaceUp = [...currentPlayer.faceUp];
-                                  newFaceUp[selectedCards[0].index] = currentPlayer.faceUp[i];
-                                  newFaceUp[i] = temp;
-
-                                  const updatedPlayers = gameState.players.map((p) =>
-                                    p.id === currentPlayerId ? { ...p, faceUp: newFaceUp } : p
-                                  );
-
-                                  const updatedState = {
-                                    ...gameState,
-                                    players: updatedPlayers,
-                                    lastAction: `${currentPlayer.name} swapped face-up cards`,
-                                  };
-
-                                  if (testMode) {
-                                    setGameState(updatedState);
-                                  } else {
-                                    window.storage.set(
-                                      `game:${roomCode}`,
-                                      JSON.stringify(updatedState),
-                                      true
-                                    );
-                                    setGameState(updatedState);
-                                  }
-                                  setSelectedCards([]);
-                                } else {
-                                  // Nothing selected - select this face-up card
-                                  setSelectedCards([{ type: 'faceUp', index: i }]);
-                                }
-                              } else if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
-                                // Normal face-up selection
-                                const alreadySelected = selectedCards.findIndex(
-                                  (s) => s.type === 'faceUp' && s.index === i
-                                );
-                                if (alreadySelected >= 0) {
-                                  setSelectedCards(
-                                    selectedCards.filter((_, idx) => idx !== alreadySelected)
-                                  );
-                                } else {
-                                  const clickedCard = currentPlayer.faceUp[i];
-                                  if (
-                                    selectedCards.length === 0 ||
-                                    selectedCards.every((s) => {
-                                      const existingCard = currentPlayer.faceUp[s.index];
-                                      return existingCard.rank === clickedCard.rank;
-                                    })
-                                  ) {
-                                    setSelectedCards([
-                                      ...selectedCards,
-                                      { type: 'faceUp', index: i },
-                                    ]);
-                                  }
-                                }
-                              } else if (!isSetupPhase && isMyTurn && canCombineWithHand) {
-                                // Combining face-up with final hand cards
-                                const alreadySelected = selectedCards.findIndex(
-                                  (s) => s.type === 'faceUp' && s.index === i
-                                );
-                                if (alreadySelected >= 0) {
-                                  setSelectedCards(
-                                    selectedCards.filter((_, idx) => idx !== alreadySelected)
-                                  );
-                                } else {
-                                  // Must match rank of selected hand cards
-                                  const clickedCard = currentPlayer.faceUp[i];
-                                  const handCard = currentPlayer.hand[selectedCards[0].index];
-                                  if (clickedCard.rank === handCard.rank) {
-                                    setSelectedCards([
-                                      ...selectedCards,
-                                      { type: 'faceUp', index: i },
-                                    ]);
-                                  }
+                              // Also check if it matches already selected cards
+                              if (selectedCards.length > 0 && selectedCards[0].type === 'faceUp') {
+                                const firstSelectedCard = currentPlayer.faceUp[selectedCards[0].index];
+                                if (card.rank !== firstSelectedCard.rank) {
+                                  isPlayable = false;
                                 }
                               }
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
+                            }
+
+                            // Face-up cards are selectable if:
+                            // 1. Setup phase (for swapping)
+                            // 2. Normal play when face-up is the active source AND card is playable
+                            // 3. When deck is empty and playing final hand cards of matching rank
+                            const faceUpSelectable =
+                              isSetupPhase ||
+                              (!isSetupPhase && isMyTurn && currentSource === 'faceUp' && isPlayable) ||
+                              (!isSetupPhase && isMyTurn && canCombineWithHand);
+
+                            return (
+                              <Card
+                                key={card.id}
+                                card={card}
+                                small
+                                selectable={faceUpSelectable}
+                                selected={selectedCards.some((s) => s.type === 'faceUp' && s.index === i)}
+                                onClick={() => {
+                                  if (isSetupPhase) {
+                                    // Setup phase: allow selection and swapping
+                                    const alreadySelected = selectedCards.findIndex(
+                                      (s) => s.type === 'faceUp' && s.index === i
+                                    );
+
+                                    if (alreadySelected >= 0) {
+                                      // Clicking same face-up card - deselect it
+                                      setSelectedCards([]);
+                                    } else if (
+                                      selectedCards.length === 1 &&
+                                      selectedCards[0].type === 'hand'
+                                    ) {
+                                      // Hand card selected, clicking face-up - swap them
+                                      swapCards(selectedCards[0].index, i);
+                                      setSelectedCards([]);
+                                    } else if (
+                                      selectedCards.length === 1 &&
+                                      selectedCards[0].type === 'faceUp'
+                                    ) {
+                                      // Different face-up card selected, clicking another face-up - swap them
+                                      const temp = currentPlayer.faceUp[selectedCards[0].index];
+                                      const newFaceUp = [...currentPlayer.faceUp];
+                                      newFaceUp[selectedCards[0].index] = currentPlayer.faceUp[i];
+                                      newFaceUp[i] = temp;
+
+                                      const updatedPlayers = gameState.players.map((p) =>
+                                        p.id === currentPlayerId ? { ...p, faceUp: newFaceUp } : p
+                                      );
+
+                                      const updatedState = {
+                                        ...gameState,
+                                        players: updatedPlayers,
+                                        lastAction: `${currentPlayer.name} swapped face-up cards`,
+                                      };
+
+                                      if (testMode) {
+                                        setGameState(updatedState);
+                                      } else {
+                                        window.storage.set(
+                                          `game:${roomCode}`,
+                                          JSON.stringify(updatedState),
+                                          true
+                                        );
+                                        setGameState(updatedState);
+                                      }
+                                      setSelectedCards([]);
+                                    } else {
+                                      // Nothing selected - select this face-up card
+                                      setSelectedCards([{ type: 'faceUp', index: i }]);
+                                    }
+                                  } else if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
+                                    // Normal face-up selection
+                                    const alreadySelected = selectedCards.findIndex(
+                                      (s) => s.type === 'faceUp' && s.index === i
+                                    );
+                                    if (alreadySelected >= 0) {
+                                      setSelectedCards(
+                                        selectedCards.filter((_, idx) => idx !== alreadySelected)
+                                      );
+                                    } else {
+                                      const clickedCard = currentPlayer.faceUp[i];
+                                      if (
+                                        selectedCards.length === 0 ||
+                                        selectedCards.every((s) => {
+                                          const existingCard = currentPlayer.faceUp[s.index];
+                                          return existingCard.rank === clickedCard.rank;
+                                        })
+                                      ) {
+                                        setSelectedCards([
+                                          ...selectedCards,
+                                          { type: 'faceUp', index: i },
+                                        ]);
+                                      }
+                                    }
+                                  } else if (!isSetupPhase && isMyTurn && canCombineWithHand) {
+                                    // Combining face-up with final hand cards
+                                    const alreadySelected = selectedCards.findIndex(
+                                      (s) => s.type === 'faceUp' && s.index === i
+                                    );
+                                    if (alreadySelected >= 0) {
+                                      setSelectedCards(
+                                        selectedCards.filter((_, idx) => idx !== alreadySelected)
+                                      );
+                                    } else {
+                                      // Must match rank of selected hand cards
+                                      const clickedCard = currentPlayer.faceUp[i];
+                                      const handCard = currentPlayer.hand[selectedCards[0].index];
+                                      if (handCard && clickedCard.rank === handCard.rank) {
+                                        setSelectedCards([
+                                          ...selectedCards,
+                                          { type: 'faceUp', index: i },
+                                        ]);
+                                      }
+                                    }
+                                  }
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
 
@@ -1459,239 +1466,236 @@ export default function ShitheadGame() {
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-slate-400 text-sm">Hand</p>
                         {!isSetupPhase && (
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => setHandSortMode('original')}
-                            className={`px-2 py-1 text-xs rounded ${
-                              handSortMode === 'original'
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                            }`}
-                          >
-                            Original
-                          </button>
-                          <button
-                            onClick={() => setHandSortMode('rank')}
-                            className={`px-2 py-1 text-xs rounded ${
-                              handSortMode === 'rank'
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                            }`}
-                          >
-                            Rank
-                          </button>
-                          <button
-                            onClick={() => setHandSortMode('suit')}
-                            className={`px-2 py-1 text-xs rounded ${
-                              handSortMode === 'suit'
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                            }`}
-                          >
-                            Suit
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="hand-area flex flex-wrap">
-                      {(() => {
-                        if (!currentPlayer || !currentPlayer.hand) {
-                          return null;
-                        }
-                        
-                        const isDrawing = drawingCards.length > 0;
-                        
-                        // During drawing: show ORIGINAL array order with empty slots
-                        // Normal: show sorted compact view
-                        if (isDrawing) {
-                          return currentPlayer.hand.map((card, arrayIndex) => {
-                            if (!card) {
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => setHandSortMode('original')}
+                              className={`px-2 py-1 text-xs rounded ${handSortMode === 'original'
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                }`}
+                            >
+                              Original
+                            </button>
+                            <button
+                              onClick={() => setHandSortMode('rank')}
+                              className={`px-2 py-1 text-xs rounded ${handSortMode === 'rank'
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                }`}
+                            >
+                              Rank
+                            </button>
+                            <button
+                              onClick={() => setHandSortMode('suit')}
+                              className={`px-2 py-1 text-xs rounded ${handSortMode === 'suit'
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                }`}
+                            >
+                              Suit
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="hand-area flex flex-wrap">
+                        {(() => {
+                          if (!currentPlayer || !currentPlayer.hand) {
+                            return null;
+                          }
+
+                          const isDrawing = drawingCards.length > 0;
+
+                          // During drawing: show ORIGINAL array order with empty slots
+                          // Normal: show sorted compact view
+                          if (isDrawing) {
+                            return currentPlayer.hand.map((card, arrayIndex) => {
+                              if (!card) {
+                                return (
+                                  <div
+                                    key={`slot-${arrayIndex}`}
+                                    data-empty-slot
+                                    className="w-20 h-28 border-2 border-dashed border-slate-600 rounded-lg bg-slate-900/60 mr-2"
+                                  />
+                                );
+                              }
                               return (
-                                <div
-                                  key={`slot-${arrayIndex}`}
-                                  data-empty-slot
-                                  className="w-20 h-28 border-2 border-dashed border-slate-600 rounded-lg bg-slate-900/60 mr-2"
-                                />
+                                <div key={card.id} className="mr-2">
+                                  <Card
+                                    card={card}
+                                    selectable={false}
+                                    selected={false}
+                                    onClick={() => { }}
+                                  />
+                                </div>
                               );
+                            });
+                          }
+
+                          // NORMAL MODE: sorted compact view with overlapping groups
+                          // Get compact hand (non-null cards) with their original array indices
+                          const cardsWithIndices = currentPlayer.hand
+                            .map((card, arrayIndex) => ({ card, arrayIndex }))
+                            .filter((item): item is { card: Card; arrayIndex: number } => item.card !== null);
+
+                          let sortedCards = [...cardsWithIndices];
+
+                          // Apply sorting
+                          if (handSortMode === 'rank') {
+                            sortedCards.sort((a, b) => {
+                              if (!a.card || !b.card || !a.card.rank || !b.card.rank) return 0;
+                              const rankA = RANK_VALUES[a.card.rank] || 0;
+                              const rankB = RANK_VALUES[b.card.rank] || 0;
+                              const rankDiff = rankA - rankB;
+                              if (rankDiff !== 0) return rankDiff;
+                              return a.card.suit.localeCompare(b.card.suit);
+                            });
+                          } else if (handSortMode === 'suit') {
+                            sortedCards.sort((a, b) => {
+                              if (!a.card || !b.card || !a.card.suit || !b.card.suit) return 0;
+                              const suitOrder = { '♠': 0, '♥': 1, '♣': 2, '♦': 3 };
+                              const suitDiff = suitOrder[a.card.suit as keyof typeof suitOrder] - suitOrder[b.card.suit as keyof typeof suitOrder];
+                              if (suitDiff !== 0) return suitDiff;
+                              const rankA = RANK_VALUES[a.card.rank] || 0;
+                              const rankB = RANK_VALUES[b.card.rank] || 0;
+                              return rankA - rankB;
+                            });
+                          }
+
+                          return sortedCards.map((item, index) => {
+                            // Check if next card is same rank/suit (depending on sort mode)
+                            const nextItem = sortedCards[index + 1];
+                            let sameGroup = false;
+
+                            if (nextItem) {
+                              if (handSortMode === 'rank') {
+                                sameGroup = item.card.rank === nextItem.card.rank;
+                              } else if (handSortMode === 'suit') {
+                                sameGroup = item.card.suit === nextItem.card.suit;
+                              }
                             }
+
                             return (
-                              <div key={card.id} className="mr-2">
+                              <div
+                                key={item.card.id}
+                                data-card-key={item.card.id}
+                                className={sameGroup ? '-mr-12' : 'mr-2'}
+                                style={{ zIndex: index }}
+                              >
                                 <Card
-                                  card={card}
-                                  selectable={false}
-                                  selected={false}
-                                  onClick={() => {}}
+                                  card={item.card}
+                                  selectable={
+                                    isSetupPhase ||
+                                    (!isSetupPhase &&
+                                      isMyTurn &&
+                                      GameLogic.getAvailableCardSource(currentPlayer) === 'hand' &&
+                                      (() => {
+                                        let isPlayable = true;
+                                        const isVeryFirstTurn = gameState.discardPile.length === 0 &&
+                                          !gameState.lastAction?.includes('picked up');
+                                        if (isVeryFirstTurn) {
+                                          const startingCard = GameLogic.getStartingCard(currentPlayer);
+                                          if (startingCard) {
+                                            // On first turn, can play any card of the starting rank
+                                            isPlayable = item.card.rank === startingCard.rank;
+                                          } else {
+                                            // If pile is empty and player doesn't have starting card, can play anything
+                                            isPlayable = true;
+                                          }
+                                        } else {
+                                          isPlayable = GameLogic.canPlayMultipleCards([item.card], gameState.discardPile);
+                                          console.log(`Card ${item.card.rank}${item.card.suit} playable:`, isPlayable, 'Pile length:', gameState.discardPile.length, 'Top card:', gameState.discardPile[gameState.discardPile.length - 1]);
+                                        }
+                                        if (selectedCards.length > 0 && selectedCards[0].type === 'hand') {
+                                          const firstSelectedCard = currentPlayer.hand[selectedCards[0].index];
+                                          if (firstSelectedCard && item.card.rank !== firstSelectedCard.rank) {
+                                            isPlayable = false;
+                                          }
+                                        }
+                                        return isPlayable;
+                                      })()
+                                    )
+                                  }
+                                  selected={selectedCards.some((s) => s.type === 'hand' && s.index === item.arrayIndex)}
+                                  onClick={() => {
+                                    if (isSetupPhase) {
+                                      const alreadySelected = selectedCards.findIndex(
+                                        (s) => s.type === 'hand' && s.index === item.arrayIndex
+                                      );
+
+                                      if (alreadySelected >= 0) {
+                                        setSelectedCards([]);
+                                      } else if (
+                                        selectedCards.length === 1 &&
+                                        selectedCards[0].type === 'faceUp'
+                                      ) {
+                                        swapCards(item.arrayIndex, selectedCards[0].index);
+                                        setSelectedCards([]);
+                                      } else if (
+                                        selectedCards.length === 1 &&
+                                        selectedCards[0].type === 'hand'
+                                      ) {
+                                        const temp = currentPlayer.hand[selectedCards[0].index];
+                                        const newHand = [...currentPlayer.hand];
+                                        newHand[selectedCards[0].index] = currentPlayer.hand[item.arrayIndex];
+                                        newHand[item.arrayIndex] = temp;
+
+                                        const updatedPlayers = gameState.players.map((p) =>
+                                          p.id === currentPlayerId ? { ...p, hand: newHand } : p
+                                        );
+
+                                        const updatedState = {
+                                          ...gameState,
+                                          players: updatedPlayers,
+                                          lastAction: `${currentPlayer.name} swapped hand cards`,
+                                        };
+
+                                        if (testMode) {
+                                          setGameState(updatedState);
+                                        } else {
+                                          window.storage.set(
+                                            `game:${roomCode}`,
+                                            JSON.stringify(updatedState),
+                                            true
+                                          );
+                                          setGameState(updatedState);
+                                        }
+                                        setSelectedCards([]);
+                                      } else {
+                                        setSelectedCards([{ type: 'hand', index: item.arrayIndex }]);
+                                      }
+                                    } else if (
+                                      !isSetupPhase &&
+                                      isMyTurn &&
+                                      GameLogic.getAvailableCardSource(currentPlayer) === 'hand'
+                                    ) {
+                                      const alreadySelected = selectedCards.findIndex(
+                                        (s) => s.type === 'hand' && s.index === item.arrayIndex
+                                      );
+                                      if (alreadySelected >= 0) {
+                                        setSelectedCards(
+                                          selectedCards.filter((_, idx) => idx !== alreadySelected)
+                                        );
+                                      } else {
+                                        const clickedCard = currentPlayer.hand[item.arrayIndex];
+                                        if (clickedCard && (
+                                          selectedCards.length === 0 ||
+                                          selectedCards.every((s) => {
+                                            const existingCard = currentPlayer.hand[s.index];
+                                            return existingCard && existingCard.rank === clickedCard.rank;
+                                          })
+                                        )) {
+                                          setSelectedCards([...selectedCards, { type: 'hand', index: item.arrayIndex }]);
+                                        }
+                                      }
+                                    }
+                                  }}
                                 />
                               </div>
                             );
-                          });
-                        }
-                        
-                        // NORMAL MODE: sorted compact view with overlapping groups
-                        // Get compact hand (non-null cards) with their original array indices
-                        const cardsWithIndices = currentPlayer.hand
-                          .map((card, arrayIndex) => ({ card, arrayIndex }))
-                          .filter((item): item is { card: Card; arrayIndex: number } => item.card !== null);
-                        
-                        let sortedCards = [...cardsWithIndices];
-                        
-                        // Apply sorting
-                        if (handSortMode === 'rank') {
-                          sortedCards.sort((a, b) => {
-                            if (!a.card || !b.card || !a.card.rank || !b.card.rank) return 0;
-                            const rankA = RANK_VALUES[a.card.rank] || 0;
-                            const rankB = RANK_VALUES[b.card.rank] || 0;
-                            const rankDiff = rankA - rankB;
-                            if (rankDiff !== 0) return rankDiff;
-                            return a.card.suit.localeCompare(b.card.suit);
-                          });
-                        } else if (handSortMode === 'suit') {
-                          sortedCards.sort((a, b) => {
-                            if (!a.card || !b.card || !a.card.suit || !b.card.suit) return 0;
-                            const suitOrder = { '♠': 0, '♥': 1, '♣': 2, '♦': 3 };
-                            const suitDiff = suitOrder[a.card.suit as keyof typeof suitOrder] - suitOrder[b.card.suit as keyof typeof suitOrder];
-                            if (suitDiff !== 0) return suitDiff;
-                            const rankA = RANK_VALUES[a.card.rank] || 0;
-                            const rankB = RANK_VALUES[b.card.rank] || 0;
-                            return rankA - rankB;
-                          });
-                        }
-                        
-                        return sortedCards.map((item, index) => {
-                          // Check if next card is same rank/suit (depending on sort mode)
-                          const nextItem = sortedCards[index + 1];
-                          let sameGroup = false;
-                          
-                          if (nextItem) {
-                            if (handSortMode === 'rank') {
-                              sameGroup = item.card.rank === nextItem.card.rank;
-                            } else if (handSortMode === 'suit') {
-                              sameGroup = item.card.suit === nextItem.card.suit;
-                            }
-                          }
-                          
-                          return (
-                            <div 
-                              key={item.card.id} 
-                              data-card-key={item.card.id}
-                              className={sameGroup ? '-mr-12' : 'mr-2'}
-                              style={{ zIndex: index }}
-                            >
-                              <Card
-                                card={item.card}
-                                selectable={
-                                isSetupPhase ||
-                                (!isSetupPhase &&
-                                  isMyTurn &&
-                                  GameLogic.getAvailableCardSource(currentPlayer) === 'hand' &&
-                                  (() => {
-                                    let isPlayable = true;
-                                    const isVeryFirstTurn = gameState.discardPile.length === 0 && 
-                                                            !gameState.lastAction?.includes('picked up');
-                                    if (isVeryFirstTurn) {
-                                      const startingCard = GameLogic.getStartingCard(currentPlayer);
-                                      if (startingCard) {
-                                        // On first turn, can play any card of the starting rank
-                                        isPlayable = item.card.rank === startingCard.rank;
-                                      } else {
-                                        // If pile is empty and player doesn't have starting card, can play anything
-                                        isPlayable = true;
-                                      }
-                                    } else {
-                                      isPlayable = GameLogic.canPlayMultipleCards([item.card], gameState.discardPile);
-                                      console.log(`Card ${item.card.rank}${item.card.suit} playable:`, isPlayable, 'Pile length:', gameState.discardPile.length, 'Top card:', gameState.discardPile[gameState.discardPile.length - 1]);
-                                    }
-                                    if (selectedCards.length > 0 && selectedCards[0].type === 'hand') {
-                                      const firstSelectedCard = currentPlayer.hand[selectedCards[0].index];
-                                      if (firstSelectedCard && item.card.rank !== firstSelectedCard.rank) {
-                                        isPlayable = false;
-                                      }
-                                    }
-                                    return isPlayable;
-                                  })()
-                                )
-                              }
-                              selected={selectedCards.some((s) => s.type === 'hand' && s.index === item.arrayIndex)}
-                              onClick={() => {
-                                if (isSetupPhase) {
-                                  const alreadySelected = selectedCards.findIndex(
-                                    (s) => s.type === 'hand' && s.index === item.arrayIndex
-                                  );
-
-                                  if (alreadySelected >= 0) {
-                                    setSelectedCards([]);
-                                  } else if (
-                                    selectedCards.length === 1 &&
-                                    selectedCards[0].type === 'faceUp'
-                                  ) {
-                                    swapCards(item.arrayIndex, selectedCards[0].index);
-                                    setSelectedCards([]);
-                                  } else if (
-                                    selectedCards.length === 1 &&
-                                    selectedCards[0].type === 'hand'
-                                  ) {
-                                    const temp = currentPlayer.hand[selectedCards[0].index];
-                                    const newHand = [...currentPlayer.hand];
-                                    newHand[selectedCards[0].index] = currentPlayer.hand[item.arrayIndex];
-                                    newHand[item.arrayIndex] = temp;
-
-                                    const updatedPlayers = gameState.players.map((p) =>
-                                      p.id === currentPlayerId ? { ...p, hand: newHand } : p
-                                    );
-
-                                    const updatedState = {
-                                      ...gameState,
-                                      players: updatedPlayers,
-                                      lastAction: `${currentPlayer.name} swapped hand cards`,
-                                    };
-
-                                    if (testMode) {
-                                      setGameState(updatedState);
-                                    } else {
-                                      window.storage.set(
-                                        `game:${roomCode}`,
-                                        JSON.stringify(updatedState),
-                                        true
-                                      );
-                                      setGameState(updatedState);
-                                    }
-                                    setSelectedCards([]);
-                                  } else {
-                                    setSelectedCards([{ type: 'hand', index: item.arrayIndex }]);
-                                  }
-                                } else if (
-                                  !isSetupPhase &&
-                                  isMyTurn &&
-                                  GameLogic.getAvailableCardSource(currentPlayer) === 'hand'
-                                ) {
-                                  const alreadySelected = selectedCards.findIndex(
-                                    (s) => s.type === 'hand' && s.index === item.arrayIndex
-                                  );
-                                  if (alreadySelected >= 0) {
-                                    setSelectedCards(
-                                      selectedCards.filter((_, idx) => idx !== alreadySelected)
-                                    );
-                                  } else {
-                                    const clickedCard = currentPlayer.hand[item.arrayIndex];
-                                    if (clickedCard && (
-                                      selectedCards.length === 0 ||
-                                      selectedCards.every((s) => {
-                                        const existingCard = currentPlayer.hand[s.index];
-                                        return existingCard && existingCard.rank === clickedCard.rank;
-                                      })
-                                    )) {
-                                      setSelectedCards([...selectedCards, { type: 'hand', index: item.arrayIndex }]);
-                                    }
-                                  }
-                                }
-                              }}
-                            />
-                          </div>
-                        );
-                      })
-                    })()}
+                          })
+                        })()}
+                      </div>
                     </div>
-                  </div>
                   )}
 
                   {isSetupPhase && (
@@ -1705,26 +1709,26 @@ export default function ShitheadGame() {
                   )}
 
                   {!isSetupPhase && isMyTurn && (
-                <div className="flex gap-3">
-                  <button
-                    onClick={playCards}
-                    disabled={selectedCards.length === 0}
-                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Play{' '}
-                    {selectedCards.length > 0
-                      ? `${selectedCards.length} Card${selectedCards.length > 1 ? 's' : ''}`
-                      : 'Cards'}
-                  </button>
-                  <button
-                    onClick={pickUpPile}
-                    disabled={gameState.discardPile.length === 0}
-                    className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:from-red-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Pick Up Pile ({gameState.discardPile.length})
-                  </button>
-                </div>
-              )}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={playCards}
+                        disabled={selectedCards.length === 0}
+                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Play{' '}
+                        {selectedCards.length > 0
+                          ? `${selectedCards.length} Card${selectedCards.length > 1 ? 's' : ''}`
+                          : 'Cards'}
+                      </button>
+                      <button
+                        onClick={pickUpPile}
+                        disabled={gameState.discardPile.length === 0}
+                        className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:from-red-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Pick Up Pile ({gameState.discardPile.length})
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1732,48 +1736,45 @@ export default function ShitheadGame() {
 
           <div className="grid grid-cols-3 gap-4">
             {gameState.players.map((player, index) => {
-                const isTheirTurn =
-                  gameState.phase === 'playing' &&
-                  gameState.players[gameState.currentTurn]?.id === player.id;
-                const isControlling = testMode && index === controllingPlayer;
-                const isClickable = testMode;
-                
-                return (
-                  <div
-                    key={player.id}
-                    onClick={() => {
-                      if (testMode) {
-                        setControllingPlayer(index);
-                        setSelectedCards([]);
-                      }
-                    }}
-                    className={`rounded-lg p-3 border-2 transition-all ${
-                      isControlling 
-                        ? 'bg-green-900 border-green-500 shadow-lg ring-2 ring-green-400' 
-                        : 'bg-slate-800 border-slate-700'
-                    } ${
-                      isTheirTurn ? 'border-yellow-500 shadow-lg' : ''
-                    } ${
-                      isClickable ? 'cursor-pointer hover:border-green-400' : ''
+              const isTheirTurn =
+                gameState.phase === 'playing' &&
+                gameState.players[gameState.currentTurn]?.id === player.id;
+              const isControlling = testMode && index === controllingPlayer;
+              const isClickable = testMode;
+
+              return (
+                <div
+                  key={player.id}
+                  onClick={() => {
+                    if (testMode) {
+                      setControllingPlayer(index);
+                      setSelectedCards([]);
+                    }
+                  }}
+                  className={`rounded-lg p-3 border-2 transition-all ${isControlling
+                      ? 'bg-green-900 border-green-500 shadow-lg ring-2 ring-green-400'
+                      : 'bg-slate-800 border-slate-700'
+                    } ${isTheirTurn ? 'border-yellow-500 shadow-lg' : ''
+                    } ${isClickable ? 'cursor-pointer hover:border-green-400' : ''
                     }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white font-semibold truncate">
-                        {player.name}
-                        {isControlling && <span className="ml-2 text-xs text-green-400">(You)</span>}
-                      </p>
-                      {isTheirTurn && (
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-                      )}
-                    </div>
-                    <div className="text-xs text-slate-400 space-y-1">
-                      <div>Hand: {player.hand.filter((c): c is Card => c !== null).length}</div>
-                      <div>Face Up: {player.faceUp.length}</div>
-                      <div>Face Down: {player.faceDown.length}</div>
-                    </div>
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-white font-semibold truncate">
+                      {player.name}
+                      {isControlling && <span className="ml-2 text-xs text-green-400">(You)</span>}
+                    </p>
+                    {isTheirTurn && (
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+                    )}
                   </div>
-                );
-              })}
+                  <div className="text-xs text-slate-400 space-y-1">
+                    <div>Hand: {player.hand.filter((c): c is Card => c !== null).length}</div>
+                    <div>Face Up: {player.faceUp.length}</div>
+                    <div>Face Down: {player.faceDown.length}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -1792,8 +1793,8 @@ export default function ShitheadGame() {
             </div>,
             document.body
           )
-      }
-    </>
+        }
+      </>
     );
   }
 

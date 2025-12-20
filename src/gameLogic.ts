@@ -271,7 +271,7 @@ export function getStartingPlayer(players: Player[]): number {
   for (const targetCard of startOrder) {
     for (let i = 0; i < players.length; i++) {
       const hasCard = players[i].hand.some(
-        (card) => card.rank === targetCard.rank && card.suit === targetCard.suit
+        (card) => card != null && card.rank === targetCard.rank && card.suit === targetCard.suit
       );
       if (hasCard) {
         return i;
@@ -286,7 +286,7 @@ export function getStartingCard(player: Player): Card | null {
   // Starting order: red 4, black 4, red 5, black 5, red 6, black 6... all the way to Ace
   const ranks = ['4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   const nonNullHand = player.hand.filter((c): c is Card => c !== null);
-  
+
   for (const rank of ranks) {
     // Check for red first
     const redCard = nonNullHand.find((card) => {
@@ -294,7 +294,7 @@ export function getStartingCard(player: Player): Card | null {
       return card.rank === rank && isRed;
     });
     if (redCard) return redCard;
-    
+
     // Then check for black
     const blackCard = nonNullHand.find((card) => {
       const isBlack = card.suit === '♠' || card.suit === '♣';
