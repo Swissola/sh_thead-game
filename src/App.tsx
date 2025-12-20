@@ -393,6 +393,9 @@ export default function ShitheadGame() {
     if (!testMode) return;
 
     const originalLog = console.log;
+    let updateScheduled = false;
+    const pendingLogs: string[] = [];
+
     console.log = (...args: any[]) => {
       originalLog(...args);
       const message = args
@@ -400,7 +403,17 @@ export default function ShitheadGame() {
           typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
         )
         .join(' ');
-      setConsoleLogs((prev) => [...prev.slice(-49), message]); // Keep last 50 logs
+      
+      pendingLogs.push(message);
+      
+      if (!updateScheduled) {
+        updateScheduled = true;
+        setTimeout(() => {
+          setConsoleLogs((prev) => [...prev.slice(-(50 - pendingLogs.length)), ...pendingLogs]);
+          pendingLogs.length = 0;
+          updateScheduled = false;
+        }, 0);
+      }
     };
 
     return () => {
@@ -723,6 +736,7 @@ export default function ShitheadGame() {
 
     // Determine next turn (same player if burned, otherwise next)
     const nextTurn = burned ? playerIndex : GameLogic.getNextPlayer(playerIndex, updatedPlayers);
+    console.log('Turn change:', { from: playerIndex, to: nextTurn, burned, playerCount: updatedPlayers.length });
 
     // Check if game is over
     const gameOver = GameLogic.isGameOver(updatedPlayers);
@@ -1624,7 +1638,6 @@ export default function ShitheadGame() {
                                           }
                                         } else {
                                           isPlayable = GameLogic.canPlayMultipleCards([item.card], gameState.discardPile);
-                                          console.log(`Card ${item.card.rank}${item.card.suit} playable:`, isPlayable, 'Pile length:', gameState.discardPile.length, 'Top card:', gameState.discardPile[gameState.discardPile.length - 1]);
                                         }
                                         if (selectedCards.length > 0 && selectedCards[0].type === 'hand') {
                                           const firstSelectedCard = currentPlayer.hand[selectedCards[0].index];
