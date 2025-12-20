@@ -1374,9 +1374,8 @@ export default function ShitheadGame() {
                 return (
                   <div
                     key={player.id}
-                    className={`bg-slate-800 rounded-lg p-3 border-2 transition-all ${
-                      isTheirTurn ? 'border-green-500 shadow-lg' : 'border-slate-700'
-                    }`}
+                    className={`bg-slate-800 rounded-lg p-3 border-2 transition-all ${isTheirTurn ? 'border-green-500 shadow-lg' : 'border-slate-700'
+                      }`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-white font-semibold truncate">{player.name}</p>
