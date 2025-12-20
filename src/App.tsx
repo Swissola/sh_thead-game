@@ -482,11 +482,8 @@ export default function ShitheadGame() {
       if (cardSource !== 'hand') {
         return alert('You can only combine hand and face-up cards when playing from your hand');
       }
-      // Check if this empties the hand
-      const handCardsPlayed = selectedCards.filter((s) => s.type === 'hand').length;
-      if (handCardsPlayed !== player.hand.length) {
-        return alert('You can only combine face-up cards with your final hand cards');
-      }
+      // When deck is empty, you can combine matching hand cards with matching face-up cards
+      // No restriction on needing to play all hand cards - just matching ranks
     }
 
     // Get the actual card objects based on selection
