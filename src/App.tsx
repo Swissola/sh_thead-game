@@ -1595,7 +1595,7 @@ export default function ShitheadGame() {
                                       }
                                     } else {
                                       isPlayable = GameLogic.canPlayMultipleCards([item.card], gameState.discardPile);
-                                      console.log(`Card ${item.card.rank}${item.card.suit} playable:`, isPlayable, 'Top card:', gameState.discardPile[gameState.discardPile.length - 1]);
+                                      console.log(`Card ${item.card.rank}${item.card.suit} playable:`, isPlayable, 'Pile length:', gameState.discardPile.length, 'Top card:', gameState.discardPile[gameState.discardPile.length - 1]);
                                     }
                                     if (selectedCards.length > 0 && selectedCards[0].type === 'hand') {
                                       const firstSelectedCard = currentPlayer.hand[selectedCards[0].index];
