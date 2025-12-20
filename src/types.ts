@@ -12,7 +12,7 @@ export interface Card {
 export interface Player {
     id: string;
     name: string;
-    hand: Card[];
+    hand: (Card | null)[]; // Fixed array with nulls for empty slots
     faceUp: Card[];
     faceDown: Card[];
     isReady: boolean;

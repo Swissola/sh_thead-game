@@ -192,7 +192,8 @@ export function getPlayResult(cardsPlayed: Card[], discardPile: Card[]): PlayRes
 // ============================================================================
 
 export function getAvailableCardSource(player: Player): CardSource {
-  if (player.hand.length > 0) return 'hand';
+  const nonNullHand = player.hand.filter((c): c is Card => c !== null);
+  if (nonNullHand.length > 0) return 'hand';
   if (player.faceUp.length > 0) return 'faceUp';
   return 'faceDown';
 }
@@ -201,7 +202,8 @@ export function canPlayerPlay(player: Player, discardPile: Card[]): boolean {
   const source = getAvailableCardSource(player);
 
   if (source === 'hand') {
-    return player.hand.some((card) => canPlayCard(card, discardPile));
+    const nonNullHand = player.hand.filter((c): c is Card => c !== null);
+    return nonNullHand.some((card) => canPlayCard(card, discardPile));
   }
 
   if (source === 'faceUp') {
@@ -212,11 +214,13 @@ export function canPlayerPlay(player: Player, discardPile: Card[]): boolean {
 }
 
 export function shouldDrawCards(player: Player, deckSize: number): boolean {
-  return player.hand.length < 3 && deckSize > 0;
+  const nonNullCount = player.hand.filter((c): c is Card => c !== null).length;
+  return nonNullCount < 3 && deckSize > 0;
 }
 
 export function getCardsToDrawCount(player: Player, deckSize: number): number {
-  const needed = 3 - player.hand.length;
+  const nonNullCount = player.hand.filter((c): c is Card => c !== null).length;
+  const needed = 3 - nonNullCount;
   return Math.min(needed, deckSize);
 }
 
@@ -225,7 +229,8 @@ export function getCardsToDrawCount(player: Player, deckSize: number): number {
 // ============================================================================
 
 export function hasPlayerWon(player: Player): boolean {
-  return player.hand.length === 0 && player.faceUp.length === 0 && player.faceDown.length === 0;
+  const nonNullHand = player.hand.filter((c): c is Card => c !== null);
+  return nonNullHand.length === 0 && player.faceUp.length === 0 && player.faceDown.length === 0;
 }
 
 export function getFinishedPlayers(players: Player[]): Player[] {
@@ -278,22 +283,24 @@ export function getStartingPlayer(players: Player[]): number {
 }
 
 export function getStartingCard(player: Player): Card | null {
-  const startOrder = [
-    { rank: '4', suit: '♥' },
-    { rank: '4', suit: '♦' },
-    { rank: '4', suit: '♠' },
-    { rank: '4', suit: '♣' },
-    { rank: '5', suit: '♥' },
-    { rank: '5', suit: '♦' },
-  ];
-
-  for (const targetCard of startOrder) {
-    const foundCard = player.hand.find(
-      (card) => card.rank === targetCard.rank && card.suit === targetCard.suit
-    );
-    if (foundCard) {
-      return foundCard;
-    }
+  // Starting order: red 4, black 4, red 5, black 5, red 6, black 6... all the way to Ace
+  const ranks = ['4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const nonNullHand = player.hand.filter((c): c is Card => c !== null);
+  
+  for (const rank of ranks) {
+    // Check for red first
+    const redCard = nonNullHand.find((card) => {
+      const isRed = card.suit === '♥' || card.suit === '♦';
+      return card.rank === rank && isRed;
+    });
+    if (redCard) return redCard;
+    
+    // Then check for black
+    const blackCard = nonNullHand.find((card) => {
+      const isBlack = card.suit === '♠' || card.suit === '♣';
+      return card.rank === rank && isBlack;
+    });
+    if (blackCard) return blackCard;
   }
 
   return null;
