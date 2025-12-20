@@ -1256,47 +1256,36 @@ export default function ShitheadGame() {
                     <div className="space-y-4">
                       <div>
                         <p className="text-slate-400 text-sm mb-2">Table</p>
-                        <div className="flex items-start gap-4">
-                          {/* Face Down cards stack */}
-                          {currentPlayer.faceDown.length > 0 && (
-                            <div className="relative" style={{ width: '80px', height: '128px' }}>
-                              {currentPlayer.faceDown.map((card, i) => (
-                                <div
-                                  key={`faceDown-${i}`}
-                                  className="absolute"
-                                  style={{
-                                    left: `${i * 2}px`,
-                                    top: `${i * 2}px`,
-                                    zIndex: i,
-                                  }}
-                                >
-                                  <Card
-                                    card={card}
-                                    faceDown
-                                    small
-                                    selectable={
-                                      !isSetupPhase &&
-                                      isMyTurn &&
-                                      GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
-                                    }
-                                    selected={selectedCards.some((s) => s.type === 'faceDown' && s.index === i)}
-                                    onClick={() => {
-                                      if (
-                                        !isSetupPhase &&
-                                        isMyTurn &&
-                                        GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
-                                      ) {
-                                        setSelectedCards([{ type: 'faceDown', index: i }]);
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                        <div className="relative">
+                          {/* Face Down cards - laid out horizontally */}
+                          <div className="flex gap-2">
+                            {currentPlayer.faceDown.map((card, i) => (
+                              <Card
+                                key={`faceDown-${i}`}
+                                card={card}
+                                faceDown
+                                small
+                                selectable={
+                                  !isSetupPhase &&
+                                  isMyTurn &&
+                                  GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
+                                }
+                                selected={selectedCards.some((s) => s.type === 'faceDown' && s.index === i)}
+                                onClick={() => {
+                                  if (
+                                    !isSetupPhase &&
+                                    isMyTurn &&
+                                    GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
+                                  ) {
+                                    setSelectedCards([{ type: 'faceDown', index: i }]);
+                                  }
+                                }}
+                              />
+                            ))}
+                          </div>
 
-                          {/* Face Up cards */}
-                          <div className="flex gap-2 flex-wrap">
+                          {/* Face Up cards - overlaid on top with margins */}
+                          <div className="flex gap-2" style={{ marginTop: '-80px', marginLeft: '10px', position: 'relative', zIndex: 10 }}>
                             {currentPlayer.faceUp.map((card, i) => {
                               // Check if we can select face-up cards alongside hand cards
                               const deckEmpty = gameState.deck.length === 0;
