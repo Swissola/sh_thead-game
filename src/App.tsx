@@ -1229,7 +1229,6 @@ export default function ShitheadGame() {
                         const deckEmpty = gameState.deck.length === 0;
                         const currentSource = GameLogic.getAvailableCardSource(currentPlayer);
                         const canCombineWithHand =
-                          deckEmpty &&
                           currentSource === 'hand' &&
                           selectedCards.length > 0 &&
                           selectedCards[0].type === 'hand';
@@ -1252,7 +1251,7 @@ export default function ShitheadGame() {
                         // Face-up cards are selectable if:
                         // 1. Setup phase (for swapping)
                         // 2. Normal play when face-up is the active source AND card is playable
-                        // 3. When deck is empty and we're playing final hand cards of matching rank
+                        // 3. When playing hand cards of matching rank (can combine any time)
                         const faceUpSelectable =
                           isSetupPhase ||
                           (!isSetupPhase && isMyTurn && currentSource === 'faceUp' && isPlayable) ||
@@ -1454,10 +1453,11 @@ export default function ShitheadGame() {
                     </div>
                   </div>
 
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-slate-400 text-sm">Hand</p>
-                      {!isSetupPhase && (
+                  {currentPlayer.hand.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-slate-400 text-sm">Hand</p>
+                        {!isSetupPhase && (
                         <div className="flex gap-1">
                           <button
                             onClick={() => setHandSortMode('original')}
@@ -1687,6 +1687,7 @@ export default function ShitheadGame() {
                     })()}
                     </div>
                   </div>
+                  )}
 
                   {isSetupPhase && (
                     <button
