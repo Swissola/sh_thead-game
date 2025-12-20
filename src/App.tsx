@@ -1,24 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Users, Plus, Copy, Check, Crown, ArrowRight, HelpCircle, X } from 'lucide-react';
 import * as GameLogic from './gameLogic';
+import type { GameState, Card, CardProps, CardSelection } from './types';
 
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-const RANK_VALUES = {
-  '2': 2,
-  '3': 3,
-  '4': 4,
-  '5': 5,
-  '6': 6,
-  '7': 7,
-  '8': 8,
-  '9': 9,
-  '10': 10,
-  J: 11,
-  Q: 12,
-  K: 13,
-  A: 14,
-};
 
 const createDeck = (numDecks = 1) => {
   const deck = [];
@@ -38,7 +24,7 @@ const createDeck = (numDecks = 1) => {
   return deck;
 };
 
-const shuffleDeck = (deck) => {
+const shuffleDeck = (deck: Card[]): Card[] => {
   const shuffled = [...deck];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -47,7 +33,7 @@ const shuffleDeck = (deck) => {
   return shuffled;
 };
 
-const Card = ({ card, faceDown, onClick, selectable, selected, small }) => {
+const Card: React.FC<CardProps> = ({ card, faceDown, onClick, selectable, selected, small }) => {
   const isRed = card?.suit === '♥' || card?.suit === '♦';
 
   // Get deck color for card backs
@@ -190,20 +176,16 @@ const Card = ({ card, faceDown, onClick, selectable, selected, small }) => {
 };
 
 export default function ShitheadGame() {
-  const [screen, setScreen] = useState('menu');
+  const [screen, setScreen] = useState<'menu' | 'lobby' | 'game'>('menu');
   const [roomCode, setRoomCode] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [playerId, setPlayerId] = useState('');
-  const [gameState, setGameState] = useState(null);
-  const [selectedCards, setSelectedCards] = useState([]);
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [selectedCards, setSelectedCards] = useState<CardSelection[]>([]);
   const [copied, setCopied] = useState(false);
   const [testMode, setTestMode] = useState(false);
   const [controllingPlayer, setControllingPlayer] = useState(0);
   const [showRules, setShowRules] = useState(false);
-
-  useEffect(() => {
-    setPlayerId(`player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-  }, []);
 
   const createTestGame = () => {
     setTestMode(true);
@@ -244,8 +226,7 @@ export default function ShitheadGame() {
   const createRoom = async () => {
     if (!playerName.trim()) return alert('Please enter your name');
 
-    const code = Math.random().toString(36).substr(2, 6).toUpperCase();
-    const newGameState = {
+    const newGameState: GameState = {
       roomCode: code,
       host: playerId,
       players: [
@@ -353,7 +334,7 @@ export default function ShitheadGame() {
     }
   }, [screen, roomCode, testMode]);
 
-  const swapCards = (handIndex, faceUpIndex) => {
+  const swapCards = (handIndex: number, faceUpIndex: number): void => {
     const currentPlayerId = testMode ? gameState.players[controllingPlayer].id : playerId;
     const player = gameState.players.find((p) => p.id === currentPlayerId);
     if (!player || gameState.phase !== 'setup') return;
@@ -654,7 +635,7 @@ export default function ShitheadGame() {
   /**
    * Helper function to update game state (handles both test mode and multiplayer)
    */
-  const updateGameState = (newState) => {
+  const updateGameState = (newState: GameState): void => {
     if (testMode) {
       setGameState(newState);
     } else {

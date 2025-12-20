@@ -5,27 +5,7 @@
  * special card effects, and game rules.
  */
 
-// ============================================================================
-// TYPES & CONSTANTS
-// ============================================================================
-
-export interface Card {
-  suit: string;
-  rank: string;
-  id: string;
-  deckColor: string;
-}
-
-export interface Player {
-  id: string;
-  name: string;
-  hand: Card[];
-  faceUp: Card[];
-  faceDown: Card[];
-  isReady: boolean;
-}
-
-export type CardSource = 'hand' | 'faceUp' | 'faceDown';
+import type { Card, Player, CardSource } from './types';
 
 export const RANK_VALUES: Record<string, number> = {
   '2': 2,
