@@ -192,6 +192,7 @@ export default function ShitheadGame() {
   const [drawingCards, setDrawingCards] = useState<Array<{ card: Card; id: string; targetPos: { x: number; y: number }; startPos?: { x: number; y: number } }>>([]);
   const [handSortMode, setHandSortMode] = useState<'original' | 'rank' | 'suit'>('original');
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
+  const [pickUpConfirmation, setPickUpConfirmation] = useState<{ show: boolean; playerIndex: number } | null>(null);
 
   const createTestGame = () => {
     setTestMode(true);
@@ -852,6 +853,21 @@ export default function ShitheadGame() {
     if (gameState.discardPile.length === 0) {
       return alert('The pile is empty - you must play a card');
     }
+
+    // Check if player has valid cards to play from any source
+    if (GameLogic.canPlayerPlay(player, gameState.discardPile)) {
+      // Player has valid cards - ask for confirmation
+      setPickUpConfirmation({ show: true, playerIndex });
+      return;
+    }
+
+    // Player has no valid cards - proceed with pickup
+    confirmPickUpPile(playerIndex);
+  };
+
+  const confirmPickUpPile = (playerIndex: number) => {
+    if (!gameState) return;
+    const player = gameState.players[playerIndex];
 
     // Add all discard pile cards to player's hand
     // Fill null slots first, then extend array
@@ -1840,6 +1856,41 @@ export default function ShitheadGame() {
                   <Card card={card} small />
                 </div>
               ))}
+            </div>,
+            document.body
+          )
+        }
+
+        {pickUpConfirmation?.show &&
+          createPortal(
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-slate-800 border-2 border-purple-500 rounded-lg p-6 max-w-md shadow-2xl">
+                <h2 className="text-xl font-bold text-white mb-4">Confirm Pick Up</h2>
+                <p className="text-slate-300 mb-6">
+                  You have valid cards to play. Are you sure you want to pick up the pile?
+                </p>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      setPickUpConfirmation(null);
+                    }}
+                    className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (pickUpConfirmation) {
+                        confirmPickUpPile(pickUpConfirmation.playerIndex);
+                        setPickUpConfirmation(null);
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
+                  >
+                    Pick Up Anyway
+                  </button>
+                </div>
+              </div>
             </div>,
             document.body
           )
