@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { Users, Plus, Copy, Check, Crown, ArrowRight, HelpCircle, X } from 'lucide-react';
 import * as GameLogic from './gameLogic';
+import { RANK_VALUES } from './gameLogic';
 import type { GameState, Card, CardProps, CardSelection } from './types';
 
-const SUITS = ['♠', '♥', '♦', '♣'];
+const SUITS = ['♠', '♥', '♣', '♦'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 const createDeck = (numDecks = 1) => {
@@ -135,15 +136,14 @@ const Card: React.FC<CardProps> = ({ card, faceDown, onClick, selectable, select
 
   return (
     <div
-      onClick={onClick}
+      onClick={selectable ? onClick : undefined}
       className={`
         ${small ? 'w-16 h-24' : 'w-20 h-32'} 
         rounded-lg overflow-hidden
-        transition-all cursor-pointer relative
+        transition-all relative
         bg-white
-        ${selectable ? 'hover:scale-110 hover:-translate-y-2 shadow-lg' : ''}
+        ${selectable ? 'cursor-pointer hover:scale-110 hover:-translate-y-2 shadow-lg' : 'cursor-default'}
         ${selected ? 'scale-110 -translate-y-3 ring-4 ring-yellow-400' : ''}
-        ${!selectable ? 'cursor-default' : ''}
         shadow-md border-2 border-gray-200
       `}
     >
@@ -190,6 +190,7 @@ export default function ShitheadGame() {
   const [controllingPlayer, setControllingPlayer] = useState(0);
   const [showRules, setShowRules] = useState(false);
   const [drawingCards, setDrawingCards] = useState<Array<{ card: Card; id: string; targetPos: { x: number; y: number }; startPos?: { x: number; y: number } }>>([]);
+  const [handSortMode, setHandSortMode] = useState<'original' | 'rank' | 'suit'>('original');
 
   const createTestGame = () => {
     setTestMode(true);
@@ -220,6 +221,7 @@ export default function ShitheadGame() {
       currentTurn: 0,
       deck,
       discardPile: [],
+      burnPile: [],
       lastAction: 'Test game created! Use the green dropdown to switch players.',
     };
 
@@ -259,6 +261,7 @@ export default function ShitheadGame() {
       currentTurn: startingPlayerIndex,
       deck,
       discardPile: [],
+      burnPile: [],
       lastAction: `Ready to play! ${dealtPlayers[startingPlayerIndex].name} starts.`,
     };
 
@@ -281,6 +284,7 @@ export default function ShitheadGame() {
       currentTurn: 0,
       deck: [],
       discardPile: [],
+      burnPile: [],
       lastAction: `${playerName} created the room`,
     };
 
@@ -520,6 +524,53 @@ export default function ShitheadGame() {
     // For face-down cards, we play blind
     const isBlindPlay = selectedCards[0].type === 'faceDown';
 
+    // CRITICAL: Reorder hand array to match current visual sort order
+    // This makes the current sorted view the new "original" for stable positions
+    if (cardSource === 'hand' && handSortMode !== 'original') {
+      const compactHand = player.hand
+        .map((card, arrayIndex) => ({ card, arrayIndex }))
+        .filter((item): item is { card: Card; arrayIndex: number } => item.card !== null);
+      
+      let sortedHand = [...compactHand];
+      
+      if (handSortMode === 'rank') {
+        sortedHand.sort((a, b) => {
+          const rankA = RANK_VALUES[a.card.rank] || 0;
+          const rankB = RANK_VALUES[b.card.rank] || 0;
+          const rankDiff = rankA - rankB;
+          if (rankDiff !== 0) return rankDiff;
+          return a.card.suit.localeCompare(b.card.suit);
+        });
+      } else if (handSortMode === 'suit') {
+        sortedHand.sort((a, b) => {
+          const suitOrder = { '♠': 0, '♥': 1, '♣': 2, '♦': 3 };
+          const suitDiff = suitOrder[a.card.suit as keyof typeof suitOrder] - suitOrder[b.card.suit as keyof typeof suitOrder];
+          if (suitDiff !== 0) return suitDiff;
+          const rankA = RANK_VALUES[a.card.rank] || 0;
+          const rankB = RANK_VALUES[b.card.rank] || 0;
+          return rankA - rankB;
+        });
+      }
+      
+      // Rebuild hand array in sorted order
+      player.hand = sortedHand.map(item => item.card);
+      
+      // Update selected card indices to match new positions
+      selectedCards.forEach(sel => {
+        if (sel.type === 'hand') {
+          // Find new position of this card in sorted array
+          const newIndex = sortedHand.findIndex(item => item.arrayIndex === sel.index);
+          if (newIndex >= 0) {
+            sel.index = newIndex;
+          }
+        }
+      });
+      
+      // Switch to original mode since we just made this the new baseline
+      setHandSortMode('original');
+    }
+
+
     // Validate the play (unless it's blind)
     if (!isBlindPlay && !GameLogic.canPlayMultipleCards(cardsToPlay, gameState.discardPile)) {
       return alert('Those cards cannot be played on the current pile');
@@ -612,13 +663,15 @@ export default function ShitheadGame() {
 
     // Valid play - add cards to discard pile
     let newDiscardPile = [...gameState.discardPile, ...cardsToPlay];
+    let newBurnPile = [...gameState.burnPile];
 
     // Check if pile should burn
     const burned = GameLogic.shouldBurnPile(newDiscardPile);
     const playResult = GameLogic.getPlayResult(cardsToPlay, newDiscardPile);
 
-    // If burned, clear the pile
+    // If burned, move entire pile to burn pile
     if (burned) {
+      newBurnPile = [...newBurnPile, ...newDiscardPile];
       newDiscardPile = [];
     }
 
@@ -626,8 +679,13 @@ export default function ShitheadGame() {
     const cardsToDraw = GameLogic.getCardsToDrawCount(updatedPlayer, gameState.deck.length);
     const drawnCards = cardsToDraw > 0 ? gameState.deck.slice(0, cardsToDraw) : [];
 
-    // Track the current hand size for empty slot calculation
-    const currentHandSize = updatedPlayer.hand.length;
+    // Track which indices in the hand array are null (empty slots)
+    const emptyIndices: number[] = [];
+    for (let i = 0; i < updatedPlayer.hand.length; i++) {
+      if (updatedPlayer.hand[i] === null) {
+        emptyIndices.push(i);
+      }
+    }
 
     // Check if player won
     const playerWon = GameLogic.hasPlayerWon(updatedPlayer);
@@ -657,6 +715,7 @@ export default function ShitheadGame() {
       ...gameState,
       players: updatedPlayers,
       discardPile: newDiscardPile,
+      burnPile: newBurnPile,
       deck: gameState.deck.slice(cardsToDraw),
       currentTurn: nextTurn,
       phase: gameOver ? 'finished' : 'playing',
@@ -665,77 +724,63 @@ export default function ShitheadGame() {
 
     // If drawing cards, trigger animation
     if (drawnCards.length > 0) {
-      // First, set drawingCards to create empty slots
+      // Get deck position
+      const deckElement = document.querySelector('.draw-pile-card');
+      let deckPos = { x: window.innerWidth / 2, y: 100 };
+      if (deckElement) {
+        const deckRect = deckElement.getBoundingClientRect();
+        deckPos = { x: deckRect.left + deckRect.width / 2, y: deckRect.top + deckRect.height / 2 };
+      }
+
+      // Set drawing cards to trigger empty slot rendering
       setDrawingCards(drawnCards.map((card, i) => ({ 
         card, 
         id: `draw-${card.id}-${Date.now()}-${i}`, 
         targetPos: { x: 0, y: 0 },
-        startPos: { x: 0, y: 0 }
+        startPos: deckPos
       })));
 
-      // Then update state and query positions
+      // Update state WITHOUT filling cards yet
       flushSync(() => {
         updateGameState(updatedState);
       });
 
-      // Small delay to ensure DOM has rendered
+      // Query slot positions after render
       setTimeout(() => {
-        // Query empty slot positions after DOM update
         const handContainer = document.querySelector('.hand-area');
         const slots = handContainer?.querySelectorAll('[data-empty-slot]');
         
-        // Get deck position as starting point
-        const deckElement = document.querySelector('.draw-pile-card');
-        let deckPos = { x: window.innerWidth / 2, y: 100 };
-        if (deckElement) {
-          const deckRect = deckElement.getBoundingClientRect();
-          deckPos = { x: deckRect.left + deckRect.width / 2, y: deckRect.top + deckRect.height / 2 };
-        }
-
-        console.log('Deck position:', deckPos);
-        console.log('Found slots:', slots?.length);
-
-        // Create animation objects with target positions
         const drawnCardsWithPositions = drawnCards.map((card, index) => {
           let targetPos = { x: window.innerWidth / 2, y: window.innerHeight - 200 };
           
-          // Map to the actual empty slot elements (they're rendered in order)
           if (slots && index < slots.length) {
             const slotRect = (slots[index] as HTMLElement).getBoundingClientRect();
             targetPos = { x: slotRect.left + slotRect.width / 2, y: slotRect.top + slotRect.height / 2 };
-            console.log(`Slot ${index} position:`, targetPos);
-          } else {
-            console.log(`No slot found for index ${index}`);
           }
           
           return { 
             card, 
             id: `draw-${card.id}-${Date.now()}-${index}`, 
             targetPos,
-            startPos: deckPos 
+            startPos: deckPos
           };
         });
 
         setDrawingCards(drawnCardsWithPositions);
 
-        // After animation completes, fill the null slots in hand
+        // After animation completes, fill cards
         setTimeout(() => {
-          // Fill null slots from left to right with drawn cards
-          let drawnIndex = 0;
-          for (let i = 0; i < updatedPlayer.hand.length && drawnIndex < drawnCards.length; i++) {
-            if (updatedPlayer.hand[i] === null) {
-              updatedPlayer.hand[i] = drawnCards[drawnIndex];
-              drawnIndex++;
-            }
+          for (let i = 0; i < drawnCards.length && i < emptyIndices.length; i++) {
+            const arrayIndex = emptyIndices[i];
+            updatedPlayer.hand[arrayIndex] = drawnCards[i];
           }
-          // If still cards to add (hand was less than 3), extend array
-          while (drawnIndex < drawnCards.length) {
-            updatedPlayer.hand.push(drawnCards[drawnIndex]);
-            drawnIndex++;
+          for (let i = emptyIndices.length; i < drawnCards.length; i++) {
+            updatedPlayer.hand.push(drawnCards[i]);
           }
           
           const finalPlayers = gameState.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
           const finalState = { ...updatedState, players: finalPlayers };
+
           updateGameState(finalState);
           setDrawingCards([]);
         }, 700);
@@ -1181,6 +1226,85 @@ export default function ShitheadGame() {
                   <p className="text-base text-white font-bold mt-2">
                     {gameState.discardPile.length} cards
                   </p>
+                  {gameState.discardPile.length > 0 && (() => {
+                    const topCard = gameState.discardPile[gameState.discardPile.length - 1];
+                    
+                    // If top is a 3, we need to show what we're playing on
+                    if (topCard.rank === '3') {
+                      // Count the 3s from the top
+                      let threeCount = 0;
+                      for (let i = gameState.discardPile.length - 1; i >= 0 && gameState.discardPile[i].rank === '3'; i--) {
+                        threeCount++;
+                      }
+                      
+                      // Find the non-3 card underneath
+                      let actualTopIndex = -1;
+                      let baseRank = '';
+                      for (let i = gameState.discardPile.length - threeCount - 1; i >= 0; i--) {
+                        if (gameState.discardPile[i].rank !== '3') {
+                          actualTopIndex = i;
+                          baseRank = gameState.discardPile[i].rank;
+                          break;
+                        }
+                      }
+                      
+                      if (actualTopIndex >= 0) {
+                        // Count the base cards (non-3s) of this rank
+                        let baseCount = 0;
+                        for (let i = actualTopIndex; i >= 0 && gameState.discardPile[i].rank === baseRank; i--) {
+                          baseCount++;
+                        }
+                        
+                        const actualTop = gameState.discardPile[actualTopIndex];
+                        const suitColor = actualTop.suit === '♥' || actualTop.suit === '♦' ? 'text-red-400' : 'text-gray-300';
+                        
+                        return (
+                          <p className="text-xs text-yellow-400 mt-1">
+                            Play on: {baseCount}× {actualTop.rank}
+                            <span className={suitColor}>{actualTop.suit}</span>
+                            {threeCount > 0 && ` + ${threeCount}× 3`}
+                            <br />
+                            <span className="text-xs text-purple-300">
+                              ({baseCount === 3 ? 'Play 1× ' + baseRank + ' or ' : ''}{threeCount === 3 ? 'Play 1× 3' : ''}{baseCount === 3 && threeCount === 3 ? ' to burn!' : ''})
+                            </span>
+                          </p>
+                        );
+                      }
+                    }
+                    
+                    return null;
+                  })()}
+                </div>
+
+                {/* Burn Pile - positioned to the right */}
+                <div className="text-center ml-12">
+                  <p className="text-slate-400 text-sm mb-2">Burn Pile</p>
+                  {gameState.burnPile.length > 0 ? (
+                    <div className="relative w-16 h-24">
+                      {/* Show last 8 cards in messy pile */}
+                      {gameState.burnPile.slice(-8).map((card, index) => (
+                        <div
+                          key={card.id}
+                          className="absolute"
+                          style={{
+                            left: `${index * 2}px`,
+                            top: `${index * 1.5}px`,
+                            transform: `rotate(${(index % 3 - 1) * 8}deg)`,
+                            zIndex: index,
+                          }}
+                        >
+                          <Card card={card} small />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="w-16 h-24 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center text-slate-600 text-xs">
+                      Empty
+                    </div>
+                  )}
+                  <p className="text-base text-white font-bold mt-2">
+                    {gameState.burnPile.length} cards
+                  </p>
                 </div>
               </div>
 
@@ -1367,50 +1491,112 @@ export default function ShitheadGame() {
                   </div>
 
                   <div className="mb-4">
-                    <p className="text-slate-400 text-sm mb-2">Hand</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-slate-400 text-sm">Hand</p>
+                      {!isSetupPhase && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setHandSortMode('original')}
+                            className={`px-2 py-1 text-xs rounded ${
+                              handSortMode === 'original'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                            }`}
+                          >
+                            Original
+                          </button>
+                          <button
+                            onClick={() => setHandSortMode('rank')}
+                            className={`px-2 py-1 text-xs rounded ${
+                              handSortMode === 'rank'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                            }`}
+                          >
+                            Rank
+                          </button>
+                          <button
+                            onClick={() => setHandSortMode('suit')}
+                            className={`px-2 py-1 text-xs rounded ${
+                              handSortMode === 'suit'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                            }`}
+                          >
+                            Suit
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <div className="hand-area flex gap-2 flex-wrap">
                       {(() => {
-                        // During drawing: show actual positions with empty slots
-                        // Normal: show compact (no gaps)
-                        if (drawingCards.length > 0) {
-                          console.log('DRAWING MODE - cards not selectable');
-                          // DRAWING MODE: Show all positions including empties
-                          const handWithEmpties = [...currentPlayer.hand];
-                          
-                          return handWithEmpties.map((card, slotIndex) => {
+                        if (!currentPlayer || !currentPlayer.hand) {
+                          return null;
+                        }
+                        
+                        const isDrawing = drawingCards.length > 0;
+                        
+                        // During drawing: show ORIGINAL array order with empty slots
+                        // Normal: show sorted compact view
+                        if (isDrawing) {
+                          return currentPlayer.hand.map((card, arrayIndex) => {
                             if (!card) {
                               return (
                                 <div
-                                  key={`slot-${slotIndex}`}
+                                  key={`slot-${arrayIndex}`}
                                   data-empty-slot
                                   className="w-20 h-28 border-2 border-dashed border-slate-600 rounded-lg bg-slate-900/60"
                                 />
                               );
                             }
-
                             return (
                               <Card
                                 key={card.id}
                                 card={card}
-                                selectable={false} // Can't select during animation
+                                selectable={false}
                                 selected={false}
                                 onClick={() => {}}
                               />
                             );
                           });
-                        } else {
-                          // NORMAL MODE: Compact display (no gaps)
-                          const compactHand = currentPlayer.hand.filter((c): c is Card => c !== null);
-                          
-                          return compactHand.map((card) => {
-                            // Find the actual index in the full hand array
-                            const actualIndex = currentPlayer.hand.indexOf(card);
-                            
-                            return (
+                        }
+                        
+                        // NORMAL MODE: sorted compact view
+                        // Get compact hand (non-null cards) with their original array indices
+                        const cardsWithIndices = currentPlayer.hand
+                          .map((card, arrayIndex) => ({ card, arrayIndex }))
+                          .filter((item): item is { card: Card; arrayIndex: number } => item.card !== null);
+                        
+                        let sortedCards = [...cardsWithIndices];
+                        
+                        // Apply sorting
+                        if (handSortMode === 'rank') {
+                          sortedCards.sort((a, b) => {
+                            if (!a.card || !b.card || !a.card.rank || !b.card.rank) return 0;
+                            const rankA = RANK_VALUES[a.card.rank] || 0;
+                            const rankB = RANK_VALUES[b.card.rank] || 0;
+                            const rankDiff = rankA - rankB;
+                            if (rankDiff !== 0) return rankDiff;
+                            return a.card.suit.localeCompare(b.card.suit);
+                          });
+                        } else if (handSortMode === 'suit') {
+                          sortedCards.sort((a, b) => {
+                            if (!a.card || !b.card || !a.card.suit || !b.card.suit) return 0;
+                            const suitOrder = { '♠': 0, '♥': 1, '♣': 2, '♦': 3 };
+                            const suitDiff = suitOrder[a.card.suit as keyof typeof suitOrder] - suitOrder[b.card.suit as keyof typeof suitOrder];
+                            if (suitDiff !== 0) return suitDiff;
+                            const rankA = RANK_VALUES[a.card.rank] || 0;
+                            const rankB = RANK_VALUES[b.card.rank] || 0;
+                            return rankA - rankB;
+                          });
+                        }
+                        
+                        return sortedCards.map((item) => {
+                          return (
+                            <div key={item.card.id} data-card-key={item.card.id}>
                               <Card
-                                key={card.id}
-                                card={card}
-                              selectable={
+                                card={item.card}
+                                selectable={
                                 isSetupPhase ||
                                 (!isSetupPhase &&
                                   isMyTurn &&
@@ -1422,26 +1608,27 @@ export default function ShitheadGame() {
                                       const startingCard = GameLogic.getStartingCard(currentPlayer);
                                       if (startingCard) {
                                         // On first turn, can play any card of the starting rank
-                                        isPlayable = card.rank === startingCard.rank;
+                                        isPlayable = item.card.rank === startingCard.rank;
                                       }
                                     } else {
-                                      isPlayable = GameLogic.canPlayMultipleCards([card], gameState.discardPile);
-                                      console.log(`Card ${card.rank}${card.suit} playable:`, isPlayable, 'Top card:', gameState.discardPile[gameState.discardPile.length - 1]);
+                                      isPlayable = GameLogic.canPlayMultipleCards([item.card], gameState.discardPile);
+                                      console.log(`Card ${item.card.rank}${item.card.suit} playable:`, isPlayable, 'Top card:', gameState.discardPile[gameState.discardPile.length - 1]);
                                     }
                                     if (selectedCards.length > 0 && selectedCards[0].type === 'hand') {
                                       const firstSelectedCard = currentPlayer.hand[selectedCards[0].index];
-                                      if (firstSelectedCard && card.rank !== firstSelectedCard.rank) {
+                                      if (firstSelectedCard && item.card.rank !== firstSelectedCard.rank) {
                                         isPlayable = false;
                                       }
                                     }
                                     return isPlayable;
-                                  })())
+                                  })()
+                                )
                               }
-                              selected={selectedCards.some((s) => s.type === 'hand' && s.index === actualIndex)}
+                              selected={selectedCards.some((s) => s.type === 'hand' && s.index === item.arrayIndex)}
                               onClick={() => {
                                 if (isSetupPhase) {
                                   const alreadySelected = selectedCards.findIndex(
-                                    (s) => s.type === 'hand' && s.index === actualIndex
+                                    (s) => s.type === 'hand' && s.index === item.arrayIndex
                                   );
 
                                   if (alreadySelected >= 0) {
@@ -1450,7 +1637,7 @@ export default function ShitheadGame() {
                                     selectedCards.length === 1 &&
                                     selectedCards[0].type === 'faceUp'
                                   ) {
-                                    swapCards(actualIndex, selectedCards[0].index);
+                                    swapCards(item.arrayIndex, selectedCards[0].index);
                                     setSelectedCards([]);
                                   } else if (
                                     selectedCards.length === 1 &&
@@ -1458,8 +1645,8 @@ export default function ShitheadGame() {
                                   ) {
                                     const temp = currentPlayer.hand[selectedCards[0].index];
                                     const newHand = [...currentPlayer.hand];
-                                    newHand[selectedCards[0].index] = currentPlayer.hand[actualIndex];
-                                    newHand[actualIndex] = temp;
+                                    newHand[selectedCards[0].index] = currentPlayer.hand[item.arrayIndex];
+                                    newHand[item.arrayIndex] = temp;
 
                                     const updatedPlayers = gameState.players.map((p) =>
                                       p.id === currentPlayerId ? { ...p, hand: newHand } : p
@@ -1483,7 +1670,7 @@ export default function ShitheadGame() {
                                     }
                                     setSelectedCards([]);
                                   } else {
-                                    setSelectedCards([{ type: 'hand', index: actualIndex }]);
+                                    setSelectedCards([{ type: 'hand', index: item.arrayIndex }]);
                                   }
                                 } else if (
                                   !isSetupPhase &&
@@ -1491,14 +1678,14 @@ export default function ShitheadGame() {
                                   GameLogic.getAvailableCardSource(currentPlayer) === 'hand'
                                 ) {
                                   const alreadySelected = selectedCards.findIndex(
-                                    (s) => s.type === 'hand' && s.index === actualIndex
+                                    (s) => s.type === 'hand' && s.index === item.arrayIndex
                                   );
                                   if (alreadySelected >= 0) {
                                     setSelectedCards(
                                       selectedCards.filter((_, idx) => idx !== alreadySelected)
                                     );
                                   } else {
-                                    const clickedCard = currentPlayer.hand[actualIndex];
+                                    const clickedCard = currentPlayer.hand[item.arrayIndex];
                                     if (clickedCard && (
                                       selectedCards.length === 0 ||
                                       selectedCards.every((s) => {
@@ -1506,16 +1693,16 @@ export default function ShitheadGame() {
                                         return existingCard && existingCard.rank === clickedCard.rank;
                                       })
                                     )) {
-                                      setSelectedCards([...selectedCards, { type: 'hand', index: actualIndex }]);
+                                      setSelectedCards([...selectedCards, { type: 'hand', index: item.arrayIndex }]);
                                     }
                                   }
                                 }
                               }}
                             />
-                          );
-                        });
-                        }
-                      })()}
+                          </div>
+                        );
+                      })
+                    })()}
                     </div>
                   </div>
 

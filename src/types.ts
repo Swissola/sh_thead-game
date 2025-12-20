@@ -26,6 +26,7 @@ export interface GameState {
     currentTurn: number;
     deck: Card[];
     discardPile: Card[];
+    burnPile: Card[]; // Cards that have been burned/removed from game
     lastAction: string;
 }
 
