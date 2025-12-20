@@ -408,9 +408,9 @@ export default function ShitheadGame() {
           typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
         )
         .join(' ');
-      
+
       pendingLogs.push(message);
-      
+
       if (!updateScheduled) {
         updateScheduled = true;
         setTimeout(() => {
@@ -1256,36 +1256,47 @@ export default function ShitheadGame() {
                     <div className="space-y-4">
                       <div>
                         <p className="text-slate-400 text-sm mb-2">Table</p>
-                        <div className="relative h-32 flex items-start">
-                          {/* Face Down cards - offset to left and underneath */}
-                          <div className="absolute left-0 top-0 flex gap-2 z-0">
-                            {currentPlayer.faceDown.map((card, i) => (
-                              <Card
-                                key={`faceDown-${i}`}
-                                card={card}
-                                faceDown
-                                small
-                                selectable={
-                                  !isSetupPhase &&
-                                  isMyTurn &&
-                                  GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
-                                }
-                                selected={selectedCards.some((s) => s.type === 'faceDown' && s.index === i)}
-                                onClick={() => {
-                                  if (
-                                    !isSetupPhase &&
-                                    isMyTurn &&
-                                    GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
-                                  ) {
-                                    setSelectedCards([{ type: 'faceDown', index: i }]);
-                                  }
-                                }}
-                              />
-                            ))}
-                          </div>
+                        <div className="flex items-start gap-4">
+                          {/* Face Down cards stack */}
+                          {currentPlayer.faceDown.length > 0 && (
+                            <div className="relative" style={{ width: '80px', height: '128px' }}>
+                              {currentPlayer.faceDown.map((card, i) => (
+                                <div
+                                  key={`faceDown-${i}`}
+                                  className="absolute"
+                                  style={{
+                                    left: `${i * 2}px`,
+                                    top: `${i * 2}px`,
+                                    zIndex: i,
+                                  }}
+                                >
+                                  <Card
+                                    card={card}
+                                    faceDown
+                                    small
+                                    selectable={
+                                      !isSetupPhase &&
+                                      isMyTurn &&
+                                      GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
+                                    }
+                                    selected={selectedCards.some((s) => s.type === 'faceDown' && s.index === i)}
+                                    onClick={() => {
+                                      if (
+                                        !isSetupPhase &&
+                                        isMyTurn &&
+                                        GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
+                                      ) {
+                                        setSelectedCards([{ type: 'faceDown', index: i }]);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
-                          {/* Face Up cards - on top, offset right */}
-                          <div className="relative left-12 flex gap-2 z-10">
+                          {/* Face Up cards */}
+                          <div className="flex gap-2 flex-wrap">
                             {currentPlayer.faceUp.map((card, i) => {
                               // Check if we can select face-up cards alongside hand cards
                               const deckEmpty = gameState.deck.length === 0;

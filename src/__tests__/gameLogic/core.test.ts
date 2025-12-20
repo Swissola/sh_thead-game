@@ -3,29 +3,29 @@ import * as GameLogic from '../../gameLogic';
 import type { Card, Player } from '../../types';
 
 describe('GameLogic - Card Validation', () => {
-  it('should validate that two cards have the same rank', () => {
-    const card1: Card = { suit: '♥', rank: '5', id: '5h', deckColor: 'red' };
-    const card2: Card = { suit: '♠', rank: '5', id: '5s', deckColor: 'red' };
-    expect(GameLogic.canPlayCard(card2, [card1])).toBe(true);
-  });
+    it('should validate that two cards have the same rank', () => {
+        const card1: Card = { suit: '♥', rank: '5', id: '5h', deckColor: 'red' };
+        const card2: Card = { suit: '♠', rank: '5', id: '5s', deckColor: 'red' };
+        expect(GameLogic.canPlayCard(card2, [card1])).toBe(true);
+    });
 
-  it('should not allow playing a lower card (4 on K)', () => {
-    const cardK: Card = { suit: '♥', rank: 'K', id: 'Kh', deckColor: 'red' };
-    const card4: Card = { suit: '♠', rank: '4', id: '4s', deckColor: 'red' };
-    expect(GameLogic.canPlayCard(card4, [cardK])).toBe(false);
-  });
+    it('should not allow playing a lower card (4 on K)', () => {
+        const cardK: Card = { suit: '♥', rank: 'K', id: 'Kh', deckColor: 'red' };
+        const card4: Card = { suit: '♠', rank: '4', id: '4s', deckColor: 'red' };
+        expect(GameLogic.canPlayCard(card4, [cardK])).toBe(false);
+    });
 
-  it('should allow 2 to be played on any card', () => {
-    const card2: Card = { suit: '♥', rank: '2', id: '2h', deckColor: 'red' };
-    const anyCard: Card = { suit: '♠', rank: '9', id: '9s', deckColor: 'red' };
-    expect(GameLogic.canPlayCard(card2, [anyCard])).toBe(true);
-  });
+    it('should allow 2 to be played on any card', () => {
+        const card2: Card = { suit: '♥', rank: '2', id: '2h', deckColor: 'red' };
+        const anyCard: Card = { suit: '♠', rank: '9', id: '9s', deckColor: 'red' };
+        expect(GameLogic.canPlayCard(card2, [anyCard])).toBe(true);
+    });
 
-  it('should allow 10 to clear the discard pile', () => {
-    const card10: Card = { suit: '♣', rank: '10', id: '10c', deckColor: 'red' };
-    const discardPile = [card10];
-    expect(GameLogic.shouldBurnPile(discardPile)).toBe(true);
-  });
+    it('should allow 10 to clear the discard pile', () => {
+        const card10: Card = { suit: '♣', rank: '10', id: '10c', deckColor: 'red' };
+        const discardPile = [card10];
+        expect(GameLogic.shouldBurnPile(discardPile)).toBe(true);
+    });
 });
 
 describe('GameLogic - Starting Player', () => {
