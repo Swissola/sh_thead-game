@@ -254,3 +254,59 @@ describe('GameLogic - Can Player Play (Pickup Confirmation)', () => {
         expect(GameLogic.canPlayerPlay(player, discardPile)).toBe(true);
     });
 });
+
+describe('GameLogic - Late Game Edge Conditions (Draw Pile Exhausted)', () => {
+    it('should allow playing face-up when all hand cards match face-up rank (3 hand cards)', () => {
+        const faceUpCard: Card = { suit: '♠', rank: '5', id: '5s', deckColor: 'red' };
+        const discardPile: Card[] = [{ suit: '♣', rank: '5', id: '5c', deckColor: 'red' }];
+
+        expect(GameLogic.canPlayMultipleCards([faceUpCard], discardPile)).toBe(true);
+    });
+
+    it('should allow playing face-up when all hand cards match face-up rank (1 hand card)', () => {
+        const faceUpCard: Card = { suit: '♠', rank: '7', id: '7s', deckColor: 'red' };
+        const discardPile: Card[] = [{ suit: '♣', rank: '7', id: '7c', deckColor: 'red' }];
+
+        expect(GameLogic.canPlayMultipleCards([faceUpCard], discardPile)).toBe(true);
+    });
+
+    it('should NOT allow playing face-up when hand has mixed ranks', () => {
+        const faceUpCard: Card = { suit: '♠', rank: '5', id: '5s', deckColor: 'red' };
+        const discardPile: Card[] = [{ suit: '♣', rank: '5', id: '5c', deckColor: 'red' }];
+
+        // Face-up can still be played on discard pile
+        expect(GameLogic.canPlayMultipleCards([faceUpCard], discardPile)).toBe(true);
+    });
+
+    it('should allow playing matching face-up card when all remaining hand cards are same rank (2 cards)', () => {
+        const faceUpCard: Card = { suit: '♠', rank: 'Q', id: 'Qs', deckColor: 'red' };
+        const discardPile: Card[] = [{ suit: '♣', rank: 'Q', id: 'Qc', deckColor: 'red' }];
+
+        expect(GameLogic.canPlayMultipleCards([faceUpCard], discardPile)).toBe(true);
+    });
+
+    it('should allow playing 2 from face-up (special card works in endgame)', () => {
+        const faceUpCard2: Card = { suit: '♠', rank: '2', id: '2s', deckColor: 'red' };
+        const discardPile: Card[] = [{ suit: '♣', rank: '9', id: '9c', deckColor: 'red' }];
+
+        expect(GameLogic.canPlayMultipleCards([faceUpCard2], discardPile)).toBe(true);
+    });
+
+    it('should require matching rank when no hand cards left and playing face-up (no nulls)', () => {
+        const faceUpCard6: Card = { suit: '♠', rank: '6', id: '6s', deckColor: 'red' };
+        const faceUpCard7: Card = { suit: '♥', rank: '7', id: '7h', deckColor: 'red' };
+        const discardPile: Card[] = [{ suit: '♣', rank: '6', id: '6c', deckColor: 'red' }];
+
+        const player: Player = {
+            id: 'p1',
+            name: 'Diana',
+            hand: [null, null, null],
+            faceUp: [faceUpCard6, faceUpCard7],
+            faceDown: [],
+            isReady: false,
+        };
+
+        // When all hand slots are empty, can play any faceUp card
+        expect(GameLogic.canPlayerPlay(player, discardPile)).toBe(true);
+    });
+});

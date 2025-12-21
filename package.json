@@ -12,6 +12,7 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest",
+    "test:verbose": "vitest --reporter verbose",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage"
   },
@@ -28,6 +29,7 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^4.0.16",
     "@vitest/ui": "^4.0.16",
     "autoprefixer": "^10.4.23",
     "eslint": "^9.39.1",

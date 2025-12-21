@@ -13,8 +13,8 @@ export interface Player {
     id: string;
     name: string;
     hand: (Card | null)[]; // Fixed array with nulls for empty slots
-    faceUp: Card[];
-    faceDown: Card[];
+    faceUp: (Card | null)[]; // Fixed array with nulls to preserve positions
+    faceDown: (Card | null)[]; // Fixed array with nulls to preserve positions
     isReady: boolean;
 }
 
@@ -45,6 +45,7 @@ export interface CardProps {
     selectable?: boolean;
     selected?: boolean;
     small?: boolean;
+    title?: string;
 }
 
 export interface PlayResult {

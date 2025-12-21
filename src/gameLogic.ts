@@ -194,7 +194,8 @@ export function getPlayResult(cardsPlayed: Card[], discardPile: Card[]): PlayRes
 export function getAvailableCardSource(player: Player): CardSource {
   const nonNullHand = player.hand.filter((c): c is Card => c !== null);
   if (nonNullHand.length > 0) return 'hand';
-  if (player.faceUp.length > 0) return 'faceUp';
+  const nonNullFaceUp = player.faceUp.filter((c): c is Card => c !== null);
+  if (nonNullFaceUp.length > 0) return 'faceUp';
   return 'faceDown';
 }
 
@@ -207,10 +208,12 @@ export function canPlayerPlay(player: Player, discardPile: Card[]): boolean {
   }
 
   if (source === 'faceUp') {
-    return player.faceUp.some((card) => canPlayCard(card, discardPile));
+    const nonNullFaceUp = player.faceUp.filter((c): c is Card => c !== null);
+    return nonNullFaceUp.some((card) => canPlayCard(card, discardPile));
   }
 
-  return player.faceDown.length > 0;
+  const nonNullFaceDown = player.faceDown.filter((c): c is Card => c !== null);
+  return nonNullFaceDown.length > 0;
 }
 
 export function shouldDrawCards(player: Player, deckSize: number): boolean {
@@ -220,8 +223,52 @@ export function shouldDrawCards(player: Player, deckSize: number): boolean {
 
 export function getCardsToDrawCount(player: Player, deckSize: number): number {
   const nonNullCount = player.hand.filter((c): c is Card => c !== null).length;
-  const needed = 3 - nonNullCount;
-  return Math.min(needed, deckSize);
+  if (nonNullCount === 0) {
+    return Math.min(3, deckSize);
+  }
+  return Math.min(1, deckSize);
+}
+
+// ============================================================================
+// MIXED SOURCE PLAY VALIDATION
+// ============================================================================
+
+export function canPlayMixedSources(
+  deckSize: number,
+  handCards: Card[],
+  faceUpCards: Card[],
+  discardPile: Card[]
+): boolean {
+  if (deckSize > 0) return false;
+  const combined = [...handCards, ...faceUpCards];
+  return canPlayMultipleCards(combined, discardPile);
+}
+
+// ============================================================================
+// PICKUP CONFIRMATION LOGIC
+// ============================================================================
+
+export function shouldConfirmPickUp(
+  player: Player,
+  discardPile: Card[],
+  revealedFaceDown: Card | null
+): boolean {
+  const source = getAvailableCardSource(player);
+
+  if (source === 'hand') {
+    const nonNullHand = player.hand.filter((c): c is Card => c !== null);
+    return nonNullHand.some((card) => canPlayCard(card, discardPile));
+  }
+
+  if (source === 'faceUp') {
+    const nonNullFaceUp = player.faceUp.filter((c): c is Card => c !== null);
+    return nonNullFaceUp.some((card) => canPlayCard(card, discardPile));
+  }
+
+  if (revealedFaceDown) {
+    return canPlayCard(revealedFaceDown, discardPile);
+  }
+  return false;
 }
 
 // ============================================================================
@@ -230,7 +277,9 @@ export function getCardsToDrawCount(player: Player, deckSize: number): number {
 
 export function hasPlayerWon(player: Player): boolean {
   const nonNullHand = player.hand.filter((c): c is Card => c !== null);
-  return nonNullHand.length === 0 && player.faceUp.length === 0 && player.faceDown.length === 0;
+  const nonNullFaceUp = player.faceUp.filter((c): c is Card => c !== null);
+  const nonNullFaceDown = player.faceDown.filter((c): c is Card => c !== null);
+  return nonNullHand.length === 0 && nonNullFaceUp.length === 0 && nonNullFaceDown.length === 0;
 }
 
 export function getFinishedPlayers(players: Player[]): Player[] {
