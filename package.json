@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:5174": "vite --host 127.0.0.1 --port 5174",
     "dev:force": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-kill-port.ps1",
+    "dev:force:5174": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-kill-port.ps1 -Port 5174",
     "build": "tsc -b && vite build",
     "lint": "eslint . --fix",
     "format": "prettier --write .",
