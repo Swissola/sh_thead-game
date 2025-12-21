@@ -63,6 +63,7 @@ export default function ShitheadGame() {
   const { handSortMode, setHandSortMode } = useHandSorting('original');
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const [pickUpConfirmation, setPickUpConfirmation] = useState<{ show: boolean; playerIndex: number } | null>(null);
+  const [celebrationModal, setCelebrationModal] = useState<{ show: boolean; playerName: string; isShithead: boolean; placement: number } | null>(null);
   // moved to useSelection hook
 
   const createTestGame = () => {
@@ -651,10 +652,37 @@ export default function ShitheadGame() {
     }
     if (playerWon) {
       lastAction += ` ${player.name} has finished!`;
+      
+      // Calculate placement (how many players have finished before this one)
+      const finishedPlayers = updatedPlayers.filter(p => GameLogic.hasPlayerWon(p));
+      const placement = finishedPlayers.length;
+      
+      // Show celebration modal for this player
+      setCelebrationModal({
+        show: true,
+        playerName: player.name,
+        isShithead: false,
+        placement
+      });
+      
+      // Auto-hide after 3 seconds
+      setTimeout(() => setCelebrationModal(null), 3000);
     }
     if (gameOver) {
       const losers = updatedPlayers.filter((p) => !GameLogic.hasPlayerWon(p));
       lastAction = `Game Over! ${losers[0].name} is the Sh!thead! 💩`;
+      
+      // Show Sh!thead modal for the loser
+      const totalPlayers = updatedPlayers.length;
+      setCelebrationModal({
+        show: true,
+        playerName: losers[0].name,
+        isShithead: true,
+        placement: totalPlayers
+      });
+      
+      // Auto-hide after 4 seconds (give them time to feel the shame 😄)
+      setTimeout(() => setCelebrationModal(null), 4000);
     }
 
     const updatedState: GameState = {
@@ -1357,6 +1385,30 @@ export default function ShitheadGame() {
                   </button>
                 </div>
               </div>
+            </div>,
+            document.body
+          )
+        }
+
+        {celebrationModal?.show &&
+          createPortal(
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+              {celebrationModal.isShithead ? (
+                <div className="celebration-modal bg-gradient-to-br from-red-600 to-pink-600 text-white px-12 py-8 rounded-2xl shadow-2xl border-4 border-slate-800 text-center max-w-md">
+                  <div className="text-7xl mb-4 celebration-emoji-pulse">💩</div>
+                  <div className="text-5xl font-black mb-3">SH!THEAD!</div>
+                  <div className="text-2xl opacity-90">{celebrationModal.playerName} is the loser!</div>
+                </div>
+              ) : (
+                <div className="celebration-modal bg-gradient-to-br from-purple-600 to-pink-600 text-white px-12 py-8 rounded-2xl shadow-2xl border-4 border-yellow-400 text-center max-w-md">
+                  <div className="text-7xl mb-4 celebration-emoji">👑</div>
+                  <div className="text-4xl font-black mb-3">SAFE!</div>
+                  <div className="text-2xl mb-2">{celebrationModal.playerName} finished!</div>
+                  <div className="text-lg opacity-90">
+                    {celebrationModal.placement === 1 ? '1st' : celebrationModal.placement === 2 ? '2nd' : celebrationModal.placement === 3 ? '3rd' : `${celebrationModal.placement}th`} place
+                  </div>
+                </div>
+              )}
             </div>,
             document.body
           )

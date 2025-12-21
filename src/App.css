@@ -45,3 +45,47 @@
 }
 
 /* Discard animations removed: no .play-card-ghost styles */
+
+/* Celebration Modal Animations */
+@keyframes celebrationFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes celebrationBounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+@keyframes celebrationPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.85;
+  }
+}
+
+.celebration-modal {
+  animation: celebrationFadeIn 0.4s ease-out;
+}
+
+.celebration-emoji {
+  animation: celebrationBounce 1s ease-in-out infinite;
+}
+
+.celebration-emoji-pulse {
+  animation: celebrationPulse 1.5s ease-in-out infinite;
+}
