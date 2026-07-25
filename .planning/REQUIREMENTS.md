@@ -13,7 +13,7 @@ prior staged plan in the repo's `ROADMAP.md` (7 stages), captured as context in
 
 - [x] **ENGINE-01**: Every move (play cards, pick up pile, swap cards, ready up) is processed through a single, pure `applyMove(state, move)` reducer built on `gameLogic.ts`'s existing predicates
 - [x] **ENGINE-02**: No move handler mutates existing state or player objects in place — every move produces a new state object
-- [ ] **ENGINE-03**: `App.tsx` is split into Menu, Lobby, and Game screen components plus a slim orchestrator (down from ~1,500 lines in one file)
+- [x] **ENGINE-03**: `App.tsx` is split into Menu, Lobby, and Game screen components plus a slim orchestrator (down from ~1,500 lines in one file)
 - [ ] **ENGINE-04**: Duplicated rules logic (hand-sort comparators, "cards share a rank" checks, deck creation/shuffling) is removed from `App.tsx`/`Hand.tsx`/`Table.tsx` and delegated to `gameLogic.ts`'s single implementation
 - [x] **ENGINE-05**: Invalid moves and game feedback appear as in-app toast/inline messages instead of blocking `window.alert()` calls
 - [ ] **ENGINE-06**: The player finish celebration animation (already written in `App.css`) actually plays in the browser
@@ -83,7 +83,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | ENGINE-01 | Phase 1 | Complete |
 | ENGINE-02 | Phase 1 | Complete |
-| ENGINE-03 | Phase 1 | Pending |
+| ENGINE-03 | Phase 1 | Complete |
 | ENGINE-04 | Phase 1 | Pending |
 | ENGINE-05 | Phase 1 | Complete |
 | ENGINE-06 | Phase 1 | Pending |
