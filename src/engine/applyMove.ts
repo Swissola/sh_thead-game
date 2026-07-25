@@ -84,6 +84,26 @@ function applyPlayCards(
         }
     }
 
+    // Enforce the hand -> face-up -> face-down play order (CR-01): outside the
+    // documented hand+faceUp combo exception, every selection's source must equal
+    // the player's single currently-available source. Without this, a caller
+    // could submit a faceDown or pure faceUp selection while hand cards remain,
+    // bypassing the play-order rule this reducer exists to enforce.
+    if (!hasMixedSelection) {
+        const selectionTypes = new Set(move.cards.map((s) => s.type));
+        for (const type of selectionTypes) {
+            if (type !== cardSource) {
+                return {
+                    state,
+                    error: {
+                        code: ERROR_CODES.INVALID_SELECTION,
+                        message: `You must play from your ${cardSource} cards first`,
+                    },
+                };
+            }
+        }
+    }
+
     const cardsToPlay: Card[] = [];
     for (const selection of move.cards) {
         const sourceArray: (Card | null)[] =
@@ -337,6 +357,15 @@ function applyPickUpPile(
     const updatedHand = [...player.hand];
     const cardsToAdd = [...state.discardPile];
 
+    // CR-01 follow-up: unlike PLAY_CARDS, revealedFaceDownIndex is deliberately NOT
+    // gated on getAvailableCardSource(player) === 'faceDown' here. This is an accepted
+    // decision (consistent with RESEARCH.md Open Question 2's resolution that
+    // PICK_UP_PILE performs the pickup unconditionally once dispatched), not an
+    // oversight: the UI (Table.tsx) only ever lets a player reveal/select a face-down
+    // card when getAvailableCardSource already reports 'faceDown', so a spoofed
+    // revealedFaceDownIndex from a non-faceDown-source player is the same class of
+    // "untrusted client" risk as any other spoofed move field, not a rule-order bypass
+    // in its own right - picking up the pile is always legal regardless of source.
     const newFaceDown = [...player.faceDown];
     if (move.revealedFaceDownIndex !== undefined) {
         const idx = move.revealedFaceDownIndex;

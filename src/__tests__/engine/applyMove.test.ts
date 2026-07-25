@@ -575,19 +575,19 @@ describe('applyMove - PLAY_CARDS', () => {
 
     it('blind face-down play, valid: resolves via player.faceDown, plays it, advances turn', () => {
         const faceDownCard = buildCard({ id: 'facedown-6h', rank: '6', suit: '♥' });
+        const otherFaceDownCard = buildCard({ id: 'facedown-2c', rank: '2', suit: '♣' });
         const discardCard = buildCard({ id: 'discard-4c', rank: '4', suit: '♣' });
-        const handCards = [
-            buildCard({ id: 'p0-hand-0', rank: '9', suit: '♠' }),
-            buildCard({ id: 'p0-hand-1', rank: '9', suit: '♥' }),
-            buildCard({ id: 'p0-hand-2', rank: '9', suit: '♣' }),
-        ];
         const state = buildGameState({
             phase: 'playing',
             currentTurn: 0,
             discardPile: [discardCard],
             deck: [],
             players: [
-                buildPlayer({ id: 'p0', hand: handCards, faceUp: [], faceDown: [faceDownCard] }),
+                // hand and faceUp must both be empty (source === 'faceDown', CR-01)
+                // for a faceDown selection to be legal. A second faceDown card is kept
+                // so this player hasn't won after playing index 0 (keeps the assertions
+                // below focused on the blind-play resolution, not a win side effect).
+                buildPlayer({ id: 'p0', hand: [], faceUp: [], faceDown: [faceDownCard, otherFaceDownCard] }),
                 buildPlayer({ id: 'p1' }),
             ],
         });
@@ -611,11 +611,42 @@ describe('applyMove - PLAY_CARDS', () => {
     it('blind face-down play, invalid: hand receives the card plus entire former discardPile, no error', () => {
         const faceDownCard = buildCard({ id: 'facedown-5c', rank: '5', suit: '♣' });
         const topCard = buildCard({ id: 'discard-king', rank: 'K', suit: '♠' });
-        const handCard = buildCard({ id: 'p0-hand-0', rank: '9', suit: '♦' });
         const state = buildGameState({
             phase: 'playing',
             currentTurn: 0,
             discardPile: [topCard],
+            deck: [],
+            players: [
+                // hand and faceUp must both be empty (source === 'faceDown', CR-01)
+                // for a faceDown selection to be legal.
+                buildPlayer({ id: 'p0', hand: [], faceUp: [], faceDown: [faceDownCard] }),
+                buildPlayer({ id: 'p1' }),
+            ],
+        });
+        const before = snapshot(state);
+
+        const result = applyMove(state, {
+            type: 'PLAY_CARDS',
+            playerId: 'p0',
+            cards: [{ type: 'faceDown', index: 0 }],
+        });
+
+        expect(result.error).toBeUndefined();
+        expect(result.state.players[0].hand).toEqual([faceDownCard, topCard]);
+        expect(result.state.players[0].faceDown).toEqual([null]);
+        expect(result.state.discardPile).toEqual([]);
+        const expectedNextTurn = GameLogic.getNextPlayer(0, result.state.players);
+        expect(result.state.currentTurn).toBe(expectedNextTurn);
+        expect(state).toEqual(before);
+    });
+
+    it('rejects INVALID_SELECTION for a faceDown selection while the player still holds hand cards (CR-01)', () => {
+        const handCard = buildCard({ id: 'p0-hand-0', rank: '9', suit: '♦' });
+        const faceDownCard = buildCard({ id: 'facedown-5c', rank: '5', suit: '♣' });
+        const state = buildGameState({
+            phase: 'playing',
+            currentTurn: 0,
+            discardPile: [buildCard({ id: 'discard-king', rank: 'K', suit: '♠' })],
             deck: [],
             players: [
                 buildPlayer({ id: 'p0', hand: [handCard], faceUp: [], faceDown: [faceDownCard] }),
@@ -630,12 +661,34 @@ describe('applyMove - PLAY_CARDS', () => {
             cards: [{ type: 'faceDown', index: 0 }],
         });
 
-        expect(result.error).toBeUndefined();
-        expect(result.state.players[0].hand).toEqual([handCard, faceDownCard, topCard]);
-        expect(result.state.players[0].faceDown).toEqual([null]);
-        expect(result.state.discardPile).toEqual([]);
-        const expectedNextTurn = GameLogic.getNextPlayer(0, result.state.players);
-        expect(result.state.currentTurn).toBe(expectedNextTurn);
+        expect(result.error).toEqual({ code: ERROR_CODES.INVALID_SELECTION, message: 'You must play from your hand cards first' });
+        expect(result.state).toBe(state);
+        expect(state).toEqual(before);
+    });
+
+    it('rejects INVALID_SELECTION for a pure faceUp selection while the player still holds hand cards (CR-01)', () => {
+        const handCard = buildCard({ id: 'p0-hand-0', rank: '9', suit: '♦' });
+        const faceUpCard = buildCard({ id: 'faceup-9h', rank: '9', suit: '♥' });
+        const state = buildGameState({
+            phase: 'playing',
+            currentTurn: 0,
+            discardPile: [buildCard({ id: 'discard-king', rank: 'K', suit: '♠' })],
+            deck: [],
+            players: [
+                buildPlayer({ id: 'p0', hand: [handCard], faceUp: [faceUpCard], faceDown: [] }),
+                buildPlayer({ id: 'p1' }),
+            ],
+        });
+        const before = snapshot(state);
+
+        const result = applyMove(state, {
+            type: 'PLAY_CARDS',
+            playerId: 'p0',
+            cards: [{ type: 'faceUp', index: 0 }],
+        });
+
+        expect(result.error).toEqual({ code: ERROR_CODES.INVALID_SELECTION, message: 'You must play from your hand cards first' });
+        expect(result.state).toBe(state);
         expect(state).toEqual(before);
     });
 
