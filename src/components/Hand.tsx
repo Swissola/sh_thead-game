@@ -3,6 +3,7 @@ import * as GameLogic from '../gameLogic';
 import { RANK_VALUES } from '../gameLogic';
 import type { Card as CardType, CardSelection, GameState, Player } from '../types';
 import { Card as CardComponent } from './Card';
+import { useGameContext } from '../context/GameContext';
 
 interface HandProps {
     player: Player;
@@ -13,10 +14,7 @@ interface HandProps {
     selectedCards: CardSelection[];
     setSelectedCards: (sel: CardSelection[]) => void;
     gameState: GameState;
-    currentPlayerId: string;
-    swapCards: (handIndex: number, faceUpIndex: number) => void;
     drawingCards: Array<{ card: CardType; id: string; targetPos: { x: number; y: number }; startPos?: { x: number; y: number } }>;
-    updateGameState: (newState: GameState) => void;
 }
 
 const Hand: React.FC<HandProps> = ({
@@ -28,11 +26,10 @@ const Hand: React.FC<HandProps> = ({
     selectedCards,
     setSelectedCards,
     gameState,
-    currentPlayerId,
-    swapCards,
     drawingCards,
-    updateGameState,
 }) => {
+    const { dispatchMove, currentPlayerId } = useGameContext();
+
     if (!player || !player.hand) return null;
 
     const isDrawing = drawingCards.length > 0;
@@ -82,30 +79,12 @@ const Hand: React.FC<HandProps> = ({
                         });
                     }
 
-                    const cardsWithIndices = player.hand
-                        .map((card, arrayIndex) => ({ card, arrayIndex }))
-                        .filter((item): item is { card: CardType; arrayIndex: number } => item.card !== null);
+                    const sortedCards = GameLogic.sortHand(player.hand, handSortMode);
 
-                    let sortedCards = [...cardsWithIndices];
-
-                    if (handSortMode === 'rank') {
-                        sortedCards.sort((a, b) => {
-                            const rankA = RANK_VALUES[a.card.rank] || 0;
-                            const rankB = RANK_VALUES[b.card.rank] || 0;
-                            const rankDiff = rankA - rankB;
-                            if (rankDiff !== 0) return rankDiff;
-                            return a.card.suit.localeCompare(b.card.suit);
-                        });
-                    } else if (handSortMode === 'suit') {
-                        sortedCards.sort((a, b) => {
-                            const suitOrder = { '♠': 0, '♥': 1, '♣': 2, '♦': 3 };
-                            const suitDiff = suitOrder[a.card.suit as keyof typeof suitOrder] - suitOrder[b.card.suit as keyof typeof suitOrder];
-                            if (suitDiff !== 0) return suitDiff;
-                            const rankA = RANK_VALUES[a.card.rank] || 0;
-                            const rankB = RANK_VALUES[b.card.rank] || 0;
-                            return rankA - rankB;
-                        });
-                    }
+                    const resolvedHandSelection = selectedCards
+                        .filter((s) => s.type === 'hand')
+                        .map((s) => player.hand[s.index])
+                        .filter((c): c is CardType => c !== null);
 
                     return sortedCards.map((item, index) => {
                         const nextItem = sortedCards[index + 1];
@@ -147,11 +126,8 @@ const Hand: React.FC<HandProps> = ({
                                         } else {
                                             tooltip = "Can't be played on the current pile";
                                         }
-                                    } else if (selectedCards.length > 0 && selectedCards[0].type === 'hand') {
-                                        const firstSelectedCard = player.hand[selectedCards[0].index];
-                                        if (firstSelectedCard && item.card.rank !== firstSelectedCard.rank) {
-                                            tooltip = 'Select same rank to play together';
-                                        }
+                                    } else if (selectedCards.length > 0 && !GameLogic.canAddToSelection(item.card, resolvedHandSelection)) {
+                                        tooltip = 'Select same rank to play together';
                                     }
                                 }
                             }
@@ -179,11 +155,8 @@ const Hand: React.FC<HandProps> = ({
                                                 } else {
                                                     isPlayable = GameLogic.canPlayMultipleCards([item.card], gameState.discardPile);
                                                 }
-                                                if (selectedCards.length > 0 && selectedCards[0].type === 'hand') {
-                                                    const firstSelectedCard = player.hand[selectedCards[0].index];
-                                                    if (firstSelectedCard && item.card.rank !== firstSelectedCard.rank) {
-                                                        isPlayable = false;
-                                                    }
+                                                if (selectedCards.length > 0 && !GameLogic.canAddToSelection(item.card, resolvedHandSelection)) {
+                                                    isPlayable = false;
                                                 }
                                                 return isPlayable;
                                             })()
@@ -198,25 +171,24 @@ const Hand: React.FC<HandProps> = ({
                                             if (alreadySelected >= 0) {
                                                 setSelectedCards([]);
                                             } else if (selectedCards.length === 1 && selectedCards[0].type === 'faceUp') {
-                                                swapCards(item.arrayIndex, selectedCards[0].index);
+                                                dispatchMove({
+                                                    type: 'SWAP_CARDS',
+                                                    playerId: currentPlayerId,
+                                                    sourceA: 'hand',
+                                                    indexA: item.arrayIndex,
+                                                    sourceB: 'faceUp',
+                                                    indexB: selectedCards[0].index,
+                                                });
                                                 setSelectedCards([]);
                                             } else if (selectedCards.length === 1 && selectedCards[0].type === 'hand') {
-                                                const temp = player.hand[selectedCards[0].index];
-                                                const newHand = [...player.hand];
-                                                newHand[selectedCards[0].index] = player.hand[item.arrayIndex];
-                                                newHand[item.arrayIndex] = temp;
-
-                                                const updatedPlayers = gameState.players.map((p) =>
-                                                    p.id === currentPlayerId ? { ...p, hand: newHand } : p
-                                                );
-
-                                                const updatedState = {
-                                                    ...gameState,
-                                                    players: updatedPlayers,
-                                                    lastAction: `${player.name} swapped hand cards`,
-                                                };
-
-                                                updateGameState(updatedState);
+                                                dispatchMove({
+                                                    type: 'SWAP_CARDS',
+                                                    playerId: currentPlayerId,
+                                                    sourceA: 'hand',
+                                                    indexA: selectedCards[0].index,
+                                                    sourceB: 'hand',
+                                                    indexB: item.arrayIndex,
+                                                });
                                                 setSelectedCards([]);
                                             } else {
                                                 setSelectedCards([{ type: 'hand', index: item.arrayIndex }]);

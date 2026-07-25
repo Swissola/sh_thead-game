@@ -2,6 +2,7 @@ import React from 'react';
 import * as GameLogic from '../gameLogic';
 import type { Card, CardSelection, GameState, Player } from '../types';
 import { Card as CardComponent } from './Card';
+import { useGameContext } from '../context/GameContext';
 
 interface RevealedFaceDown {
     card: Card;
@@ -10,7 +11,6 @@ interface RevealedFaceDown {
 
 interface TableProps {
     gameState: GameState;
-    currentPlayerId: string;
     currentPlayer: Player;
     isSetupPhase: boolean;
     isMyTurn: boolean;
@@ -18,13 +18,10 @@ interface TableProps {
     setSelectedCards: (sel: CardSelection[]) => void;
     revealedFaceDown: RevealedFaceDown | null;
     setRevealedFaceDown: (val: RevealedFaceDown | null) => void;
-    swapCards: (handIndex: number, faceUpIndex: number) => void;
-    updateGameState: (newState: GameState) => void;
 }
 
 const Table: React.FC<TableProps> = ({
     gameState,
-    currentPlayerId,
     currentPlayer,
     isSetupPhase,
     isMyTurn,
@@ -32,10 +29,15 @@ const Table: React.FC<TableProps> = ({
     setSelectedCards,
     revealedFaceDown,
     setRevealedFaceDown,
-    swapCards,
-    updateGameState,
 }) => {
+    const { dispatchMove, currentPlayerId } = useGameContext();
+
     if (!currentPlayer) return null;
+
+    const resolvedFaceUpSelection = selectedCards
+        .filter((s) => s.type === 'faceUp')
+        .map((s) => currentPlayer.faceUp[s.index])
+        .filter((c): c is Card => c !== null);
 
     return (
         <div className="space-y-4">
@@ -100,11 +102,8 @@ const Table: React.FC<TableProps> = ({
                                 let isPlayable = true;
                                 if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
                                     isPlayable = GameLogic.canPlayMultipleCards([card], gameState.discardPile);
-                                    if (selectedCards.length > 0 && selectedCards[0].type === 'faceUp') {
-                                        const firstSelectedCard = currentPlayer.faceUp[selectedCards[0].index];
-                                        if (firstSelectedCard && card.rank !== firstSelectedCard.rank) {
-                                            isPlayable = false;
-                                        }
+                                    if (selectedCards.length > 0 && !GameLogic.canAddToSelection(card, resolvedFaceUpSelection)) {
+                                        isPlayable = false;
                                     }
                                 }
 
@@ -128,11 +127,8 @@ const Table: React.FC<TableProps> = ({
                                             } else {
                                                 tooltip = "Can't be played on the current pile";
                                             }
-                                        } else if (selectedCards.length > 0 && selectedCards[0].type === 'faceUp') {
-                                            const firstSelectedCard = currentPlayer.faceUp[selectedCards[0].index];
-                                            if (firstSelectedCard && card.rank !== firstSelectedCard.rank) {
-                                                tooltip = 'Select same rank to play together';
-                                            }
+                                        } else if (selectedCards.length > 0 && !GameLogic.canAddToSelection(card, resolvedFaceUpSelection)) {
+                                            tooltip = 'Select same rank to play together';
                                         }
                                     } else if (!deckEmpty) {
                                         tooltip = 'Cannot combine while deck has cards';
@@ -163,25 +159,24 @@ const Table: React.FC<TableProps> = ({
                                                     if (alreadySelected >= 0) {
                                                         setSelectedCards([]);
                                                     } else if (selectedCards.length === 1 && selectedCards[0].type === 'hand') {
-                                                        swapCards(selectedCards[0].index, i);
+                                                        dispatchMove({
+                                                            type: 'SWAP_CARDS',
+                                                            playerId: currentPlayerId,
+                                                            sourceA: 'hand',
+                                                            indexA: selectedCards[0].index,
+                                                            sourceB: 'faceUp',
+                                                            indexB: i,
+                                                        });
                                                         setSelectedCards([]);
                                                     } else if (selectedCards.length === 1 && selectedCards[0].type === 'faceUp') {
-                                                        const temp = currentPlayer.faceUp[selectedCards[0].index];
-                                                        const newFaceUp = [...currentPlayer.faceUp];
-                                                        newFaceUp[selectedCards[0].index] = currentPlayer.faceUp[i];
-                                                        newFaceUp[i] = temp;
-
-                                                        const updatedPlayers = gameState.players.map((p) =>
-                                                            p.id === currentPlayerId ? { ...p, faceUp: newFaceUp } : p
-                                                        );
-
-                                                        const updatedState = {
-                                                            ...gameState,
-                                                            players: updatedPlayers,
-                                                            lastAction: `${currentPlayer.name} swapped face-up cards`,
-                                                        };
-
-                                                        updateGameState(updatedState);
+                                                        dispatchMove({
+                                                            type: 'SWAP_CARDS',
+                                                            playerId: currentPlayerId,
+                                                            sourceA: 'faceUp',
+                                                            indexA: selectedCards[0].index,
+                                                            sourceB: 'faceUp',
+                                                            indexB: i,
+                                                        });
                                                         setSelectedCards([]);
                                                     } else {
                                                         setSelectedCards([{ type: 'faceUp', index: i }]);
