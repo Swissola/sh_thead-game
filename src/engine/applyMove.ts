@@ -6,9 +6,8 @@
  * copied (ENGINE-02), and every rejection returns the *original* state
  * reference unchanged.
  *
- * This file implements READY_UP, SWAP_CARDS, and PICK_UP_PILE in full.
- * PLAY_CARDS is a deliberate stub - see applyPlayCardsStub below - deferred
- * to Plan 01-03, which replaces this function entirely.
+ * This file implements all four Move types: READY_UP, SWAP_CARDS,
+ * PICK_UP_PILE, and PLAY_CARDS.
  */
 import * as GameLogic from '../gameLogic';
 import type { Card, CardSource, GameState, Player } from '../types';
@@ -29,13 +28,204 @@ export function applyMove(state: GameState, move: Move): ApplyMoveResult {
         case 'PICK_UP_PILE':
             return applyPickUpPile(state, move, playerIndex);
         case 'PLAY_CARDS':
-            return applyPlayCardsStub(state);
+            return applyPlayCards(state, move, playerIndex);
     }
 }
 
-// TODO(01-03): replace with real PLAY_CARDS implementation
-function applyPlayCardsStub(state: GameState): ApplyMoveResult {
-    return { state, error: { code: ERROR_CODES.INVALID_PLAY, message: 'PLAY_CARDS not yet implemented' } };
+function applyPlayCards(
+    state: GameState,
+    move: Extract<Move, { type: 'PLAY_CARDS' }>,
+    playerIndex: number
+): ApplyMoveResult {
+    if (state.phase !== 'playing') {
+        return { state, error: { code: ERROR_CODES.WRONG_PHASE, message: 'Cannot play cards outside playing phase' } };
+    }
+    if (move.playerId !== state.players[state.currentTurn].id) {
+        return { state, error: { code: ERROR_CODES.NOT_YOUR_TURN, message: "It is not this player's turn" } };
+    }
+    if (move.cards.length === 0) {
+        return { state, error: { code: ERROR_CODES.NO_SELECTION, message: 'Please select a card to play' } };
+    }
+
+    const player = state.players[playerIndex];
+    const effectiveHand = move.reorderedHand ?? player.hand;
+    const cardSource = GameLogic.getAvailableCardSource({ ...player, hand: effectiveHand });
+    const isBlindPlay = move.cards[0].type === 'faceDown';
+
+    const hasMixedSelection =
+        move.cards.some((s) => s.type === 'hand') && move.cards.some((s) => s.type === 'faceUp');
+
+    if (hasMixedSelection) {
+        if (state.deck.length > 0 || cardSource !== 'hand') {
+            return {
+                state,
+                error: {
+                    code: ERROR_CODES.INVALID_COMBINATION,
+                    message: 'You can only combine hand and face-up cards when the deck is empty and playing from your hand',
+                },
+            };
+        }
+        const handSelected = move.cards
+            .filter((s) => s.type === 'hand')
+            .map((s) => effectiveHand[s.index])
+            .filter((c): c is Card => c !== null && c !== undefined);
+        const faceUpSelected = move.cards
+            .filter((s) => s.type === 'faceUp')
+            .map((s) => player.faceUp[s.index])
+            .filter((c): c is Card => c !== null && c !== undefined);
+        if (!GameLogic.canPlayMixedSources(state.deck.length, handSelected, faceUpSelected, state.discardPile)) {
+            return {
+                state,
+                error: {
+                    code: ERROR_CODES.INVALID_COMBINATION,
+                    message: 'You can only combine hand and face-up cards with matching ranks when the deck is empty',
+                },
+            };
+        }
+    }
+
+    const cardsToPlay: Card[] = [];
+    for (const selection of move.cards) {
+        const sourceArray: (Card | null)[] =
+            selection.type === 'hand' ? effectiveHand : selection.type === 'faceUp' ? player.faceUp : player.faceDown;
+        if (selection.index < 0 || selection.index >= sourceArray.length) {
+            return { state, error: { code: ERROR_CODES.INVALID_SELECTION, message: 'Selected index is out of bounds' } };
+        }
+        const card = sourceArray[selection.index];
+        if (!card) {
+            return { state, error: { code: ERROR_CODES.INVALID_SELECTION, message: 'Selected slot is empty' } };
+        }
+        cardsToPlay.push(card);
+    }
+
+    if (state.isFirstTurn) {
+        const startingCard = GameLogic.getStartingCard({ ...player, hand: effectiveHand });
+        const allCardsMatch = !!startingCard && cardsToPlay.every((card) => card.rank === startingCard.rank);
+        if (!allCardsMatch) {
+            return {
+                state,
+                error: {
+                    code: ERROR_CODES.FIRST_TURN_INVALID,
+                    message: startingCard
+                        ? `First turn: you can only play ${startingCard.rank}s`
+                        : 'You must have the starting card to play first',
+                },
+            };
+        }
+    }
+
+    if (!isBlindPlay && !GameLogic.canPlayMultipleCards(cardsToPlay, state.discardPile)) {
+        return { state, error: { code: ERROR_CODES.INVALID_PLAY, message: 'Those cards cannot be played on the current pile' } };
+    }
+
+    // Fresh copies before any index-assignment - never mutate player.hand/faceUp/faceDown
+    // or effectiveHand directly (RESEARCH.md Pitfall 1 / ENGINE-02).
+    const newHand = [...effectiveHand];
+    const newFaceUp = [...player.faceUp];
+    const newFaceDown = [...player.faceDown];
+
+    for (const selection of move.cards) {
+        if (selection.type === 'hand') newHand[selection.index] = null;
+        else if (selection.type === 'faceUp') newFaceUp[selection.index] = null;
+        else newFaceDown[selection.index] = null;
+    }
+
+    if (isBlindPlay && !GameLogic.canPlayMultipleCards(cardsToPlay, state.discardPile)) {
+        // Invalid blind play - pick up the pile plus the cards played (D-02: a valid move
+        // outcome, not a rejection). Fill null slots first, then extend.
+        const pickedUpCards = [...cardsToPlay, ...state.discardPile];
+        let fillIndex = 0;
+        for (const card of pickedUpCards) {
+            while (fillIndex < newHand.length && newHand[fillIndex] !== null) {
+                fillIndex++;
+            }
+            if (fillIndex < newHand.length) {
+                newHand[fillIndex] = card;
+                fillIndex++;
+            } else {
+                newHand.push(card);
+            }
+        }
+
+        const updatedPlayer: Player = { ...player, hand: newHand, faceUp: newFaceUp, faceDown: newFaceDown };
+        const updatedPlayers = state.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
+        const nextTurn = GameLogic.getNextPlayer(playerIndex, updatedPlayers);
+
+        return {
+            state: {
+                ...state,
+                players: updatedPlayers,
+                discardPile: [],
+                currentTurn: nextTurn,
+                lastAction: `${player.name} played ${cardsToPlay[0].rank} blind - invalid! Picked up pile.`,
+                isFirstTurn: false,
+            },
+        };
+    }
+
+    // Valid play (blind or not) - burn/draw/win sequencing, preserved verbatim from
+    // App.tsx:696-746 minus the DOM/flushSync/setTimeout animation wrapper.
+    let newDiscardPile = [...state.discardPile, ...cardsToPlay];
+    let newBurnPile = [...state.burnPile];
+    const burned = GameLogic.shouldBurnPile(newDiscardPile);
+    const playResult = GameLogic.getPlayResult(cardsToPlay, newDiscardPile);
+
+    if (burned) {
+        newBurnPile = [...newBurnPile, ...newDiscardPile];
+        newDiscardPile = [];
+    }
+
+    const preDrawPlayer: Player = { ...player, hand: newHand, faceUp: newFaceUp, faceDown: newFaceDown };
+    const cardsToDraw = GameLogic.getCardsToDrawCount(preDrawPlayer, state.deck.length);
+    const drawnCards = cardsToDraw > 0 ? state.deck.slice(0, cardsToDraw) : [];
+
+    const finalHand = [...newHand];
+    let drawIndex = 0;
+    for (let i = 0; i < finalHand.length && drawIndex < drawnCards.length; i++) {
+        if (finalHand[i] === null) {
+            finalHand[i] = drawnCards[drawIndex];
+            drawIndex++;
+        }
+    }
+    while (drawIndex < drawnCards.length) {
+        finalHand.push(drawnCards[drawIndex]);
+        drawIndex++;
+    }
+
+    const updatedPlayer: Player = { ...player, hand: finalHand, faceUp: newFaceUp, faceDown: newFaceDown };
+    const updatedPlayers = state.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
+
+    const playerWon = GameLogic.hasPlayerWon(updatedPlayer);
+    const nextTurn = burned ? playerIndex : GameLogic.getNextPlayer(playerIndex, updatedPlayers);
+    const gameOver = GameLogic.isGameOver(updatedPlayers);
+
+    let lastAction = `${player.name}: ${playResult.message}`;
+    if (cardsToDraw > 0) {
+        lastAction += ` Drew ${cardsToDraw} card${cardsToDraw > 1 ? 's' : ''}.`;
+    }
+    if (playerWon) {
+        lastAction += ` ${player.name} has finished!`;
+    }
+    if (gameOver) {
+        const losers = updatedPlayers.filter((p) => !GameLogic.hasPlayerWon(p));
+        if (losers.length > 0) {
+            lastAction = `Game Over! ${losers[0].name} is the Sh!thead! \u{1F4A9}`;
+        }
+    }
+
+    return {
+        state: {
+            ...state,
+            players: updatedPlayers,
+            discardPile: newDiscardPile,
+            burnPile: newBurnPile,
+            deck: state.deck.slice(cardsToDraw),
+            currentTurn: nextTurn,
+            phase: gameOver ? 'finished' : 'playing',
+            lastAction,
+            isFirstTurn: false,
+        },
+    };
 }
 
 function applyReadyUp(state: GameState, playerIndex: number): ApplyMoveResult {
