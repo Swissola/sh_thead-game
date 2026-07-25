@@ -29,6 +29,13 @@ export function applyMove(state: GameState, move: Move): ApplyMoveResult {
             return applyPickUpPile(state, move, playerIndex);
         case 'PLAY_CARDS':
             return applyPlayCards(state, move, playerIndex);
+        default:
+            // WR-01: runtime guard for malformed/unexpected move objects - TypeScript's
+            // exhaustiveness only holds statically. Without this, a bad-input call falls
+            // through to an implicit `undefined` despite the declared ApplyMoveResult
+            // return type, which crashes the caller (GameContext.dispatchMove reads
+            // result.error on an undefined result).
+            return { state, error: { code: ERROR_CODES.INVALID_SELECTION, message: 'Unrecognised move type' } };
     }
 }
 

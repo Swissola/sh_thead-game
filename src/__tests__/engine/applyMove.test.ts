@@ -1048,3 +1048,24 @@ describe('applyMove - PLAY_CARDS', () => {
         expect(state).toEqual(before);
     });
 });
+
+describe('applyMove - unrecognised move type (WR-01)', () => {
+    it('returns an INVALID_SELECTION error instead of falling through to undefined', () => {
+        const state = buildGameState({
+            phase: 'playing',
+            currentTurn: 0,
+            players: [buildPlayer({ id: 'p0' }), buildPlayer({ id: 'p1' })],
+        });
+        const before = snapshot(state);
+
+        // Simulates a malformed/unexpected move object reaching the runtime boundary -
+        // TypeScript's exhaustiveness check only protects statically-typed callers.
+        const malformedMove = { type: 'NOT_A_REAL_MOVE', playerId: 'p0' } as unknown as Parameters<typeof applyMove>[1];
+        const result = applyMove(state, malformedMove);
+
+        expect(result).toBeDefined();
+        expect(result.state).toBe(state);
+        expect(result.error).toEqual({ code: ERROR_CODES.INVALID_SELECTION, message: 'Unrecognised move type' });
+        expect(state).toEqual(before);
+    });
+});
