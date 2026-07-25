@@ -38,7 +38,7 @@ export function GameProvider({ playerId, children }: { playerId: string; childre
     // D-10 cleanup: roomCode is derived from gameState each render, not a separate
     // state field - removes the dual-purpose roomCode state bug present in App.tsx.
     const roomCode = gameState?.roomCode ?? '';
-    const updateGameState = useGameStateUpdater(testMode, roomCode, setGameStateInternal);
+    const updateGameState = useGameStateUpdater(testMode, roomCode, setGameStateInternal, showToast);
 
     // D-10 cleanup: computed once here, replacing the four duplicate
     // `const currentPlayerId = testMode ? ... : playerId` lines in App.tsx.
@@ -52,7 +52,10 @@ export function GameProvider({ playerId, children }: { playerId: string; childre
                 showToast(result.error.message, result.error.code);
                 return;
             }
-            updateGameState(result.state);
+            // CR-02: updateGameState is async and already handles/reports its own
+            // storage-write failures via showToast - `void` marks this as an
+            // intentional fire-and-forget rather than an accidental floating promise.
+            void updateGameState(result.state);
         },
         [gameState, updateGameState, showToast]
     );
