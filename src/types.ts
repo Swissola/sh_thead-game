@@ -47,8 +47,3 @@ export interface CardProps {
     small?: boolean;
     title?: string;
 }
-
-export interface PlayResult {
-    valid: boolean;
-    message: string;
-}

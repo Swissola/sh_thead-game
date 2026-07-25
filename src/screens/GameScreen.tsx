@@ -130,7 +130,7 @@ export function GameScreen() {
             if (!updateScheduled) {
                 updateScheduled = true;
                 setTimeout(() => {
-                    setConsoleLogs((prev) => [...prev.slice(-(50 - pendingLogs.length)), ...pendingLogs]);
+                    setConsoleLogs((prev) => [...prev.slice(-Math.max(0, 50 - pendingLogs.length)), ...pendingLogs]);
                     pendingLogs.length = 0;
                     updateScheduled = false;
                 }, 0);
