@@ -17,6 +17,7 @@ CI, monitoring, store assets — needed for an actual app store release.
 ## Phases
 
 **Phase Numbering:**
+
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
@@ -33,93 +34,133 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: Rules Engine Refactor
+
 **Goal**: The game's rules run through a single, pure engine that a future server can also run, with no client-side state-mutation bugs
 **Depends on**: Nothing (first phase)
 **Requirements**: ENGINE-01, ENGINE-02, ENGINE-03, ENGINE-04, ENGINE-05, ENGINE-06, ENGINE-07
 **Success Criteria** (what must be TRUE):
+
   1. Every move (play cards, pick up pile, swap cards, ready up) is processed by one `applyMove(state, move)` reducer built on `gameLogic.ts`, with no duplicate rule logic (hand-sort, "shares a rank", deck creation) left elsewhere in the codebase
   2. No move handler mutates existing state or player objects in place — every move produces a new state object
   3. `App.tsx` is split into Menu, Lobby, and Game screen components plus a slim orchestrator
   4. Invalid moves and game feedback appear as in-app messages instead of blocking browser alerts, and the finish celebration animation plays
   5. The new engine and screen components are covered by automated tests
-**Plans:** 7 plans
 
-Plans:
+**Plans:** 7 plans
+Plans:
+**Wave 1**
+
 - [ ] 01-01-PLAN.md — Test infra (setupFiles/jest-dom, buildGameState fixtures), gameLogic.ts dedup (sortHand/canAddToSelection/createDeck/shuffleDeck), applyMove contract types (moves.ts/errors.ts)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 01-02-PLAN.md — TDD: applyMove core (READY_UP, SWAP_CARDS, PICK_UP_PILE)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 01-03-PLAN.md — TDD: applyMove PLAY_CARDS (burn/draw/win/blind/mixed-source sequencing)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 01-04-PLAN.md — GameContext (GameProvider/useGameContext) + useToast + Toast component
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 01-05-PLAN.md — App.tsx orchestrator (phase-based routing) + MenuScreen + LobbyScreen extraction
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 01-06-PLAN.md — GameScreen extraction (celebration, rules panel, play/pickup/ready wiring, ENGINE-06 CSS fix)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 01-07-PLAN.md — Hand.tsx/Table.tsx dedup + SWAP_CARDS dispatch rewire (closes the 4th duplication site)
 
 ### Phase 2: Real Cross-Device Multiplayer
+
 **Goal**: A friend can join a room from any device and play a full game with you in real time
 **Depends on**: Phase 1 (the engine must exist before it can also be the server's authority)
 **Requirements**: MPLAY-01, MPLAY-02, MPLAY-03, MPLAY-04, MPLAY-05, MPLAY-06
 **Success Criteria** (what must be TRUE):
+
   1. Two people on two different devices/browsers can join the same room code and see the same live game state
   2. Each player has a distinct, persistent identity across the session, so the app can always tell players apart
   3. A move submitted by a modified/cheating client is rejected, because the server validates every move through the same `applyMove` engine
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
+
 **Plans**: TBD
 
 ### Phase 3: Responsive UI
+
 **Goal**: Users can comfortably play the game on a phone-sized screen and via keyboard, not just a desktop mouse
 **Depends on**: Phase 1 (needs the split screen components to retrofit a responsive layout onto)
 **Requirements**: RESP-01, RESP-02, RESP-03, RESP-04, RESP-05
 **Success Criteria** (what must be TRUE):
+
   1. The board and every component reflow to fit a phone screen with no overflow
   2. A player can see card details via touch, not just mouse hover
   3. Every interactive control is at least 44px, easy to tap
   4. A player can select and play cards using only the keyboard
   5. Turn changes are announced and modals trap focus properly for screen reader/keyboard users
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 4: Mobile Packaging (Capacitor)
+
 **Goal**: Users can install and play the game as a native app on their Android or iOS phone
 **Depends on**: Phase 3 (native packaging needs the responsive/touch layer to wrap)
 **Requirements**: MOBILE-01, MOBILE-02, MOBILE-03, MOBILE-04, MOBILE-05
 **Success Criteria** (what must be TRUE):
+
   1. The app installs and runs as a native app on an Android device
   2. The app installs and runs as a native app on an iOS device
   3. The app shows a real icon and branding, not the Vite placeholder
   4. Touch play works correctly on a real device inside the native WebView, not just desktop emulation
   5. A tester can install the app via TestFlight (iOS) or the Play internal testing track (Android)
+
 **Plans**: TBD
 
 ### Phase 5: Desktop Polish
+
 **Goal**: Users get a well-polished, installable desktop experience without any native wrapper
 **Depends on**: Phase 3 (desktop polish is the stage-3 responsive layout done thoroughly)
 **Requirements**: DESKTOP-01, DESKTOP-02
 **Success Criteria** (what must be TRUE):
+
   1. The layout looks and works well at both wide and narrow desktop browser window sizes
   2. Users can install the app to their taskbar/dock as a PWA and launch it without browser chrome
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 6: Visual/Gameplay Polish
+
 **Goal**: The game feels finished — animations, sound, and modals are polished rather than functional-only
 **Depends on**: Phase 1 (the draw animation rebuild targets the Phase 1 engine, not the multiplayer or packaging work)
 **Requirements**: POLISH-01, POLISH-02, POLISH-03
 **Success Criteria** (what must be TRUE):
+
   1. The draw-card animation plays reliably, rebuilt on the Phase 1 engine rather than DOM-querying/timing hacks
   2. Sound effects play for dealing, playing, burning a pile, and winning/losing
   3. Every modal in the app uses the same shared `Modal` component
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 7: Launch Readiness
+
 **Goal**: The app is ready to submit to and operate in the app stores as a professional product
 **Depends on**: Phase 4 (store submission needs the mobile builds to exist)
 **Requirements**: LAUNCH-01, LAUNCH-02, LAUNCH-03, LAUNCH-04
 **Success Criteria** (what must be TRUE):
+
   1. A privacy policy and terms of service are published and linked from within the app
   2. Every push to the repo automatically runs lint, typecheck, and tests via CI
   3. Runtime errors in production are captured and visible in an error monitoring dashboard
   4. Store listing assets (icons, screenshots, description copy) are ready for both app stores
+
 **Plans**: TBD
 
 ## Progress
