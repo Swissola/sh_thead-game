@@ -134,3 +134,8 @@ The stale-`testMode`-closure issue noted above (see Issues Encountered) is a can
 ---
 *Phase: 01-rules-engine-refactor*
 *Completed: 2026-07-25*
+
+## Self-Check: PASSED
+
+- All 7 created/modified files confirmed present via `git ls-files` (src/App.tsx, src/screens/{MenuScreen,LobbyScreen,GameScreen}.tsx, src/__tests__/App.test.tsx, src/__tests__/screens/{MenuScreen,LobbyScreen}.test.tsx, plus this SUMMARY.md)
+- All 7 claimed commit hashes confirmed present via `git log --oneline --all` (aaf0159, 288b634, 7e44ff6, fb49818, c4ad11b, c8bd3e5, 33a978e)
