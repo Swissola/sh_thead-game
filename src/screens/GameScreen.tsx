@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { HelpCircle, X } from 'lucide-react';
 import * as GameLogic from '../gameLogic';
-import type { Card as CardType } from '../types';
+import type { Card as CardType, CardSelection } from '../types';
 import { Card } from '../components/Card';
 import DiscardPile from '../components/piles/DiscardPile';
 import DrawPile from '../components/piles/DrawPile';
 import BurnPile from '../components/piles/BurnPile';
+import Table from '../components/Table';
+import Hand from '../components/Hand';
 import { useGameContext } from '../context/GameContext';
 import { useSelection } from '../hooks/useSelection';
+import { useHandSorting } from '../hooks/useHandSorting';
 
 const getOrdinalLabel = (n: number): string => {
     if (n === 1) return '1st';
@@ -25,11 +28,15 @@ const getOrdinalLabel = (n: number): string => {
  * `{/* Task 2: ... *\/}` placeholders below.
  */
 export function GameScreen() {
-    const { gameState, dispatchMove, currentPlayerId, testMode, controllingPlayer, setControllingPlayer } =
+    const { gameState, dispatchMove, currentPlayerId, testMode, controllingPlayer, setControllingPlayer, setGameState } =
         useGameContext();
 
     const { selectedCards, setSelectedCards, revealedFaceDown, setRevealedFaceDown } = useSelection();
+    const { handSortMode, setHandSortMode } = useHandSorting('original');
     const [showRules, setShowRules] = useState(false);
+    const [drawingCards, setDrawingCards] = useState<
+        Array<{ card: CardType; id: string; targetPos: { x: number; y: number }; startPos?: { x: number; y: number } }>
+    >([]);
     const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
     const [pickUpConfirmation, setPickUpConfirmation] = useState<{ show: boolean; playerIndex: number } | null>(null);
     const [celebrationModal, setCelebrationModal] = useState<{
@@ -189,6 +196,108 @@ export function GameScreen() {
         setSelectedCards([]);
         setRevealedFaceDown(null);
         setPickUpConfirmation(null);
+    };
+
+    const swapCards = (handIndex: number, faceUpIndex: number): void => {
+        dispatchMove({
+            type: 'SWAP_CARDS',
+            playerId: currentPlayerId,
+            sourceA: 'hand',
+            indexA: handIndex,
+            sourceB: 'faceUp',
+            indexB: faceUpIndex,
+        });
+    };
+
+    /**
+     * Build the move object exactly as App.tsx:461-834 did, then dispatch it
+     * through dispatchMove in one shot - applyMove computes the authoritative
+     * final state (including drawn cards) itself, so there is no second
+     * delayed commit like the original two-phase flushSync + setTimeout(...,
+     * 700) updateGameState calls. The draw-count/ghost-portal prediction
+     * below is purely cosmetic (RESEARCH.md Pitfall 4, accepted for Phase 1).
+     */
+    const playCards = () => {
+        if (!gameState) return;
+        const playerIndex = gameState.players.findIndex((p) => p.id === currentPlayerId);
+        const player = gameState.players[playerIndex];
+
+        if (!player || gameState.phase !== 'playing' || gameState.currentTurn !== playerIndex) {
+            return;
+        }
+        if (selectedCards.length === 0 && !revealedFaceDown) {
+            return;
+        }
+
+        const cardSource = GameLogic.getAvailableCardSource(player);
+
+        let selections: CardSelection[] =
+            revealedFaceDown && selectedCards.length === 0
+                ? [{ type: 'faceDown', index: revealedFaceDown.index }]
+                : [...selectedCards];
+
+        // Reorder hand to match the current visual sort order before dispatch
+        // (App.tsx:553-602) - the sorted view becomes the new "original"
+        // baseline. applyMove adopts reorderedHand as-is rather than reading
+        // handSortMode itself, which stays a presentation-only concern.
+        let reorderedHand: (CardType | null)[] | undefined;
+        if (cardSource === 'hand' && handSortMode !== 'original') {
+            const sorted = GameLogic.sortHand(player.hand, handSortMode);
+            reorderedHand = sorted.map((s) => s.card);
+            selections = selections.map((sel) =>
+                sel.type === 'hand' ? { ...sel, index: sorted.findIndex((s) => s.arrayIndex === sel.index) } : sel
+            );
+            setHandSortMode('original');
+        }
+
+        // Client-side mixed hand+faceUp pre-check, purely to decide whether it's
+        // worth predicting a draw-animation - applyMove re-validates this
+        // authoritatively regardless and rejects with INVALID_COMBINATION
+        // (surfaced as a toast) if this pre-check was somehow wrong.
+        const hasMixedSelection =
+            selections.some((s) => s.type === 'hand') && selections.some((s) => s.type === 'faceUp');
+        let skipAnimationPrediction = false;
+        if (hasMixedSelection) {
+            const effectiveHand = reorderedHand ?? player.hand;
+            const handSelected = selections
+                .filter((s) => s.type === 'hand')
+                .map((s) => effectiveHand[s.index])
+                .filter((c): c is CardType => c !== null && c !== undefined);
+            const faceUpSelected = selections
+                .filter((s) => s.type === 'faceUp')
+                .map((s) => player.faceUp[s.index])
+                .filter((c): c is CardType => c !== null && c !== undefined);
+            const ok =
+                cardSource === 'hand' &&
+                GameLogic.canPlayMixedSources(gameState.deck.length, handSelected, faceUpSelected, gameState.discardPile);
+            skipAnimationPrediction = !ok;
+        }
+
+        if (!skipAnimationPrediction) {
+            const cardsToDraw = GameLogic.getCardsToDrawCount(player, gameState.deck.length);
+            if (cardsToDraw > 0) {
+                const drawnCards = gameState.deck.slice(0, cardsToDraw);
+                const deckElement = document.querySelector('.draw-pile-card');
+                let deckPos = { x: window.innerWidth / 2, y: 100 };
+                if (deckElement) {
+                    const deckRect = deckElement.getBoundingClientRect();
+                    deckPos = { x: deckRect.left + deckRect.width / 2, y: deckRect.top + deckRect.height / 2 };
+                }
+                setDrawingCards(
+                    drawnCards.map((card, i) => ({
+                        card,
+                        id: `draw-${card.id}-${Date.now()}-${i}`,
+                        targetPos: { x: window.innerWidth / 2, y: window.innerHeight - 200 },
+                        startPos: deckPos,
+                    }))
+                );
+                setTimeout(() => setDrawingCards([]), 700);
+            }
+        }
+
+        dispatchMove({ type: 'PLAY_CARDS', playerId: currentPlayerId, cards: selections, reorderedHand });
+        setSelectedCards([]);
+        setRevealedFaceDown(null);
     };
 
     return (
@@ -370,7 +479,20 @@ export function GameScreen() {
                                 <h3 className="text-white font-bold mb-3">{currentPlayer.name}'s Cards</h3>
 
                                 <div className="grid grid-cols-[auto_1fr] gap-8 mb-4">
-                                    {/* Task 2: Table/Hand composition + playCards wiring */}
+                                    <Table
+                                        gameState={gameState}
+                                        currentPlayerId={currentPlayerId}
+                                        currentPlayer={currentPlayer}
+                                        isSetupPhase={isSetupPhase}
+                                        isMyTurn={isMyTurn}
+                                        selectedCards={selectedCards}
+                                        setSelectedCards={setSelectedCards}
+                                        revealedFaceDown={revealedFaceDown}
+                                        setRevealedFaceDown={setRevealedFaceDown}
+                                        swapCards={swapCards}
+                                        // TODO(01-07): remove once Hand/Table dispatch SWAP_CARDS directly
+                                        updateGameState={(newState) => setGameState(newState)}
+                                    />
 
                                     <div className="grid grid-cols-[160px_100px_1fr] gap-12 items-start">
                                         <DiscardPile discardPile={gameState.discardPile} />
@@ -379,7 +501,23 @@ export function GameScreen() {
                                     </div>
                                 </div>
 
-                                {/* Task 2: Table/Hand composition + playCards wiring */}
+                                {currentPlayer.hand.length > 0 && (
+                                    <Hand
+                                        player={currentPlayer}
+                                        isSetupPhase={isSetupPhase}
+                                        isMyTurn={isMyTurn}
+                                        handSortMode={handSortMode}
+                                        setHandSortMode={setHandSortMode}
+                                        selectedCards={selectedCards}
+                                        setSelectedCards={setSelectedCards}
+                                        gameState={gameState}
+                                        currentPlayerId={currentPlayerId}
+                                        swapCards={swapCards}
+                                        drawingCards={drawingCards}
+                                        // TODO(01-07): remove once Hand/Table dispatch SWAP_CARDS directly
+                                        updateGameState={(newState) => setGameState(newState)}
+                                    />
+                                )}
 
                                 {isSetupPhase && (
                                     <button
@@ -400,7 +538,20 @@ export function GameScreen() {
                                             </div>
                                         )}
                                         <div className="flex gap-3">
-                                            {/* Task 2: Play button */}
+                                            <button
+                                                onClick={playCards}
+                                                disabled={(!revealedFaceDown && selectedCards.length === 0) || !isMyTurn}
+                                                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-500 disabled:hover:to-emerald-500"
+                                            >
+                                                Play{' '}
+                                                {(() => {
+                                                    const count =
+                                                        revealedFaceDown && selectedCards.length === 0
+                                                            ? 1
+                                                            : selectedCards.length;
+                                                    return count > 0 ? `${count} Card${count > 1 ? 's' : ''}` : 'Cards';
+                                                })()}
+                                            </button>
                                             <button
                                                 onClick={pickUpPile}
                                                 disabled={gameState.discardPile.length === 0 || !isMyTurn}
@@ -470,7 +621,17 @@ export function GameScreen() {
                 )}
             </div>
 
-            {/* Task 2: draw-animation ghost portal */}
+            {drawingCards.length > 0 &&
+                createPortal(
+                    <div className="pointer-events-none fixed inset-0 z-50">
+                        {drawingCards.map(({ card, id, targetPos }) => (
+                            <div key={id} className="draw-card-ghost" style={{ left: targetPos.x, top: targetPos.y }}>
+                                <Card card={card} small />
+                            </div>
+                        ))}
+                    </div>,
+                    document.body
+                )}
 
             {pickUpConfirmation?.show &&
                 createPortal(
