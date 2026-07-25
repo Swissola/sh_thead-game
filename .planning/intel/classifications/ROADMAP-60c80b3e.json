@@ -1,0 +1,38 @@
+{
+  "source_path": "C:\\Users\\marti\\sh_thead-game\\ROADMAP.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Shithead — roadmap beyond stage one",
+  "summary": "Staged plan for turning the prototype Shithead card game into real cross-device multiplayer, then mobile, desktop, and store-ready polish.",
+  "scope": [
+    "multiplayer",
+    "Supabase",
+    "Capacitor",
+    "Android",
+    "iOS",
+    "PWA",
+    "responsive UI",
+    "applyMove reducer engine",
+    "gameLogic.ts refactor",
+    "App.tsx",
+    "App Store",
+    "Google Play",
+    "CI",
+    "error monitoring",
+    "roadmap stages"
+  ],
+  "cross_refs": [
+    "src/gameLogic.ts",
+    "src/storage.ts",
+    "App.tsx",
+    "Hand.tsx",
+    "Table.tsx",
+    "DiscardPile.tsx",
+    "src/App.css",
+    "main.tsx"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}
