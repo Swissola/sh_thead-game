@@ -76,6 +76,25 @@ describe('MenuScreen', () => {
         expect(screen.getByTestId('probe')).toHaveTextContent('phase:none');
     });
 
+    it('clicking "Create Room" generates a well-formed, fixed-length 6-character room code (WR-03)', async () => {
+        renderMenu();
+
+        fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
+            target: { value: 'Alice' },
+        });
+        fireEvent.click(screen.getByText('Create Room'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('probe')).toHaveTextContent('phase:lobby');
+            expect(screen.getByTestId('probe')).toHaveTextContent('players:1');
+        });
+
+        const roomKeys = Object.keys(localStorage).filter((key) => key.startsWith('game:'));
+        expect(roomKeys).toHaveLength(1);
+        const roomCode = roomKeys[0].slice('game:'.length);
+        expect(roomCode).toMatch(/^[A-Z0-9]{6}$/);
+    });
+
     it('clicking "Join" with a non-empty name/room code shows "Room not found" when the room does not exist', async () => {
         renderMenu();
 

@@ -5,6 +5,19 @@ import type { GameState } from '../types';
 import { useGameContext } from '../context/GameContext';
 
 /**
+ * WR-03: Math.random().toString(36).substr(2, 6) is not suitable for anything
+ * access-control-adjacent, and can legitimately return fewer than 6 characters
+ * (further shrinking the guess space) since .substr is also deprecated.
+ * crypto.getRandomValues gives a full 6 cryptographically-random base36 digits.
+ */
+function generateRoomCode(): string {
+    return Array.from(crypto.getRandomValues(new Uint8Array(6)))
+        .map((b) => (b % 36).toString(36))
+        .join('')
+        .toUpperCase();
+}
+
+/**
  * Room creation/joining/test-mode entry, extracted from App.tsx:929-997
  * (pre-refactor line numbers). All blocking browser alerts converted to
  * showToast() calls per ENGINE-05/D-05/D-06/D-07.
@@ -99,7 +112,14 @@ export function MenuScreen() {
             return;
         }
 
-        const code = Math.random().toString(36).substr(2, 6).toUpperCase();
+        // WR-03: check for a collision against an existing room before committing
+        // to the generated code, regenerating (bounded) on collision.
+        let code = generateRoomCode();
+        for (let attempts = 0; attempts < 5; attempts++) {
+            const existing = await window.storage.get(`game:${code}`, true);
+            if (!existing) break;
+            code = generateRoomCode();
+        }
         const newGameState: GameState = {
             roomCode: code,
             host: playerId,
