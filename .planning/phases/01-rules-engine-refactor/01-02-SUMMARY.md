@@ -96,3 +96,7 @@ None - no external service configuration required.
 ---
 *Phase: 01-rules-engine-refactor*
 *Completed: 2026-07-25*
+
+## Self-Check: PASSED
+
+Both files created in this plan verified present on disk (`src/engine/applyMove.ts`, `src/__tests__/engine/applyMove.test.ts`), plus the SUMMARY.md itself. All 3 commit hashes (`bd04540`, `cd75fa7`, `879abcd`) verified present in `git log`.
