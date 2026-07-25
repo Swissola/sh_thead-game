@@ -173,14 +173,7 @@ const Table: React.FC<TableProps> = ({
                                                         setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
                                                     } else {
                                                         const clickedCard = currentPlayer.faceUp[i];
-                                                        if (
-                                                            clickedCard &&
-                                                            (selectedCards.length === 0 ||
-                                                                selectedCards.every((s) => {
-                                                                    const existingCard = currentPlayer.faceUp[s.index];
-                                                                    return existingCard && existingCard.rank === clickedCard.rank;
-                                                                }))
-                                                        ) {
+                                                        if (clickedCard && GameLogic.canAddToSelection(clickedCard, resolvedFaceUpSelection)) {
                                                             setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
                                                         }
                                                     }

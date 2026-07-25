@@ -175,14 +175,7 @@ const Hand: React.FC<HandProps> = ({
                                                 setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
                                             } else {
                                                 const clickedCard = player.hand[item.arrayIndex];
-                                                if (
-                                                    clickedCard &&
-                                                    (selectedCards.length === 0 ||
-                                                        selectedCards.every((s) => {
-                                                            const existingCard = player.hand[s.index];
-                                                            return existingCard && existingCard.rank === clickedCard.rank;
-                                                        }))
-                                                ) {
+                                                if (clickedCard && GameLogic.canAddToSelection(clickedCard, resolvedHandSelection)) {
                                                     setSelectedCards([...selectedCards, { type: 'hand', index: item.arrayIndex }]);
                                                 }
                                             }
