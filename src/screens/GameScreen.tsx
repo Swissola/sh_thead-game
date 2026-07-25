@@ -22,13 +22,12 @@ const getOrdinalLabel = (n: number): string => {
 
 /**
  * Full game screen, extracted from pre-refactor App.tsx:1065-1498. Every
- * gameplay control dispatches through GameContext's dispatchMove (D-08)
- * rather than mutating gameState directly. Table/Hand composition and the
- * Play button are wired up in this same file by Task 2 - see the
- * `{/* Task 2: ... *\/}` placeholders below.
+ * gameplay control - including Table/Hand's setup-phase swaps as of Plan
+ * 01-07 - dispatches through GameContext's dispatchMove (D-08) rather than
+ * mutating gameState directly.
  */
 export function GameScreen() {
-    const { gameState, dispatchMove, currentPlayerId, testMode, controllingPlayer, setControllingPlayer, setGameState } =
+    const { gameState, dispatchMove, currentPlayerId, testMode, controllingPlayer, setControllingPlayer } =
         useGameContext();
 
     const { selectedCards, setSelectedCards, revealedFaceDown, setRevealedFaceDown } = useSelection();
@@ -196,17 +195,6 @@ export function GameScreen() {
         setSelectedCards([]);
         setRevealedFaceDown(null);
         setPickUpConfirmation(null);
-    };
-
-    const swapCards = (handIndex: number, faceUpIndex: number): void => {
-        dispatchMove({
-            type: 'SWAP_CARDS',
-            playerId: currentPlayerId,
-            sourceA: 'hand',
-            indexA: handIndex,
-            sourceB: 'faceUp',
-            indexB: faceUpIndex,
-        });
     };
 
     /**
@@ -481,7 +469,6 @@ export function GameScreen() {
                                 <div className="grid grid-cols-[auto_1fr] gap-8 mb-4">
                                     <Table
                                         gameState={gameState}
-                                        currentPlayerId={currentPlayerId}
                                         currentPlayer={currentPlayer}
                                         isSetupPhase={isSetupPhase}
                                         isMyTurn={isMyTurn}
@@ -489,9 +476,6 @@ export function GameScreen() {
                                         setSelectedCards={setSelectedCards}
                                         revealedFaceDown={revealedFaceDown}
                                         setRevealedFaceDown={setRevealedFaceDown}
-                                        swapCards={swapCards}
-                                        // TODO(01-07): remove once Hand/Table dispatch SWAP_CARDS directly
-                                        updateGameState={(newState) => setGameState(newState)}
                                     />
 
                                     <div className="grid grid-cols-[160px_100px_1fr] gap-12 items-start">
@@ -511,11 +495,7 @@ export function GameScreen() {
                                         selectedCards={selectedCards}
                                         setSelectedCards={setSelectedCards}
                                         gameState={gameState}
-                                        currentPlayerId={currentPlayerId}
-                                        swapCards={swapCards}
                                         drawingCards={drawingCards}
-                                        // TODO(01-07): remove once Hand/Table dispatch SWAP_CARDS directly
-                                        updateGameState={(newState) => setGameState(newState)}
                                     />
                                 )}
 

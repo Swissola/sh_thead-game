@@ -213,4 +213,103 @@ describe('GameScreen', () => {
             expect(screen.getByTestId('probe')).toHaveTextContent('discardCount:0');
         });
     });
+
+    it('clicking two hand cards in setup phase swaps their positions via SWAP_CARDS (D-12)', async () => {
+        const state = buildGameState({
+            phase: 'setup',
+            players: [
+                buildPlayer({
+                    id: 'test-player',
+                    name: 'Alice',
+                    hand: [
+                        buildCard({ id: 'hand-0', rank: '5', suit: '♠' }),
+                        buildCard({ id: 'hand-1', rank: '6', suit: '♥' }),
+                    ],
+                }),
+                buildPlayer({ id: 'p1', name: 'Bob' }),
+            ],
+        });
+
+        const { container } = renderGame('test-player', state);
+        await screen.findByText('Hand');
+
+        const firstCard = container.querySelector('[data-card-key="hand-0"]')?.firstElementChild as HTMLElement;
+        const secondCard = container.querySelector('[data-card-key="hand-1"]')?.firstElementChild as HTMLElement;
+
+        fireEvent.click(firstCard);
+        await waitFor(() => expect(firstCard.className).toContain('ring-yellow-400'));
+        fireEvent.click(secondCard);
+
+        await waitFor(() => {
+            const keysInOrder = Array.from(container.querySelectorAll('[data-card-key]')).map((el) =>
+                el.getAttribute('data-card-key')
+            );
+            expect(keysInOrder).toEqual(['hand-1', 'hand-0']);
+        });
+    });
+
+    it('clicking a hand card then a face-up card in setup phase swaps them via SWAP_CARDS (D-12)', async () => {
+        const state = buildGameState({
+            phase: 'setup',
+            players: [
+                buildPlayer({
+                    id: 'test-player',
+                    name: 'Alice',
+                    hand: [buildCard({ id: 'hand-0', rank: '5', suit: '♠' })],
+                    faceUp: [buildCard({ id: 'faceup-0', rank: '6', suit: '♥' })],
+                }),
+                buildPlayer({ id: 'p1', name: 'Bob' }),
+            ],
+        });
+
+        const { container } = renderGame('test-player', state);
+        await screen.findByText('Hand');
+
+        const handCard = container.querySelector('[data-card-key="hand-0"]')?.firstElementChild as HTMLElement;
+        const faceUpCard = container.querySelector('[data-faceup-index="0"]')?.firstElementChild as HTMLElement;
+
+        fireEvent.click(handCard);
+        await waitFor(() => expect(handCard.className).toContain('ring-yellow-400'));
+        fireEvent.click(faceUpCard);
+
+        await waitFor(() => {
+            expect(container.querySelector('[data-card-key="faceup-0"]')).toBeInTheDocument();
+            expect(container.querySelector('[data-faceup-index="0"]')?.textContent).toContain('5');
+            expect(container.querySelector('[data-faceup-index="0"]')?.textContent).toContain('♠');
+        });
+    });
+
+    it('clicking two face-up cards in setup phase swaps them via SWAP_CARDS (D-12)', async () => {
+        const state = buildGameState({
+            phase: 'setup',
+            players: [
+                buildPlayer({
+                    id: 'test-player',
+                    name: 'Alice',
+                    faceUp: [
+                        buildCard({ id: 'faceup-0', rank: '6', suit: '♥' }),
+                        buildCard({ id: 'faceup-1', rank: '7', suit: '♦' }),
+                    ],
+                }),
+                buildPlayer({ id: 'p1', name: 'Bob' }),
+            ],
+        });
+
+        const { container } = renderGame('test-player', state);
+        await screen.findByText('Table');
+
+        const firstFaceUp = container.querySelector('[data-faceup-index="0"]')?.firstElementChild as HTMLElement;
+        const secondFaceUp = container.querySelector('[data-faceup-index="1"]')?.firstElementChild as HTMLElement;
+
+        fireEvent.click(firstFaceUp);
+        await waitFor(() => expect(firstFaceUp.className).toContain('ring-yellow-400'));
+        fireEvent.click(secondFaceUp);
+
+        await waitFor(() => {
+            expect(container.querySelector('[data-faceup-index="0"]')?.textContent).toContain('7');
+            expect(container.querySelector('[data-faceup-index="0"]')?.textContent).toContain('♦');
+            expect(container.querySelector('[data-faceup-index="1"]')?.textContent).toContain('6');
+            expect(container.querySelector('[data-faceup-index="1"]')?.textContent).toContain('♥');
+        });
+    });
 });
