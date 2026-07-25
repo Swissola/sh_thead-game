@@ -42,7 +42,16 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. `App.tsx` is split into Menu, Lobby, and Game screen components plus a slim orchestrator
   4. Invalid moves and game feedback appear as in-app messages instead of blocking browser alerts, and the finish celebration animation plays
   5. The new engine and screen components are covered by automated tests
-**Plans**: TBD
+**Plans:** 7 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Test infra (setupFiles/jest-dom, buildGameState fixtures), gameLogic.ts dedup (sortHand/canAddToSelection/createDeck/shuffleDeck), applyMove contract types (moves.ts/errors.ts)
+- [ ] 01-02-PLAN.md — TDD: applyMove core (READY_UP, SWAP_CARDS, PICK_UP_PILE)
+- [ ] 01-03-PLAN.md — TDD: applyMove PLAY_CARDS (burn/draw/win/blind/mixed-source sequencing)
+- [ ] 01-04-PLAN.md — GameContext (GameProvider/useGameContext) + useToast + Toast component
+- [ ] 01-05-PLAN.md — App.tsx orchestrator (phase-based routing) + MenuScreen + LobbyScreen extraction
+- [ ] 01-06-PLAN.md — GameScreen extraction (celebration, rules panel, play/pickup/ready wiring, ENGINE-06 CSS fix)
+- [ ] 01-07-PLAN.md — Hand.tsx/Table.tsx dedup + SWAP_CARDS dispatch rewire (closes the 4th duplication site)
 
 ### Phase 2: Real Cross-Device Multiplayer
 **Goal**: A friend can join a room from any device and play a full game with you in real time
