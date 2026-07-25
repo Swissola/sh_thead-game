@@ -1,9 +1,9 @@
 import React from 'react';
 import * as GameLogic from '../gameLogic';
-import { RANK_VALUES } from '../gameLogic';
 import type { Card as CardType, CardSelection, GameState, Player } from '../types';
 import { Card as CardComponent } from './Card';
 import { useGameContext } from '../context/GameContext';
+import { getCardPlayability } from '../uiLogic';
 
 interface HandProps {
     player: Player;
@@ -98,38 +98,20 @@ const Hand: React.FC<HandProps> = ({
                         }
 
                         const currentSource = GameLogic.getAvailableCardSource(player);
-                        const top = GameLogic.getEffectiveTopCard(gameState.discardPile);
                         let tooltip: string | undefined;
                         if (!isSetupPhase) {
                             if (!isMyTurn) {
                                 tooltip = 'Not your turn';
                             } else if (currentSource !== 'hand') {
                                 tooltip = 'Play from face-up or face-down first';
-                            } else {
-                                const isVeryFirstTurn = gameState.isFirstTurn;
-                                if (isVeryFirstTurn) {
-                                    const startingCard = GameLogic.getStartingCard(player);
-                                    if (startingCard && item.card.rank !== startingCard.rank) {
-                                        tooltip = `First turn: only ${startingCard.rank}s allowed`;
-                                    }
-                                } else {
-                                    const canPlay = GameLogic.canPlayMultipleCards([item.card], gameState.discardPile);
-                                    if (!canPlay) {
-                                        if (top && GameLogic.isLimiter(top)) {
-                                            if (GameLogic.isBurn(item.card)) {
-                                                tooltip = '10 cannot be played on a 7';
-                                            } else if ((RANK_VALUES[item.card.rank] || 0) > 7) {
-                                                tooltip = 'Limiter (7): only 7 or lower allowed';
-                                            } else {
-                                                tooltip = "Can't be played on the current pile";
-                                            }
-                                        } else {
-                                            tooltip = "Can't be played on the current pile";
-                                        }
-                                    } else if (selectedCards.length > 0 && !GameLogic.canAddToSelection(item.card, resolvedHandSelection)) {
-                                        tooltip = 'Select same rank to play together';
-                                    }
+                            } else if (gameState.isFirstTurn) {
+                                const startingCard = GameLogic.getStartingCard(player);
+                                if (startingCard && item.card.rank !== startingCard.rank) {
+                                    tooltip = `First turn: only ${startingCard.rank}s allowed`;
                                 }
+                            } else {
+                                // WR-04: shared with Table.tsx's face-up branch - see uiLogic.ts.
+                                tooltip = getCardPlayability(item.card, gameState.discardPile, resolvedHandSelection).tooltip;
                             }
                         }
 
@@ -143,22 +125,16 @@ const Hand: React.FC<HandProps> = ({
                                             isMyTurn &&
                                             GameLogic.getAvailableCardSource(player) === 'hand' &&
                                             (() => {
-                                                let isPlayable = true;
-                                                const isVeryFirstTurn = gameState.isFirstTurn;
-                                                if (isVeryFirstTurn) {
+                                                if (gameState.isFirstTurn) {
                                                     const startingCard = GameLogic.getStartingCard(player);
-                                                    if (startingCard) {
-                                                        isPlayable = item.card.rank === startingCard.rank;
-                                                    } else {
-                                                        isPlayable = true;
+                                                    let isPlayable = startingCard ? item.card.rank === startingCard.rank : true;
+                                                    if (selectedCards.length > 0 && !GameLogic.canAddToSelection(item.card, resolvedHandSelection)) {
+                                                        isPlayable = false;
                                                     }
-                                                } else {
-                                                    isPlayable = GameLogic.canPlayMultipleCards([item.card], gameState.discardPile);
+                                                    return isPlayable;
                                                 }
-                                                if (selectedCards.length > 0 && !GameLogic.canAddToSelection(item.card, resolvedHandSelection)) {
-                                                    isPlayable = false;
-                                                }
-                                                return isPlayable;
+                                                // WR-04: shared with Table.tsx's face-up branch - see uiLogic.ts.
+                                                return getCardPlayability(item.card, gameState.discardPile, resolvedHandSelection).isPlayable;
                                             })()
                                         )
                                     }

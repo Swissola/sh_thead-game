@@ -3,6 +3,7 @@ import * as GameLogic from '../gameLogic';
 import type { Card, CardSelection, GameState, Player } from '../types';
 import { Card as CardComponent } from './Card';
 import { useGameContext } from '../context/GameContext';
+import { getCardPlayability, type CardPlayability } from '../uiLogic';
 
 interface RevealedFaceDown {
     card: Card;
@@ -99,15 +100,14 @@ const Table: React.FC<TableProps> = ({
                                     selectedHandCards.length > 0 &&
                                     GameLogic.canPlayMixedSources(0, selectedHandCards as Card[], [card], gameState.discardPile);
 
+                                // WR-04: shared with Hand.tsx's non-first-turn branch - see uiLogic.ts.
                                 let isPlayable = true;
+                                let facePlayability: CardPlayability | null = null;
                                 if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
-                                    isPlayable = GameLogic.canPlayMultipleCards([card], gameState.discardPile);
-                                    if (selectedCards.length > 0 && !GameLogic.canAddToSelection(card, resolvedFaceUpSelection)) {
-                                        isPlayable = false;
-                                    }
+                                    facePlayability = getCardPlayability(card, gameState.discardPile, resolvedFaceUpSelection);
+                                    isPlayable = facePlayability.isPlayable;
                                 }
 
-                                const top = GameLogic.getEffectiveTopCard(gameState.discardPile);
                                 let tooltip: string | undefined;
                                 if (!isSetupPhase) {
                                     if (!isMyTurn) {
@@ -115,21 +115,7 @@ const Table: React.FC<TableProps> = ({
                                     } else if (revealedFaceDown) {
                                         tooltip = 'Revealing a face-down card';
                                     } else if (currentSource === 'faceUp') {
-                                        if (!isPlayable) {
-                                            if (top && GameLogic.isLimiter(top)) {
-                                                if (GameLogic.isBurn(card)) {
-                                                    tooltip = '10 cannot be played on a 7';
-                                                } else if ((GameLogic.RANK_VALUES[card.rank] || 0) > 7) {
-                                                    tooltip = 'Limiter (7): only 7 or lower allowed';
-                                                } else {
-                                                    tooltip = "Can't be played on the current pile";
-                                                }
-                                            } else {
-                                                tooltip = "Can't be played on the current pile";
-                                            }
-                                        } else if (selectedCards.length > 0 && !GameLogic.canAddToSelection(card, resolvedFaceUpSelection)) {
-                                            tooltip = 'Select same rank to play together';
-                                        }
+                                        tooltip = facePlayability?.tooltip;
                                     } else if (!deckEmpty) {
                                         tooltip = 'Cannot combine while deck has cards';
                                     } else if (currentSource !== 'hand') {
