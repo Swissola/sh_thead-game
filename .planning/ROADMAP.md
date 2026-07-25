@@ -46,11 +46,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Invalid moves and game feedback appear as in-app messages instead of blocking browser alerts, and the finish celebration animation plays
   5. The new engine and screen components are covered by automated tests
 
-**Plans:** 7 plans
+**Plans:** 1/7 plans executed
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Test infra (setupFiles/jest-dom, buildGameState fixtures), gameLogic.ts dedup (sortHand/canAddToSelection/createDeck/shuffleDeck), applyMove contract types (moves.ts/errors.ts)
+- [x] 01-01-PLAN.md — Test infra (setupFiles/jest-dom, buildGameState fixtures), gameLogic.ts dedup (sortHand/canAddToSelection/createDeck/shuffleDeck), applyMove contract types (moves.ts/errors.ts)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -174,7 +174,7 @@ rework lands).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Rules Engine Refactor | 0/TBD | Not started | - |
+| 1. Rules Engine Refactor | 1/7 | In Progress|  |
 | 2. Real Cross-Device Multiplayer | 0/TBD | Not started | - |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
