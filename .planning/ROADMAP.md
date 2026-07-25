@@ -23,7 +23,7 @@ CI, monitoring, store assets — needed for an actual app store release.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Rules Engine Refactor** - Extract a single pure `applyMove` reducer and split the 1,500-line `App.tsx`, so client and future server can run identical rules
+- [x] **Phase 1: Rules Engine Refactor** - Extract a single pure `applyMove` reducer and split the 1,500-line `App.tsx`, so client and future server can run identical rules (completed 2026-07-25)
 - [ ] **Phase 2: Real Cross-Device Multiplayer** - Supabase-backed rooms with Realtime sync, anonymous identity, and server-validated moves — a friend can actually join and play from another device
 - [ ] **Phase 3: Responsive UI** - The game is fully usable on a phone-sized screen and via keyboard, not just desktop mouse
 - [ ] **Phase 4: Mobile Packaging (Capacitor)** - The app installs and runs as a native app on Android and iOS
@@ -46,7 +46,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Invalid moves and game feedback appear as in-app messages instead of blocking browser alerts, and the finish celebration animation plays
   5. The new engine and screen components are covered by automated tests
 
-**Plans:** 6/7 plans executed
+**Plans:** 7/7 plans complete
 Plans:
 **Wave 1**
 
@@ -74,7 +74,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 01-07-PLAN.md — Hand.tsx/Table.tsx dedup + SWAP_CARDS dispatch rewire (closes the 4th duplication site)
+- [x] 01-07-PLAN.md — Hand.tsx/Table.tsx dedup + SWAP_CARDS dispatch rewire (closes the 4th duplication site)
 
 ### Phase 2: Real Cross-Device Multiplayer
 
@@ -174,7 +174,7 @@ rework lands).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Rules Engine Refactor | 6/7 | In Progress|  |
+| 1. Rules Engine Refactor | 7/7 | Complete   | 2026-07-25 |
 | 2. Real Cross-Device Multiplayer | 0/TBD | Not started | - |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
