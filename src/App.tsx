@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { Users, Plus, Copy, Check, Crown, ArrowRight, HelpCircle, X } from 'lucide-react';
 import * as GameLogic from './gameLogic';
@@ -44,6 +44,13 @@ const shuffleDeck = (deck: CardType[]): CardType[] => {
   return shuffled;
 };
 
+const getOrdinalLabel = (n: number): string => {
+  if (n === 1) return '1st';
+  if (n === 2) return '2nd';
+  if (n === 3) return '3rd';
+  return `${n}th`;
+};
+
 // Card component extracted to components/Card
 
 export default function ShitheadGame() {
@@ -64,9 +71,85 @@ export default function ShitheadGame() {
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const [pickUpConfirmation, setPickUpConfirmation] = useState<{ show: boolean; playerIndex: number } | null>(null);
   const [celebrationModal, setCelebrationModal] = useState<{ show: boolean; playerName: string; isShithead: boolean; placement: number } | null>(null);
+  const celebrationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const celebrationInitializedRef = useRef(false);
+  const celebratedGameOverRef = useRef(false);
+  const celebratedPlayerIdsRef = useRef<Set<string>>(new Set());
   // moved to useSelection hook
 
+  const resetCelebration = () => {
+    if (celebrationTimeoutRef.current) {
+      clearTimeout(celebrationTimeoutRef.current);
+      celebrationTimeoutRef.current = null;
+    }
+    setCelebrationModal(null);
+    celebrationInitializedRef.current = false;
+    celebratedGameOverRef.current = false;
+    celebratedPlayerIdsRef.current = new Set();
+  };
+
+  const dismissCelebration = () => {
+    if (celebrationTimeoutRef.current) {
+      clearTimeout(celebrationTimeoutRef.current);
+      celebrationTimeoutRef.current = null;
+    }
+    setCelebrationModal(null);
+  };
+
+  // Derive celebration state from gameState so every client (including ones only
+  // receiving updates via pollGameState) shows the same modal, and so a
+  // simultaneous "player finished" + "game over" transition resolves to a single
+  // modal instead of two competing setState/setTimeout calls.
+  useEffect(() => {
+    if (!gameState || gameState.phase === 'lobby') return;
+
+    const isOver = GameLogic.isGameOver(gameState.players);
+    const finishedPlayers = GameLogic.getFinishedPlayers(gameState.players);
+
+    if (!celebrationInitializedRef.current) {
+      celebrationInitializedRef.current = true;
+      finishedPlayers.forEach((p) => celebratedPlayerIdsRef.current.add(p.id));
+      celebratedGameOverRef.current = isOver;
+      return;
+    }
+
+    if (isOver) {
+      if (!celebratedGameOverRef.current) {
+        celebratedGameOverRef.current = true;
+        const losers = gameState.players.filter((p) => !GameLogic.hasPlayerWon(p));
+        if (losers.length > 0) {
+          if (celebrationTimeoutRef.current) clearTimeout(celebrationTimeoutRef.current);
+          setCelebrationModal({
+            show: true,
+            playerName: losers[0].name,
+            isShithead: true,
+            placement: gameState.players.length,
+          });
+          celebrationTimeoutRef.current = setTimeout(() => setCelebrationModal(null), 4000);
+        }
+      }
+      return;
+    }
+
+    const newlyFinished = finishedPlayers.filter((p) => !celebratedPlayerIdsRef.current.has(p.id));
+    if (newlyFinished.length > 0) {
+      const finisher = newlyFinished[0];
+      celebratedPlayerIdsRef.current.add(finisher.id);
+      const placement = celebratedPlayerIdsRef.current.size;
+      if (celebrationTimeoutRef.current) clearTimeout(celebrationTimeoutRef.current);
+      setCelebrationModal({ show: true, playerName: finisher.name, isShithead: false, placement });
+      celebrationTimeoutRef.current = setTimeout(() => setCelebrationModal(null), 3000);
+    }
+  }, [gameState]);
+
+  useEffect(() => {
+    return () => {
+      if (celebrationTimeoutRef.current) clearTimeout(celebrationTimeoutRef.current);
+    };
+  }, []);
+
   const createTestGame = () => {
+    resetCelebration();
     setTestMode(true);
     const testPlayers = ['Alice', 'Bob', 'Charlie'].map((name, i) => ({
       id: `test_player_${i}`,
@@ -105,6 +188,7 @@ export default function ShitheadGame() {
   };
 
   const createTestGameStarted = () => {
+    resetCelebration();
     setTestMode(true);
     const testPlayers = ['Alice', 'Bob', 'Charlie'].map((name, i) => ({
       id: `test_player_${i}`,
@@ -167,6 +251,7 @@ export default function ShitheadGame() {
 
     try {
       await window.storage.set(`game:${code}`, JSON.stringify(newGameState), true);
+      resetCelebration();
       setRoomCode(code);
       setGameState(newGameState);
       setScreen('lobby');
@@ -197,6 +282,7 @@ export default function ShitheadGame() {
       state.lastAction = `${playerName} joined the room`;
 
       await window.storage.set(`game:${roomCode.toUpperCase()}`, JSON.stringify(state), true);
+      resetCelebration();
       setGameState(state);
       setScreen('lobby');
     } catch {
@@ -232,6 +318,7 @@ export default function ShitheadGame() {
     };
 
     await window.storage.set(`game:${roomCode}`, JSON.stringify(updatedState), true);
+    resetCelebration();
     setGameState(updatedState);
   };
 
@@ -652,38 +739,14 @@ export default function ShitheadGame() {
     }
     if (playerWon) {
       lastAction += ` ${player.name} has finished!`;
-      
-      // Calculate placement (how many players have finished before this one)
-      const finishedPlayers = updatedPlayers.filter(p => GameLogic.hasPlayerWon(p));
-      const placement = finishedPlayers.length;
-      
-      // Show celebration modal for this player
-      setCelebrationModal({
-        show: true,
-        playerName: player.name,
-        isShithead: false,
-        placement
-      });
-      
-      // Auto-hide after 3 seconds
-      setTimeout(() => setCelebrationModal(null), 3000);
     }
     if (gameOver) {
       const losers = updatedPlayers.filter((p) => !GameLogic.hasPlayerWon(p));
       lastAction = `Game Over! ${losers[0].name} is the Sh!thead! 💩`;
-      
-      // Show Sh!thead modal for the loser
-      const totalPlayers = updatedPlayers.length;
-      setCelebrationModal({
-        show: true,
-        playerName: losers[0].name,
-        isShithead: true,
-        placement: totalPlayers
-      });
-      
-      // Auto-hide after 4 seconds (give them time to feel the shame 😄)
-      setTimeout(() => setCelebrationModal(null), 4000);
     }
+    // Celebration modal itself is derived from gameState in the effect above,
+    // so every client (including ones only polling) shows the same modal and
+    // a simultaneous playerWon+gameOver never fires two competing modals.
 
     const updatedState: GameState = {
       ...gameState,
@@ -1392,21 +1455,38 @@ export default function ShitheadGame() {
 
         {celebrationModal?.show &&
           createPortal(
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div
+              className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+              role="alert"
+              aria-live="assertive"
+            >
               {celebrationModal.isShithead ? (
-                <div className="celebration-modal bg-gradient-to-br from-red-600 to-pink-600 text-white px-12 py-8 rounded-2xl shadow-2xl border-4 border-slate-800 text-center max-w-md">
+                <div className="celebration-modal relative bg-gradient-to-br from-red-600 to-pink-600 text-white px-12 py-8 rounded-2xl shadow-2xl border-4 border-slate-800 text-center max-w-md">
+                  <button
+                    onClick={dismissCelebration}
+                    aria-label="Dismiss"
+                    className="absolute top-3 right-3 text-white/80 hover:text-white"
+                  >
+                    <X size={24} />
+                  </button>
                   <div className="text-7xl mb-4 celebration-emoji-pulse">💩</div>
                   <div className="text-5xl font-black mb-3">SH!THEAD!</div>
                   <div className="text-2xl opacity-90">{celebrationModal.playerName} is the loser!</div>
+                  <div className="text-lg opacity-90 mt-2">{getOrdinalLabel(celebrationModal.placement)} place</div>
                 </div>
               ) : (
-                <div className="celebration-modal bg-gradient-to-br from-purple-600 to-pink-600 text-white px-12 py-8 rounded-2xl shadow-2xl border-4 border-yellow-400 text-center max-w-md">
+                <div className="celebration-modal relative bg-gradient-to-br from-purple-600 to-pink-600 text-white px-12 py-8 rounded-2xl shadow-2xl border-4 border-yellow-400 text-center max-w-md">
+                  <button
+                    onClick={dismissCelebration}
+                    aria-label="Dismiss"
+                    className="absolute top-3 right-3 text-white/80 hover:text-white"
+                  >
+                    <X size={24} />
+                  </button>
                   <div className="text-7xl mb-4 celebration-emoji">👑</div>
                   <div className="text-4xl font-black mb-3">SAFE!</div>
                   <div className="text-2xl mb-2">{celebrationModal.playerName} finished!</div>
-                  <div className="text-lg opacity-90">
-                    {celebrationModal.placement === 1 ? '1st' : celebrationModal.placement === 2 ? '2nd' : celebrationModal.placement === 3 ? '3rd' : `${celebrationModal.placement}th`} place
-                  </div>
+                  <div className="text-lg opacity-90">{getOrdinalLabel(celebrationModal.placement)} place</div>
                 </div>
               )}
             </div>,
