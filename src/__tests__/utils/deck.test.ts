@@ -1,35 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Card } from '../../types';
-
-const SUITS = ['♠', '♥', '♣', '♦'];
-const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-
-const createDeck = (numDecks = 1) => {
-    const deck: Card[] = [];
-    const deckColors = ['red', 'blue', 'green', 'purple', 'orange', 'teal'];
-    for (let d = 0; d < numDecks; d++) {
-        for (const suit of SUITS) {
-            for (const rank of RANKS) {
-                deck.push({
-                    suit,
-                    rank,
-                    id: `${rank}${suit}-${d}`,
-                    deckColor: deckColors[d % deckColors.length],
-                });
-            }
-        }
-    }
-    return deck;
-};
-
-const shuffleDeck = (deck: Card[]): Card[] => {
-    const shuffled = [...deck];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-};
+import { createDeck, shuffleDeck } from '../../gameLogic';
 
 describe('Deck Utilities', () => {
     it('should create a deck with correct number of cards (52 per deck)', () => {

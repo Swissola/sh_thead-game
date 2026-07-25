@@ -354,3 +354,82 @@ export function getStartingCard(player: Player): Card | null {
 
   return null;
 }
+
+// ============================================================================
+// DECK CREATION
+// ============================================================================
+
+const SUITS = ['♠', '♥', '♣', '♦'];
+const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+export function createDeck(numDecks = 1): Card[] {
+  const deck: Card[] = [];
+  const deckColors = ['red', 'blue', 'green', 'purple', 'orange', 'teal'];
+  for (let d = 0; d < numDecks; d++) {
+    for (const suit of SUITS) {
+      for (const rank of RANKS) {
+        deck.push({
+          suit,
+          rank,
+          id: `${rank}${suit}-${d}`,
+          deckColor: deckColors[d % deckColors.length],
+        });
+      }
+    }
+  }
+  return deck;
+}
+
+export function shuffleDeck(deck: Card[]): Card[] {
+  const shuffled = [...deck];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// ============================================================================
+// HAND SORTING
+// ============================================================================
+
+export function sortHand(
+  hand: (Card | null)[],
+  mode: 'original' | 'rank' | 'suit'
+): { card: Card; arrayIndex: number }[] {
+  const cardsWithIndices = hand
+    .map((card, arrayIndex) => ({ card, arrayIndex }))
+    .filter((item): item is { card: Card; arrayIndex: number } => item.card !== null);
+
+  const sorted = [...cardsWithIndices];
+
+  if (mode === 'rank') {
+    sorted.sort((a, b) => {
+      const rankA = RANK_VALUES[a.card.rank] || 0;
+      const rankB = RANK_VALUES[b.card.rank] || 0;
+      const rankDiff = rankA - rankB;
+      if (rankDiff !== 0) return rankDiff;
+      return a.card.suit.localeCompare(b.card.suit);
+    });
+  } else if (mode === 'suit') {
+    sorted.sort((a, b) => {
+      const suitOrder = { '♠': 0, '♥': 1, '♣': 2, '♦': 3 };
+      const suitDiff = suitOrder[a.card.suit as keyof typeof suitOrder] - suitOrder[b.card.suit as keyof typeof suitOrder];
+      if (suitDiff !== 0) return suitDiff;
+      const rankA = RANK_VALUES[a.card.rank] || 0;
+      const rankB = RANK_VALUES[b.card.rank] || 0;
+      return rankA - rankB;
+    });
+  }
+
+  return sorted;
+}
+
+// ============================================================================
+// SELECTION
+// ============================================================================
+
+export function canAddToSelection(candidate: Card, selected: Card[]): boolean {
+  if (selected.length === 0) return true;
+  return selected.every((c) => c.rank === candidate.rank);
+}
