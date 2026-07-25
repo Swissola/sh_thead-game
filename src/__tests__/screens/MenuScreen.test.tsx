@@ -89,4 +89,37 @@ describe('MenuScreen', () => {
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Room not found');
     });
+
+    it('clicking "Join" on a valid, waiting room joins successfully without a spurious retry toast (WR-02)', async () => {
+        const roomState = {
+            roomCode: 'ABC123',
+            host: 'host-player',
+            players: [{ id: 'host-player', name: 'Host', hand: [], faceUp: [], faceDown: [], isReady: false }],
+            phase: 'lobby',
+            currentTurn: 0,
+            deck: [],
+            discardPile: [],
+            burnPile: [],
+            lastAction: 'Host created the room',
+            isFirstTurn: true,
+        };
+        localStorage.setItem('game:ABC123', JSON.stringify(roomState));
+
+        renderMenu();
+
+        fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
+            target: { value: 'Alice' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('Room code'), {
+            target: { value: 'ABC123' },
+        });
+        fireEvent.click(screen.getByText('Join'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('probe')).toHaveTextContent('phase:lobby');
+            expect(screen.getByTestId('probe')).toHaveTextContent('players:2');
+        });
+
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
 });

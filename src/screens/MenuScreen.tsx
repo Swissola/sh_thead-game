@@ -152,6 +152,19 @@ export function MenuScreen() {
             state.lastAction = `${playerName} joined the room`;
 
             await setGameState(state);
+
+            // WR-02: the localStorage-only backend has no atomic read-modify-write, so
+            // two players joining the same room within the same poll window can race -
+            // whichever write lands second silently discards the other's join. A full
+            // fix needs a backend with compare-and-set/transactions; at minimum, detect
+            // the collision by re-reading and surface a retry prompt rather than
+            // leaving the dropped player with no room and no explanation.
+            const verifyResult = await window.storage.get(`game:${state.roomCode}`, true);
+            const verifiedState = verifyResult ? JSON.parse(verifyResult.value) : null;
+            const stillPresent = verifiedState?.players?.some((p: { id: string }) => p.id === playerId);
+            if (!stillPresent) {
+                showToast('Failed to join room - please retry.');
+            }
         } catch {
             showToast('Failed to join room');
         }
