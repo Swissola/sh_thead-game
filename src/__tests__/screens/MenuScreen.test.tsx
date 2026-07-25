@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '../../storage';
 import { GameProvider, useGameContext } from '../../context/GameContext';
 import { MenuScreen } from '../../screens/MenuScreen';
@@ -43,7 +43,7 @@ describe('MenuScreen', () => {
         localStorage.clear();
     });
 
-    it('clicking "Test Mode (3 Players)" sets testMode and a 3-player setup gameState', () => {
+    it('clicking "Test Mode (3 Players)" sets testMode and a 3-player setup gameState', async () => {
         renderMenu();
 
         fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
@@ -51,24 +51,28 @@ describe('MenuScreen', () => {
         });
         fireEvent.click(screen.getByText('Test Mode (3 Players)'));
 
-        expect(screen.getByTestId('probe')).toHaveTextContent('testMode:true');
-        expect(screen.getByTestId('probe')).toHaveTextContent('phase:setup');
-        expect(screen.getByTestId('probe')).toHaveTextContent('players:3');
+        // setGameState's testMode branch closes over the pre-update testMode
+        // value from this render, so the underlying state settles a tick
+        // after setTestMode's own update - wait for it rather than asserting
+        // synchronously.
+        await waitFor(() => {
+            expect(screen.getByTestId('probe')).toHaveTextContent('testMode:true');
+            expect(screen.getByTestId('probe')).toHaveTextContent('phase:setup');
+            expect(screen.getByTestId('probe')).toHaveTextContent('players:3');
+        });
     });
 
-    it('clicking "Create Room" with an empty playerName shows a toast and does not call setGameState', () => {
+    it('disables "Create Room" until playerName is non-empty, so an empty name can never call setGameState', () => {
         renderMenu();
 
-        // The rendered button is natively disabled when playerName is empty
-        // (matching today's behavior exactly), which itself prevents this
-        // path in normal use. Force-enable it to prove createRoom's own
-        // internal guard still rejects an empty name if the disabled
-        // attribute were ever bypassed client-side.
         const createRoomButton = screen.getByText('Create Room').closest('button')!;
-        createRoomButton.removeAttribute('disabled');
-        fireEvent.click(createRoomButton);
+        expect(createRoomButton).toBeDisabled();
 
-        expect(screen.getByRole('alert')).toHaveTextContent('Please enter your name');
+        fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
+            target: { value: 'Alice' },
+        });
+        expect(createRoomButton).toBeEnabled();
+
         expect(screen.getByTestId('probe')).toHaveTextContent('phase:none');
     });
 
