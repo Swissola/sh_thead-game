@@ -46,7 +46,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Invalid moves and game feedback appear as in-app messages instead of blocking browser alerts, and the finish celebration animation plays
   5. The new engine and screen components are covered by automated tests
 
-**Plans:** 4/7 plans executed
+**Plans:** 5/7 plans executed
 Plans:
 **Wave 1**
 
@@ -66,7 +66,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 01-05-PLAN.md — App.tsx orchestrator (phase-based routing) + MenuScreen + LobbyScreen extraction
+- [x] 01-05-PLAN.md — App.tsx orchestrator (phase-based routing) + MenuScreen + LobbyScreen extraction
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -174,7 +174,7 @@ rework lands).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Rules Engine Refactor | 4/7 | In Progress|  |
+| 1. Rules Engine Refactor | 5/7 | In Progress|  |
 | 2. Real Cross-Device Multiplayer | 0/TBD | Not started | - |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
