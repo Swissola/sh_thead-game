@@ -56,7 +56,10 @@ describe('Router', () => {
     });
 
     it("renders GameScreen content and not Menu/Lobby content when gameState.phase is a non-'lobby' value", async () => {
-        const playingState = buildGameState({ phase: 'playing' });
+        const playingState = buildGameState({
+            phase: 'playing',
+            players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+        });
 
         render(
             <GameProvider playerId="test-player">
@@ -65,7 +68,10 @@ describe('Router', () => {
             </GameProvider>
         );
 
-        expect(await screen.findByText(/Game screen placeholder/)).toBeInTheDocument();
+        // Plan 01-06 replaced GameScreen's placeholder with the full extraction -
+        // assert on board content unique to GameScreen (MenuScreen's own title is
+        // also "SH!THEAD", so that text isn't a safe disambiguator here).
+        expect(await screen.findByText(/Pick Up Pile/)).toBeInTheDocument();
         expect(screen.queryByText('Create Room')).not.toBeInTheDocument();
         expect(screen.queryByText('Game Lobby')).not.toBeInTheDocument();
     });
