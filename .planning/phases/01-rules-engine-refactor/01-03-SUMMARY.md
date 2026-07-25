@@ -97,3 +97,12 @@ None - no external service configuration required.
 ---
 *Phase: 01-rules-engine-refactor*
 *Completed: 2026-07-25*
+
+## Self-Check: PASSED
+
+- FOUND: src/engine/applyMove.ts
+- FOUND: src/__tests__/engine/applyMove.test.ts
+- FOUND: .planning/phases/01-rules-engine-refactor/01-03-SUMMARY.md
+- FOUND commit: c9e286c (test)
+- FOUND commit: c752d7d (feat)
+- FOUND commit: 01ec19e (docs)
