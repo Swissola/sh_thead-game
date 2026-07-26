@@ -24,4 +24,37 @@ describe('Toast', () => {
 
         expect(onDismiss).toHaveBeenCalledTimes(1);
     });
+
+    it('renders border-red-500 for variant "error" (and when variant is omitted)', () => {
+        const { container } = render(<Toast toast={{ message: 'Invalid play', variant: 'error' }} onDismiss={vi.fn()} />);
+
+        expect(container.querySelector('.border-red-500')).toBeInTheDocument();
+    });
+
+    it('renders border-amber-500 for variant "reconcile"', () => {
+        const { container } = render(
+            <Toast
+                toast={{ message: "Your move didn't stick - synced with the latest game state.", variant: 'reconcile' }}
+                onDismiss={vi.fn()}
+            />
+        );
+
+        expect(container.querySelector('.border-amber-500')).toBeInTheDocument();
+    });
+
+    it('renders border-green-500 for variant "reconnect"', () => {
+        const { container } = render(<Toast toast={{ message: 'Bob reconnected', variant: 'reconnect' }} onDismiss={vi.fn()} />);
+
+        expect(container.querySelector('.border-green-500')).toBeInTheDocument();
+    });
+
+    it('exposes role="alert" and aria-label="Dismiss" for every variant', () => {
+        (['error', 'reconcile', 'reconnect'] as const).forEach((variant) => {
+            const { unmount } = render(<Toast toast={{ message: 'Some message', variant }} onDismiss={vi.fn()} />);
+
+            expect(screen.getByRole('alert')).toBeInTheDocument();
+            expect(screen.getByLabelText('Dismiss')).toBeInTheDocument();
+            unmount();
+        });
+    });
 });
