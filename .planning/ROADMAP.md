@@ -89,12 +89,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
 
-**Plans:** 13 plans
+**Plans:** 2/13 plans executed
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Supabase toolchain, local stack, browser client singleton, shared room contract
-- [ ] 02-02-PLAN.md — Engine hardening (gate revealedFaceDownIndex), Deno-safe import specifiers, toast variants
+- [x] 02-01-PLAN.md — Supabase toolchain, local stack, browser client singleton, shared room contract
+- [x] 02-02-PLAN.md — Engine hardening (gate revealedFaceDownIndex), Deno-safe import specifiers, toast variants
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -206,7 +206,7 @@ rework lands).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
-| 2. Real Cross-Device Multiplayer | 0/TBD | Not started | - |
+| 2. Real Cross-Device Multiplayer | 2/13 | In Progress|  |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
