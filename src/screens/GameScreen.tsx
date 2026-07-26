@@ -156,23 +156,20 @@ export function GameScreen() {
     // UI-side pre-check only (advisory, not authoritative - see this plan's
     // threat model T-01-11). applyMove's PICK_UP_PILE performs the pickup
     // unconditionally once dispatched.
+    //
+    // Face-down cards are always played blind - the player never learns a
+    // selected face-down card's identity before committing (see playCards'
+    // faceDown handling below), so shouldConfirmPickUp can never be told
+    // what that card is either. Passing it here would be the same
+    // information leak as showing it in the UI: the mere presence/absence
+    // of the "are you sure" dialog would reveal whether the hidden card was
+    // playable.
     const pickUpPile = () => {
         const player = gameState.players.find((p) => p.id === currentPlayerId);
         const playerIndex = gameState.players.findIndex((p) => p.id === currentPlayerId);
         if (!player) return;
 
-        let effectiveRevealed: CardType | null = null;
-        if (revealedFaceDown) {
-            if (gameState.isFirstTurn) {
-                const startingCard = GameLogic.getStartingCard(player);
-                effectiveRevealed =
-                    startingCard && revealedFaceDown.card.rank === startingCard.rank ? revealedFaceDown.card : null;
-            } else {
-                effectiveRevealed = revealedFaceDown.card;
-            }
-        }
-
-        if (GameLogic.shouldConfirmPickUp(player, gameState.discardPile, effectiveRevealed)) {
+        if (GameLogic.shouldConfirmPickUp(player, gameState.discardPile, null)) {
             setPickUpConfirmation({ show: true, playerIndex });
             return;
         }
@@ -555,8 +552,9 @@ export function GameScreen() {
                                     <>
                                         {revealedFaceDown && (
                                             <div className="mb-2 flex items-center gap-2">
-                                                <span className="text-slate-300 text-sm">Revealed:</span>
-                                                <Card card={revealedFaceDown.card} small />
+                                                <span className="text-slate-300 text-sm">
+                                                    Face-down card selected - played blind, revealed after you commit.
+                                                </span>
                                             </div>
                                         )}
                                         <div className="flex gap-3">
