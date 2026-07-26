@@ -32,3 +32,14 @@ boundary rules.
   modifies. `npx eslint src/supabase/session.ts src/__tests__/supabase/session.test.ts`
   (this plan's only two files) is clean with zero output. Not re-fixed here per scope
   boundary; still carried forward for the same future lint-cleanup pass.
+
+## Plan 02-03 (Task 2)
+
+- **`npm run lint` still exits 1** (Task 2 acceptance criterion expects exit 0) — the
+  same three pre-existing issues logged under Plan 02-01 above, in the same three files
+  (`App.tsx`, `GameContext.tsx`, `GameScreen.tsx`), none of which this plan touches or
+  modifies. `npx eslint supabase/functions/_shared/engine.ts
+  supabase/functions/_shared/db.ts supabase/functions/_shared/respond.ts
+  src/__tests__/edge/db.test.ts` (this task's four new/changed source files) is clean
+  with zero output. Not re-fixed here per scope boundary; still carried forward for the
+  same future lint-cleanup pass.
