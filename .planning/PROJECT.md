@@ -26,13 +26,17 @@ app store release) is in service of that.
   stage one
 - ✓ A single browser can play a full game start-to-finish via the existing
   Menu/Lobby/Game flow — stage one
+- ✓ Rules run through one shared, pure `applyMove` engine so client and server
+  never disagree — Phase 1 (2026-07-26). Live UAT surfaced and fixed four
+  further pre-existing bugs beyond the refactor's own scope: a same-rank
+  multi-card play under-drew replacement cards, a face-down card's identity
+  leaked to the player before they committed to playing it, and two related
+  draw-animation regressions from fixing the first bug.
 
 ### Active
 
 <!-- Current scope. Building toward these. See REQUIREMENTS.md for full v1 list with IDs. -->
 
-- [ ] Rules run through one shared `applyMove` engine so client and server never
-      disagree (Phase 1)
 - [ ] Real cross-device multiplayer via Supabase, replacing the localStorage-poll
       illusion (Phase 2)
 - [ ] A responsive, touch- and keyboard-usable UI (Phase 3)
@@ -60,26 +64,35 @@ app store release) is in service of that.
   `createRoom`/`joinRoom`/`pollGameState` in `App.tsx` read/write the same
   browser's local storage on a 2-second poll. Two people on different devices
   cannot see the same room today, regardless of what the join-code UI implies.
-- `playerId` is never actually set (`App.tsx:62`, guarded by a
-  `@ts-expect-error`), so even the existing multiplayer plumbing can't tell
-  players apart outside test mode.
-- State is mutated directly in place: `playCards` (`App.tsx:461-834`, ~370
+  **(Phase 2 scope, not yet addressed.)**
+- ~~`playerId` is never actually set (`App.tsx:62`, guarded by a
+  `@ts-expect-error`)~~ — **Resolved in Phase 1**: `App.tsx` now generates a
+  real `crypto.randomUUID()` on mount, no `@ts-expect-error` bypass.
+- ~~State is mutated directly in place: `playCards` (`App.tsx:461-834`, ~370
   lines) takes a live reference into `gameState.players[playerIndex]` and later
-  mutates it directly before ever copying it — a classic React footgun that
-  gets worse once state has to reconcile with a server.
-- Rules logic is duplicated 2-3 times outside `gameLogic.ts` (hand-sort
-  comparators, "cards share a rank" checks, deck creation/shuffling).
+  mutates it directly before ever copying it~~ — **Resolved in Phase 1**: all
+  moves now go through the pure `applyMove` reducer, proven immutable by a
+  40+ test suite asserting reference-inequality on every mutated array.
+- ~~Rules logic is duplicated 2-3 times outside `gameLogic.ts`~~ —
+  **Resolved in Phase 1**: `Hand.tsx`/`Table.tsx` call `gameLogic.ts`
+  directly for hand-sort and rank-share checks; zero inline duplicates remain.
 - Zero responsive design: no Tailwind breakpoints or `@media` queries anywhere
   in `src/`; fixed pixel widths overflow on a phone screen.
+  **(Phase 3 scope, not yet addressed.)**
 - Mouse-only interaction: hover-only tooltips, no keyboard support for
-  selecting or playing a card.
-- 14 blocking `window.alert()` calls are the entire user-feedback mechanism
-  for invalid moves.
-- `src/App.css` is imported by nothing — the celebration modal's animations
-  are fully written and have never played (confirmed still true as of this
-  roadmap: `main.tsx` does not import `App.css`).
-- Test coverage is 100% pure-logic-only; every mutation path (handlers,
-  screens, hooks, `storage.ts`) has zero test coverage.
+  selecting or playing a card. **(Phase 3 scope, not yet addressed.)**
+- ~~14 blocking `window.alert()` calls are the entire user-feedback
+  mechanism~~ — **Resolved in Phase 1**: zero `alert()` calls remain, all
+  replaced by a toast system.
+- ~~`src/App.css` is imported by nothing — the celebration modal's animations
+  ... have never played~~ — **Resolved in Phase 1**: `main.tsx` imports
+  `App.css`; the celebration animation was confirmed actually rendering in a
+  live browser via UAT.
+- Test coverage was 100% pure-logic-only; every mutation path (handlers,
+  screens, hooks) had zero test coverage. **Substantially improved in Phase
+  1**: 153 tests now cover the engine, screens, hooks, and components — though
+  gaps remain (two of the four bugs found in live UAT had no automated
+  coverage until added retroactively; `storage.ts` itself is still untested).
 
 None of this is a criticism of stage one — it's an accurate account of what
 this roadmap has to deal with, as opposed to what the existing feature list
@@ -114,7 +127,7 @@ full extracted context.
 | Supabase (Postgres + Realtime + anonymous auth) for the multiplayer backend | Free tier generous enough for friends-scale play, zero ops, and plain Postgres underneath means migrating off it later is a data export, not a data-model rewrite | — Pending |
 | Capacitor wrapping the existing React web app for Android/iOS | Reuses ~95% of the current codebase, one UI to maintain, fastest path to both stores; trades native look-and-feel for not building a second UI layer | — Pending |
 | Responsive web app, no native wrapper, for desktop | No Tauri/Electron packaging work; desktop is the same responsive app in a browser window, PWA-installable if a taskbar icon is wanted | — Pending |
-| Refactor-first sequencing: build a shared `applyMove` rules engine before the backend work | Client and future server need to run identical rules instead of duplicating them a fourth time; without this, a modified client could submit an illegal move once rooms are real and nothing would stop it | — Pending |
+| Refactor-first sequencing: build a shared `applyMove` rules engine before the backend work | Client and future server need to run identical rules instead of duplicating them a fourth time; without this, a modified client could submit an illegal move once rooms are real and nothing would stop it | ✓ Delivered (Phase 1, 2026-07-26). Note for Phase 2: `applyMove`'s `PLAY_CARDS` case computes the hand→faceUp→faceDown play-order rule but doesn't fully enforce it outside one branch (flagged in `01-REVIEW.md` CR-01, confirmed pre-existing, not fixed in Phase 1) — worth closing before treating the engine as the server's authority. |
 
 ---
-*Last updated: 2026-07-25 after initial roadmap creation*
+*Last updated: 2026-07-26 after Phase 1 completion*
