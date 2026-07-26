@@ -91,20 +91,20 @@ describe('useToast', () => {
         act(() => {
             vi.advanceTimersByTime(2000);
         });
-        expect(result.current.toast).toEqual({ message: 'First error', code: 'NOT_YOUR_TURN' });
+        expect(result.current.toast).toEqual({ message: 'First error', code: 'NOT_YOUR_TURN', variant: 'error' });
 
         // A second show() call replaces the message and restarts the timer.
         act(() => {
             result.current.show('Second error', 'INVALID_PLAY');
         });
-        expect(result.current.toast).toEqual({ message: 'Second error', code: 'INVALID_PLAY' });
+        expect(result.current.toast).toEqual({ message: 'Second error', code: 'INVALID_PLAY', variant: 'error' });
 
         // Advance past the *original* timer's remaining time (1500ms) - if the timer
         // were not reset, the toast would have disappeared by now.
         act(() => {
             vi.advanceTimersByTime(1500);
         });
-        expect(result.current.toast).toEqual({ message: 'Second error', code: 'INVALID_PLAY' });
+        expect(result.current.toast).toEqual({ message: 'Second error', code: 'INVALID_PLAY', variant: 'error' });
 
         // Advance the rest of the new timer's duration (2000ms more, totalling 3500ms
         // since the second show() call) to confirm it does eventually dismiss.
