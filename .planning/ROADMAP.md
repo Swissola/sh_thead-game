@@ -89,7 +89,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
 
-**Plans:** 2/13 plans executed
+**Plans:** 3/13 plans executed
 Plans:
 **Wave 1**
 
@@ -99,7 +99,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1)*
 
 - [ ] 02-03-PLAN.md — rooms/moves schema with deny-all-writes RLS, Realtime publication, shared Edge Function foundation, hosted-project push
-- [ ] 02-04-PLAN.md — Anonymous-auth identity bootstrap and last-used-name persistence
+- [x] 02-04-PLAN.md — Anonymous-auth identity bootstrap and last-used-name persistence
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -206,7 +206,7 @@ rework lands).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
-| 2. Real Cross-Device Multiplayer | 2/13 | In Progress|  |
+| 2. Real Cross-Device Multiplayer | 3/13 | In Progress|  |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
