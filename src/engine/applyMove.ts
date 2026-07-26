@@ -9,10 +9,10 @@
  * This file implements all four Move types: READY_UP, SWAP_CARDS,
  * PICK_UP_PILE, and PLAY_CARDS.
  */
-import * as GameLogic from '../gameLogic';
-import type { Card, CardSource, GameState, Player } from '../types';
-import { ERROR_CODES } from './errors';
-import type { ApplyMoveResult, Move } from './moves';
+import * as GameLogic from '../gameLogic.ts';
+import type { Card, CardSource, GameState, Player } from '../types.ts';
+import { ERROR_CODES } from './errors.ts';
+import type { ApplyMoveResult, Move } from './moves.ts';
 
 export function applyMove(state: GameState, move: Move): ApplyMoveResult {
     const playerIndex = state.players.findIndex((p) => p.id === move.playerId);
