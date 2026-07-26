@@ -23,3 +23,12 @@ boundary rules.
   `ws`, `ajv`, `@babel/core`) — none in `@supabase/supabase-js` or `supabase` themselves.
   Out of scope for this plan (build-tooling supply chain, unrelated to the Supabase
   scaffolding this plan adds); flagged for a future dependency-audit pass.
+
+## Plan 02-04
+
+- **`npm run lint` still exits 1** (Task 2 acceptance criterion expects exit 0) — the
+  same three pre-existing issues logged under Plan 02-01 above, in the same three files
+  (`App.tsx`, `GameContext.tsx`, `GameScreen.tsx`), none of which this plan touches or
+  modifies. `npx eslint src/supabase/session.ts src/__tests__/supabase/session.test.ts`
+  (this plan's only two files) is clean with zero output. Not re-fixed here per scope
+  boundary; still carried forward for the same future lint-cleanup pass.
