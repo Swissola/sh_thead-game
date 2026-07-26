@@ -89,7 +89,38 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
 
-**Plans**: TBD
+**Plans:** 13 plans
+Plans:
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Supabase toolchain, local stack, browser client singleton, shared room contract
+- [ ] 02-02-PLAN.md — Engine hardening (gate revealedFaceDownIndex), Deno-safe import specifiers, toast variants
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 02-03-PLAN.md — rooms/moves schema with deny-all-writes RLS, Realtime publication, shared Edge Function foundation, hosted-project push
+- [ ] 02-04-PLAN.md — Anonymous-auth identity bootstrap and last-used-name persistence
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 02-05-PLAN.md — create-room / join-room Edge Functions, the full reconnect seat-matching story, wrapper invariant checker
+- [ ] 02-06-PLAN.md — start-game / apply-move Edge Functions: server-side deal and server-authoritative moves
+- [ ] 02-07-PLAN.md — check-turn-timeout / heartbeat / remove-player: grace-period auto-pickup, server-verified liveness, host transfer
+- [ ] 02-08-PLAN.md — useRoomSubscription (Realtime replaces the poll) and usePresence
+- [ ] 02-09-PLAN.md — Optimistic dispatch and authoritative reconciliation in GameContext
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 02-10-PLAN.md — App.tsx identity gate and Realtime wiring; MenuScreen create/join via Edge Functions, name pre-fill, join-link
+- [ ] 02-11-PLAN.md — LobbyScreen: server-backed start, join-link copy, host removal, offline markers
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 02-12-PLAN.md — GameScreen: two-state offline badge, reconnect toast, check-turn-timeout client trigger, Leave Game
+
+**Wave 6** *(blocked on Wave 5)*
+
+- [ ] 02-13-PLAN.md — Edge Function functional smoke suite over all seven wrappers, plus the two-device cross-device play test
 
 ### Phase 3: Responsive UI
 

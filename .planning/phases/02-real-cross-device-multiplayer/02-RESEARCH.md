@@ -511,17 +511,17 @@ export const supabase = createClient(
 
 ## Open Questions
 
-1. **Should `turn_started_at` reset on every move, or only when `currentTurn` changes?**
+1. **Should `turn_started_at` reset on every move, or only when `currentTurn` changes?** (RESOLVED — see plan 02-06: reset unconditionally on every successful move)
    - What we know: `applyPlayCards` can return the same `currentTurn` after a burn (player goes again).
    - What's unclear: whether the 60s grace period should restart for that player's "next action" or keep counting from their original turn start.
    - Recommendation: default to resetting on every successful move (simpler, arguably fairer to the player); confirm with the user only if it turns out to matter in practice.
 
-2. **Should `SELECT` on `rooms` be restricted to players actually in that room, rather than any authenticated (anonymous) user?**
+2. **Should `SELECT` on `rooms` be restricted to players actually in that room, rather than any authenticated (anonymous) user?** (RESOLVED — see plan 02-03: `using (true)` kept for parity, risk accepted as T-02-08)
    - What we know: the existing localStorage design has no real access control beyond an unguessable room code (WR-03's 36^6 combination space); `using (true)` preserves that exact posture.
    - What's unclear: whether Phase 2's move to a real backend raises the bar the user expects for "who can read a room's state."
    - Recommendation: keep `using (true)` for parity with existing risk acceptance; revisit only if a future phase adds anything more sensitive to room state than card positions in a party game.
 
-3. **Exact set of Edge Functions for lobby management (D-06/D-07/D-08) - one per operation, or a single `manage-room` function with an action discriminator?**
+3. **Exact set of Edge Functions for lobby management (D-06/D-07/D-08) - one per operation, or a single `manage-room` function with an action discriminator?** (RESOLVED — see plans 02-05/02-06/02-07: one function per operation, seven in total)
    - What we know: `create-room`, `join-room`, `start-game`, and `apply-move` are clearly distinct concerns; D-06 (rejoin-by-name), D-07 (host removes AFK player), D-08 (host transfer on disconnect) are smaller lobby-only operations that could be folded into `join-room` or split out.
    - What's unclear: this is a task-breakdown-level decision, not a research-level one.
    - Recommendation: leave to the planner; either shape satisfies the "RLS blocks direct writes, Edge Function is the only writer" architecture requirement.
