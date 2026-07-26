@@ -223,10 +223,8 @@ export function shouldDrawCards(player: Player, deckSize: number): boolean {
 
 export function getCardsToDrawCount(player: Player, deckSize: number): number {
   const nonNullCount = player.hand.filter((c): c is Card => c !== null).length;
-  if (nonNullCount === 0) {
-    return Math.min(3, deckSize);
-  }
-  return Math.min(1, deckSize);
+  const cardsNeeded = Math.max(0, 3 - nonNullCount);
+  return Math.min(cardsNeeded, deckSize);
 }
 
 // ============================================================================

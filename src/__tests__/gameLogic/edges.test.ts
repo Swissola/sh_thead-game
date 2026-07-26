@@ -49,8 +49,9 @@ describe('GameLogic edge conditions', () => {
     it('shouldDrawCards and draw count adhere to limits', () => {
         const player: Player = { id: 'p', name: 'P', hand: [c('4', '♥', '4h'), null], faceUp: [], faceDown: [], isReady: false };
         expect(GameLogic.shouldDrawCards(player, 2)).toBe(true);
-        expect(GameLogic.getCardsToDrawCount(player, 2)).toBe(1);
-        expect(GameLogic.getCardsToDrawCount(player, 10)).toBe(1);
+        // Hand has 1 card, needs 2 to reach 3 - capped by deck size.
+        expect(GameLogic.getCardsToDrawCount(player, 2)).toBe(2);
+        expect(GameLogic.getCardsToDrawCount(player, 10)).toBe(2);
         const player2: Player = { id: 'q', name: 'Q', hand: [null, null, null], faceUp: [], faceDown: [], isReady: false };
         expect(GameLogic.getCardsToDrawCount(player2, 5)).toBe(3);
         expect(GameLogic.getCardsToDrawCount(player2, 2)).toBe(2);
