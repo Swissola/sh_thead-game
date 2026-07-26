@@ -262,7 +262,19 @@ export function GameScreen() {
         }
 
         if (!skipAnimationPrediction) {
-            const cardsToDraw = GameLogic.getCardsToDrawCount(player, gameState.deck.length);
+            // getCardsToDrawCount needs the hand as it will be AFTER this play
+            // (cards.ts's applyMove does the same via preDrawPlayer) - passing
+            // the still-full pre-play hand under-counts by however many hand
+            // cards are being played, since the function only asks "how many
+            // more do I need to reach 3" from whatever hand it's given.
+            const effectiveHandForDraw = reorderedHand ?? player.hand;
+            const postPlayHand =
+                cardSource === 'hand'
+                    ? effectiveHandForDraw.map((c, idx) =>
+                          selections.some((s) => s.type === 'hand' && s.index === idx) ? null : c
+                      )
+                    : player.hand;
+            const cardsToDraw = GameLogic.getCardsToDrawCount({ ...player, hand: postPlayHand }, gameState.deck.length);
             if (cardsToDraw > 0) {
                 const drawnCards = gameState.deck.slice(0, cardsToDraw);
                 const deckElement = document.querySelector('.draw-pile-card');
@@ -280,12 +292,11 @@ export function GameScreen() {
                 // card's position is the Nth drawn card's landing spot. Falls
                 // back to the hand-area container, then a fixed point, when no
                 // hand card was played (faceUp/faceDown-only plays).
-                const effectiveHand = reorderedHand ?? player.hand;
                 const playedHandCards =
                     cardSource === 'hand'
                         ? selections
                               .filter((s) => s.type === 'hand')
-                              .map((s) => effectiveHand[s.index])
+                              .map((s) => effectiveHandForDraw[s.index])
                               .filter((c): c is CardType => c !== null && c !== undefined)
                         : [];
                 const handSlotPositions = playedHandCards
