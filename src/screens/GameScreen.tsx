@@ -271,11 +271,42 @@ export function GameScreen() {
                     const deckRect = deckElement.getBoundingClientRect();
                     deckPos = { x: deckRect.left + deckRect.width / 2, y: deckRect.top + deckRect.height / 2 };
                 }
+
+                // Target the screen position of the hand slot each drawn card
+                // lands in, read BEFORE dispatch while the about-to-be-played
+                // cards are still rendered at their real positions. applyMove
+                // fills vacated hand slots in ascending index order (see
+                // applyMove.ts's PLAY_CARDS case), so the Nth played hand
+                // card's position is the Nth drawn card's landing spot. Falls
+                // back to the hand-area container, then a fixed point, when no
+                // hand card was played (faceUp/faceDown-only plays).
+                const effectiveHand = reorderedHand ?? player.hand;
+                const playedHandCards =
+                    cardSource === 'hand'
+                        ? selections
+                              .filter((s) => s.type === 'hand')
+                              .map((s) => effectiveHand[s.index])
+                              .filter((c): c is CardType => c !== null && c !== undefined)
+                        : [];
+                const handSlotPositions = playedHandCards
+                    .map((card) => document.querySelector(`[data-card-key="${card.id}"]`))
+                    .filter((el): el is Element => el !== null)
+                    .map((el) => {
+                        const rect = el.getBoundingClientRect();
+                        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                    });
+                const handAreaElement = document.querySelector('.hand-area');
+                let handAreaPos = { x: window.innerWidth / 2, y: window.innerHeight - 200 };
+                if (handAreaElement) {
+                    const areaRect = handAreaElement.getBoundingClientRect();
+                    handAreaPos = { x: areaRect.left + areaRect.width / 2, y: areaRect.top + areaRect.height / 2 };
+                }
+
                 setDrawingCards(
                     drawnCards.map((card, i) => ({
                         card,
                         id: `draw-${card.id}-${Date.now()}-${i}`,
-                        targetPos: { x: window.innerWidth / 2, y: window.innerHeight - 200 },
+                        targetPos: handSlotPositions[i] ?? handAreaPos,
                         startPos: deckPos,
                     }))
                 );
