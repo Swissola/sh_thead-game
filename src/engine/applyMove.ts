@@ -9,10 +9,10 @@
  * This file implements all four Move types: READY_UP, SWAP_CARDS,
  * PICK_UP_PILE, and PLAY_CARDS.
  */
-import * as GameLogic from '../gameLogic';
-import type { Card, CardSource, GameState, Player } from '../types';
-import { ERROR_CODES } from './errors';
-import type { ApplyMoveResult, Move } from './moves';
+import * as GameLogic from '../gameLogic.ts';
+import type { Card, CardSource, GameState, Player } from '../types.ts';
+import { ERROR_CODES } from './errors.ts';
+import type { ApplyMoveResult, Move } from './moves.ts';
 
 export function applyMove(state: GameState, move: Move): ApplyMoveResult {
     const playerIndex = state.players.findIndex((p) => p.id === move.playerId);
@@ -364,15 +364,29 @@ function applyPickUpPile(
     const updatedHand = [...player.hand];
     const cardsToAdd = [...state.discardPile];
 
-    // CR-01 follow-up: unlike PLAY_CARDS, revealedFaceDownIndex is deliberately NOT
-    // gated on getAvailableCardSource(player) === 'faceDown' here. This is an accepted
-    // decision (consistent with RESEARCH.md Open Question 2's resolution that
-    // PICK_UP_PILE performs the pickup unconditionally once dispatched), not an
-    // oversight: the UI (Table.tsx) only ever lets a player reveal/select a face-down
-    // card when getAvailableCardSource already reports 'faceDown', so a spoofed
-    // revealedFaceDownIndex from a non-faceDown-source player is the same class of
-    // "untrusted client" risk as any other spoofed move field, not a rule-order bypass
-    // in its own right - picking up the pile is always legal regardless of source.
+    // T-02-03 (Phase 2 hardening, D-13): under Phase 1's trusted client,
+    // revealedFaceDownIndex was deliberately left un-gated on
+    // getAvailableCardSource(player) === 'faceDown' because the UI (Table.tsx) only
+    // ever let a player reveal/select a face-down card once that source was already
+    // 'faceDown', so the risk was accepted as no worse than any other spoofed move
+    // field. Under MPLAY-04, applyMove is the server's trust boundary and the client
+    // is no longer trusted to have honoured that UI restriction, so a modified client
+    // could otherwise reveal (and thus learn the identity of) a face-down card while
+    // still holding hand or face-up cards. Gate it the same way CR-01 gates
+    // PLAY_CARDS: reject unless faceDown is the player's only available source.
+    // Picking up an unrevealed pile remains always legal regardless of source, which
+    // is what keeps D-05's server auto-pickup safe.
+    const cardSource = GameLogic.getAvailableCardSource(player);
+    if (move.revealedFaceDownIndex !== undefined && cardSource !== 'faceDown') {
+        return {
+            state,
+            error: {
+                code: ERROR_CODES.INVALID_SELECTION,
+                message: `You must play from your ${cardSource} cards first`,
+            },
+        };
+    }
+
     const newFaceDown = [...player.faceDown];
     if (move.revealedFaceDownIndex !== undefined) {
         const idx = move.revealedFaceDownIndex;

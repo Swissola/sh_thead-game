@@ -302,16 +302,15 @@ describe('applyMove - PICK_UP_PILE', () => {
         expect(state).toEqual(before);
     });
 
-    it('unshifts the revealed face-down card into the pickup and nulls it out of faceDown when revealedFaceDownIndex is set', () => {
+    it('unshifts the revealed face-down card into the pickup and nulls it out of faceDown when revealedFaceDownIndex is set (source is faceDown, T-02-03)', () => {
         const discard1 = buildCard({ id: 'discard-1', rank: '7', suit: '♣' });
         const faceDownCard = buildCard({ id: 'facedown-0', rank: 'Q', suit: '♠' });
-        const p0Hand = buildCard({ id: 'p0-hand-0' });
         const state = buildGameState({
             phase: 'playing',
             currentTurn: 0,
             discardPile: [discard1],
             players: [
-                buildPlayer({ id: 'p0', hand: [p0Hand], faceDown: [faceDownCard] }),
+                buildPlayer({ id: 'p0', hand: [], faceUp: [], faceDown: [faceDownCard] }),
                 buildPlayer({ id: 'p1' }),
             ],
         });
@@ -326,7 +325,83 @@ describe('applyMove - PICK_UP_PILE', () => {
         expect(result.error).toBeUndefined();
         expect(result.state.players[0].faceDown).not.toBe(state.players[0].faceDown);
         expect(result.state.players[0].faceDown[0]).toBeNull();
-        expect(result.state.players[0].hand).toEqual([p0Hand, faceDownCard, discard1]);
+        expect(result.state.players[0].hand).toEqual([faceDownCard, discard1]);
+        expect(state).toEqual(before);
+    });
+
+    it('rejects PICK_UP_PILE with revealedFaceDownIndex set while the player still holds hand cards (T-02-03)', () => {
+        const handCard = buildCard({ id: 'p0-hand-0', rank: '9', suit: '♦' });
+        const faceDownCard = buildCard({ id: 'facedown-0', rank: 'Q', suit: '♠' });
+        const state = buildGameState({
+            phase: 'playing',
+            currentTurn: 0,
+            discardPile: [buildCard({ id: 'discard-1' })],
+            players: [
+                buildPlayer({ id: 'p0', hand: [handCard], faceUp: [], faceDown: [faceDownCard] }),
+                buildPlayer({ id: 'p1' }),
+            ],
+        });
+        const before = snapshot(state);
+
+        const result = applyMove(state, {
+            type: 'PICK_UP_PILE',
+            playerId: 'p0',
+            revealedFaceDownIndex: 0,
+        });
+
+        expect(result.error).toEqual({ code: ERROR_CODES.INVALID_SELECTION, message: 'You must play from your hand cards first' });
+        expect(result.state).toBe(state);
+        expect(state).toEqual(before);
+    });
+
+    it('rejects PICK_UP_PILE with revealedFaceDownIndex set while the player still holds only faceUp cards (T-02-03)', () => {
+        const faceUpCard = buildCard({ id: 'faceup-0', rank: '9', suit: '♥' });
+        const faceDownCard = buildCard({ id: 'facedown-0', rank: 'Q', suit: '♠' });
+        const state = buildGameState({
+            phase: 'playing',
+            currentTurn: 0,
+            discardPile: [buildCard({ id: 'discard-1' })],
+            players: [
+                buildPlayer({ id: 'p0', hand: [], faceUp: [faceUpCard], faceDown: [faceDownCard] }),
+                buildPlayer({ id: 'p1' }),
+            ],
+        });
+        const before = snapshot(state);
+
+        const result = applyMove(state, {
+            type: 'PICK_UP_PILE',
+            playerId: 'p0',
+            revealedFaceDownIndex: 0,
+        });
+
+        expect(result.error).toEqual({ code: ERROR_CODES.INVALID_SELECTION, message: 'You must play from your faceUp cards first' });
+        expect(result.state).toBe(state);
+        expect(state).toEqual(before);
+    });
+
+    it('accepts PICK_UP_PILE with revealedFaceDownIndex set when faceDown is the only remaining source (T-02-03)', () => {
+        const discard1 = buildCard({ id: 'discard-1', rank: '7', suit: '♣' });
+        const faceDownCard = buildCard({ id: 'facedown-0', rank: 'Q', suit: '♠' });
+        const state = buildGameState({
+            phase: 'playing',
+            currentTurn: 0,
+            discardPile: [discard1],
+            players: [
+                buildPlayer({ id: 'p0', hand: [], faceUp: [], faceDown: [faceDownCard] }),
+                buildPlayer({ id: 'p1' }),
+            ],
+        });
+        const before = snapshot(state);
+
+        const result = applyMove(state, {
+            type: 'PICK_UP_PILE',
+            playerId: 'p0',
+            revealedFaceDownIndex: 0,
+        });
+
+        expect(result.error).toBeUndefined();
+        expect(result.state.players[0].faceDown[0]).toBeNull();
+        expect(result.state.players[0].hand).toEqual([faceDownCard, discard1]);
         expect(state).toEqual(before);
     });
 

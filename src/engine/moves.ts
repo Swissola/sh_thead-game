@@ -3,8 +3,8 @@
  * (play cards, pick up pile, swap cards, ready up) goes through, plus the
  * ApplyMoveResult shape applyMove returns.
  */
-import type { Card, CardSelection, CardSource, GameState } from '../types';
-import type { ErrorCode } from './errors';
+import type { Card, CardSelection, CardSource, GameState } from '../types.ts';
+import type { ErrorCode } from './errors.ts';
 
 export type Move =
     | {

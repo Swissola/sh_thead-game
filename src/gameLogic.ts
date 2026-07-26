@@ -5,7 +5,7 @@
  * special card effects, and game rules.
  */
 
-import type { Card, Player, CardSource } from './types';
+import type { Card, Player, CardSource } from './types.ts';
 
 export const RANK_VALUES: Record<string, number> = {
   '2': 2,
