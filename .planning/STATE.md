@@ -25,11 +25,18 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 1 of 13
-Status: Executing Phase 02
-Last activity: 2026-07-26 -- Phase 02 execution started
+Plan: 02-03, Task 3 of 3 — CHECKPOINT PENDING (human action required)
+Status: 3/13 plans complete (02-01, 02-02, 02-04); 02-03 has Tasks 1-2 merged, Task 3 blocked on a real hosted Supabase project link
+Last activity: 2026-07-26 -- Wave 2 paused at 02-03's hosted-project checkpoint
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 23%
+
+**Note for any future resume/re-plan:** 02-03-SUMMARY.md exists on disk but documents
+PARTIAL completion (2/3 tasks) — do not treat its presence as proof the plan is done.
+Task 3 (`supabase link` + `supabase db push` against a real hosted project, using a
+user-supplied `SUPABASE_ACCESS_TOKEN`) has not been attempted. Wave 3 (02-05..02-09)
+must not start until Task 3 is confirmed complete — several of those plans' Edge
+Functions assume a real database to test against.
 
 ## Performance Metrics
 
