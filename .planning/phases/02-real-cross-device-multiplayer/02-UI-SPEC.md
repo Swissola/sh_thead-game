@@ -110,7 +110,7 @@ Leave Game button is intentionally **not** red: it is a neutral exit action (the
 | Menu display name field (D-09) | No copy change — placeholder stays "Enter your name"; the field's initial `value` now reads from a persisted last-used name instead of defaulting to `''`, still fully editable |
 | Empty state | Not applicable — Phase 2 introduces no new empty-data view. (The existing "Waiting for players..." / "Waiting for host to start the game..." copy in `LobbyScreen.tsx` is unchanged and out of scope.) |
 | Error state (existing pattern, unchanged) | Short, direct, present-tense: "Room not found", "Game has already started", "Failed to join room - please retry." New reconciliation copy above follows the same register: plain statement of what happened, no jargon. |
-| Destructive confirmation | "Leave Game": clicking the header button opens a lightweight confirm dialog reusing the existing `pickUpConfirmation` portal pattern (`bg-black/50` overlay, `slate-800` panel, `border-2 border-purple-500`). Title: "Leave game?" Body: "You can rejoin any time with the same room code - your seat will be waiting." Buttons: "Cancel" (`slate-700`/`slate-600`, matches existing Cancel styling) and "Leave" (`bg-red-600 hover:bg-red-700`, matching the existing "Pick Up Anyway" confirm-button treatment for a final destructive-style confirm action, even though the underlying action is reversible) |
+| Destructive confirmation | "Leave Game": clicking the header button opens a lightweight confirm dialog reusing the existing `pickUpConfirmation` portal pattern (`bg-black/50` overlay, `slate-800` panel, `border-2 border-purple-500`). Title: "Leave game?" Body: "You can rejoin any time with the same room code - your seat will be waiting." Buttons: "Keep Playing" (`slate-700`/`slate-600`, same neutral dismiss-button styling used elsewhere in the confirm-dialog pattern) and "Leave Game" (`bg-red-600 hover:bg-red-700`, matching the existing "Pick Up Anyway" confirm-button treatment for a final destructive-style confirm action, even though the underlying action is reversible). Neither label is generic — both name the specific choice being made, per the copywriting BLOCK list on vague labels like "Cancel"/"Submit"/"OK". This dialog is distinct from the pre-existing `pickUpConfirmation` dialog (`GameScreen.tsx:671`), which keeps its own "Cancel" label unchanged and is out of scope for this gate |
 
 ---
 
@@ -142,3 +142,5 @@ Leave Game button is intentionally **not** red: it is a neutral exit action (the
 - [ ] Dimension 6 Registry Safety: PASS
 
 **Approval:** pending
+</content>
+</invoke>
