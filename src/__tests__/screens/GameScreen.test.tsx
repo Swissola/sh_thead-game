@@ -214,6 +214,87 @@ describe('GameScreen', () => {
         });
     });
 
+    it('playing two same-rank hand cards refills the hand to 3 and shows a ghost card per drawn card (regression: e3f30b3, ab02f0b)', async () => {
+        const state = buildGameState({
+            phase: 'playing',
+            isFirstTurn: false,
+            currentTurn: 0,
+            deck: [
+                buildCard({ id: 'deck-0', rank: '9', suit: '♣' }),
+                buildCard({ id: 'deck-1', rank: '10', suit: '♣' }),
+            ],
+            discardPile: [],
+            players: [
+                buildPlayer({
+                    id: 'test-player',
+                    name: 'Alice',
+                    hand: [
+                        buildCard({ id: 'hand-0', rank: '7', suit: '♠' }),
+                        buildCard({ id: 'hand-1', rank: '7', suit: '♥' }),
+                        buildCard({ id: 'hand-2', rank: '3', suit: '♣' }),
+                    ],
+                }),
+                buildPlayer({ id: 'p1', name: 'Bob', hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })] }),
+            ],
+        });
+
+        const { container } = renderGame('test-player', state);
+        await screen.findByText('Hand');
+
+        fireEvent.click(container.querySelector('[data-card-key="hand-0"]')?.firstElementChild as HTMLElement);
+        fireEvent.click(container.querySelector('[data-card-key="hand-1"]')?.firstElementChild as HTMLElement);
+        await waitFor(() => {
+            const selected = container.querySelectorAll('[data-card-key="hand-0"] .ring-yellow-400, [data-card-key="hand-1"] .ring-yellow-400');
+            expect(selected.length).toBe(2);
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: /^Play/ }));
+
+        // Ghost portal reflects the draw prediction synchronously, before the
+        // 700ms setTimeout that clears it - checked immediately, no waitFor,
+        // to avoid racing the real-timer clear.
+        expect(container.ownerDocument.querySelectorAll('.draw-card-ghost').length).toBe(2);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('probe')).toHaveTextContent('Alice(ready:false,hand:3)');
+        });
+    });
+
+    it('does not reveal a selected face-down card\'s rank/suit before Play is clicked (regression: 9f4f0fa)', async () => {
+        const state = buildGameState({
+            phase: 'playing',
+            isFirstTurn: false,
+            currentTurn: 0,
+            deck: [],
+            discardPile: [],
+            players: [
+                buildPlayer({
+                    id: 'test-player',
+                    name: 'Alice',
+                    hand: [],
+                    faceUp: [],
+                    faceDown: [buildCard({ id: 'facedown-0', rank: 'Q', suit: '♦' })],
+                }),
+                buildPlayer({ id: 'p1', name: 'Bob', hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♣' })] }),
+            ],
+        });
+
+        const { container } = renderGame('test-player', state);
+        await screen.findByText('Table');
+
+        expect(screen.queryByText('Q')).not.toBeInTheDocument();
+
+        fireEvent.click(container.querySelector('[data-facedown-index="0"]')?.firstElementChild as HTMLElement);
+
+        await waitFor(() => {
+            expect(screen.getByText(/played blind/i)).toBeInTheDocument();
+        });
+        // The face-down card is selected (Play is enabled) but its identity
+        // must still not appear anywhere in the DOM.
+        expect(screen.queryByText('Q')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /^Play/ })).not.toBeDisabled();
+    });
+
     it('clicking two hand cards in setup phase swaps their positions via SWAP_CARDS (D-12)', async () => {
         const state = buildGameState({
             phase: 'setup',
