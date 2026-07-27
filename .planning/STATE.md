@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
+status: executing
 last_updated: "2026-07-27T19:55:47.082Z"
-last_activity: "2026-07-27 -- Task 3 hosted-project checkpoint completed: migration 0001 pushed"
+last_activity: "2026-07-27 -- Plan 02-07 (server-side disconnect handling) merged into stage-1-refactor"
 progress:
   total_phases: 7
   completed_phases: 1
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-07 — COMPLETE (all 3 tasks: D-05 grace-period auto-pickup, D-08 heartbeat/host
+Plan: 02-07 — COMPLETE and merged (all 3 tasks: D-05 grace-period auto-pickup, D-08 heartbeat/host
 transfer, D-07 host-removes-player, plus the three Deno wrappers)
-Status: 7/13 plans complete in this worktree's view (02-01..02-07); Wave 3 siblings 02-08/02-09
-executing in parallel in separate worktrees, not yet merged here
-Last activity: 2026-07-27 -- Plan 02-07 (server-side disconnect handling) completed: all three
+Status: 7/13 plans complete and merged into stage-1-refactor (02-01..02-07); 02-08/02-09
+still executing in parallel in separate worktrees, not yet merged
+Last activity: 2026-07-27 -- Plan 02-07 (server-side disconnect handling) merged: all three
 Edge Function operations implemented, unit-tested, and passing scripts/check-edge-wrappers.mjs
 
 Progress: [███████░░░] 70%
@@ -42,7 +42,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 
 **Velocity:**
 
-- Total plans completed: 7
+- Total plans completed: 14
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -50,7 +50,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| Phase 02 P07 | 1 | 25min | 3 tasks, 10 files |
 
 **Recent Trend:**
 
@@ -58,7 +58,6 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 - Trend: -
 
 *Updated after each plan completion*
-| Phase 02 P07 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
