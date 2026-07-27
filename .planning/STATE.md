@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-last_updated: "2026-07-27T18:45:00.000Z"
-last_activity: 2026-07-27 -- 02-03 Task 3 hosted-project checkpoint completed, Wave 3 unblocked
+status: completed
+last_updated: "2026-07-27T19:57:24.655Z"
+last_activity: "2026-07-27 -- Task 3 hosted-project checkpoint completed: migration 0001 pushed"
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 20
-  completed_plans: 8
+  completed_plans: 14
   percent: 14
 ---
 
@@ -25,12 +25,16 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-03 — COMPLETE (all 3 tasks, including Task 3's hosted-project checkpoint)
-Status: 4/13 plans complete (02-01, 02-02, 02-03, 02-04); Wave 3 (02-05..02-09) unblocked
-Last activity: 2026-07-27 -- Task 3 hosted-project checkpoint completed: migration 0001 pushed
-to Supabase project kyoxrafrsxwybyryzgzd, anonymous sign-in verified live, .env.local wired up
+Plan: 02-08 — COMPLETE (both tasks: useRoomSubscription, usePresence)
+Status: Wave 3 in progress. 02-01..02-06 merged into stage-1-refactor; 02-08 complete in this
+worktree (this SUMMARY). Sibling plans 02-07 and 02-09 were executing in parallel in separate
+worktrees at the time this plan finished — their completion status is not visible from here;
+check their own SUMMARY.md files at merge time.
+Last activity: 2026-07-27 -- Plan 02-08 complete: useRoomSubscription (Realtime postgres_changes
+stream replacing the localStorage poll) and usePresence (Presence channel + heartbeat cadence)
+both implemented, tested (18 new tests), and committed.
 
-Progress: [███░░░░░░░] 31%
+Progress: [███████░░░] 70%
 
 **Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
 present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
@@ -56,6 +60,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 02 P08 | 35min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -68,6 +73,7 @@ Recent decisions affecting current work:
 - Pre-roadmap: Capacitor chosen to wrap the existing React app for Android/iOS, no separate native UI
 - Pre-roadmap: Desktop ships as a responsive web app (PWA-installable), no Tauri/Electron
 - Pre-roadmap: Refactor-first sequencing — Phase 1 (rules engine) is a hard dependency for Phase 2 (multiplayer)
+- [Phase 02]: useRoomSubscription signals reconciliation from the Realtime broadcast callback, not the functions.invoke() response, per RESEARCH.md Pattern 3
 
 ### Pending Todos
 
@@ -94,6 +100,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-26T13:05:02.843Z
-Stopped at: Phase 02 UI-SPEC approved
-Resume file: .planning/phases/02-real-cross-device-multiplayer/02-UI-SPEC.md
+Last session: 2026-07-27T19:57:24.648Z
+Stopped at: Completed 02-08-PLAN.md
+Resume file: None
