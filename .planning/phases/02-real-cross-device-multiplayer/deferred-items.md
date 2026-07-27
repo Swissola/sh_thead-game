@@ -95,3 +95,24 @@ boundary rules.
   the lint check above. **Action required at Wave 3 integration:** once 02-05 merges,
   re-run `node scripts/check-edge-wrappers.mjs` against these two wrappers to confirm
   they pass the live checker unchanged.
+
+## Plan 02-07
+
+- **`npm run lint` still exits 1** (Task 3 acceptance criterion expects exit 0) — the
+  same three pre-existing issues logged under Plan 02-01 above, in the same three files
+  (`App.tsx`, `GameContext.tsx`, `GameScreen.tsx`), none of which this plan touches,
+  modifies, or is permitted to touch (`GameContext.tsx` is explicitly out of scope for
+  this wave - owned by sibling plan 02-09, executing in parallel). `npx eslint
+  supabase/functions/_shared/turnTimeout.ts supabase/functions/_shared/heartbeat.ts
+  supabase/functions/_shared/removePlayer.ts src/__tests__/edge/turnTimeout.test.ts
+  src/__tests__/edge/heartbeat.test.ts src/__tests__/edge/removePlayer.test.ts` (this
+  plan's six new source/test files; the three Deno wrapper `index.ts` files are
+  globally ignored by `eslint.config.js`) is clean with zero errors and zero warnings.
+  Not re-fixed here per scope boundary; still carried forward for the same future
+  lint-cleanup pass.
+- This worktree's branch was also created from the same stale base commit (`d606485`)
+  described under Plan 02-05 above, predating plan 02-03's merge of the shared modules
+  this plan depends on (`engine.ts`, `db.ts`, `respond.ts`, etc.). Fixed at the start of
+  this plan's execution via `git merge --ff-only stage-1-refactor` (confirmed a safe
+  fast-forward: `git merge-base HEAD stage-1-refactor` equalled the worktree's
+  pre-merge HEAD), followed by `npm install` since `node_modules` did not yet exist.
