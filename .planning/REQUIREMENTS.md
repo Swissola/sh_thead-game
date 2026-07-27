@@ -24,9 +24,9 @@ prior staged plan in the repo's `ROADMAP.md` (7 stages), captured as context in
 - [x] **MPLAY-01**: A friend on a different device or browser can join a room using a room code and see the same live game
 - [x] **MPLAY-02**: Room state is stored in Supabase (Postgres) and updates propagate via Realtime subscriptions, replacing the 2-second `localStorage` poll
 - [ ] **MPLAY-03**: Each player has a persistent, distinguishable identity via Supabase anonymous auth (fixes the never-set `playerId` bug)
-- [ ] **MPLAY-04**: Moves are validated server-side by a Supabase Edge Function calling the same `applyMove` engine, so a modified client cannot submit an illegal move
+- [x] **MPLAY-04**: Moves are validated server-side by a Supabase Edge Function calling the same `applyMove` engine, so a modified client cannot submit an illegal move
 - [ ] **MPLAY-05**: The client applies a move optimistically for instant feedback, then reconciles against the authoritative server broadcast
-- [ ] **MPLAY-06**: Players can see when an opponent has disconnected mid-game (presence)
+- [x] **MPLAY-06**: Players can see when an opponent has disconnected mid-game (presence)
 
 ### Responsive UI
 
@@ -91,9 +91,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MPLAY-01 | Phase 2 | Complete |
 | MPLAY-02 | Phase 2 | Complete |
 | MPLAY-03 | Phase 2 | Pending |
-| MPLAY-04 | Phase 2 | Pending |
+| MPLAY-04 | Phase 2 | Complete |
 | MPLAY-05 | Phase 2 | Pending |
-| MPLAY-06 | Phase 2 | Pending |
+| MPLAY-06 | Phase 2 | Complete |
 | RESP-01 | Phase 3 | Pending |
 | RESP-02 | Phase 3 | Pending |
 | RESP-03 | Phase 3 | Pending |

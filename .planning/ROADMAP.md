@@ -89,7 +89,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
 
-**Plans:** 4/13 plans executed
+**Plans:** 7/13 plans executed
 Plans:
 **Wave 1**
 
@@ -103,9 +103,9 @@ Plans:
 
 **Wave 3** *(unblocked — Wave 2 complete)*
 
-- [ ] 02-05-PLAN.md — create-room / join-room Edge Functions, the full reconnect seat-matching story, wrapper invariant checker
-- [ ] 02-06-PLAN.md — start-game / apply-move Edge Functions: server-side deal and server-authoritative moves
-- [ ] 02-07-PLAN.md — check-turn-timeout / heartbeat / remove-player: grace-period auto-pickup, server-verified liveness, host transfer
+- [x] 02-05-PLAN.md — create-room / join-room Edge Functions, the full reconnect seat-matching story, wrapper invariant checker
+- [x] 02-06-PLAN.md — start-game / apply-move Edge Functions: server-side deal and server-authoritative moves
+- [x] 02-07-PLAN.md — check-turn-timeout / heartbeat / remove-player: grace-period auto-pickup, server-verified liveness, host transfer
 - [ ] 02-08-PLAN.md — useRoomSubscription (Realtime replaces the poll) and usePresence
 - [ ] 02-09-PLAN.md — Optimistic dispatch and authoritative reconciliation in GameContext
 
@@ -206,7 +206,7 @@ rework lands).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
-| 2. Real Cross-Device Multiplayer | 3/13 | In Progress|  |
+| 2. Real Cross-Device Multiplayer | 7/13 | In Progress|  |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
