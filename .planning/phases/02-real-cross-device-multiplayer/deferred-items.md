@@ -64,3 +64,34 @@ boundary rules.
   since the worktree's HEAD was a strict ancestor - no rewrite, no lost work). Flagging
   here in case the same stale-base issue affects sibling worktrees for 02-06/02-07/
   02-08/02-09, which were reportedly branched the same way.
+
+## Plan 02-06
+
+- **`npm run lint` still exits 1** (Task 3 acceptance criterion expects exit 0) — the
+  same three pre-existing issues logged under Plan 02-01 above, in the same three files
+  (`App.tsx`, `GameContext.tsx`, `GameScreen.tsx`), none of which this plan touches,
+  modifies, or is permitted to touch (`GameContext.tsx` is explicitly out of scope for
+  this wave - owned by a sibling plan). `npx eslint
+  supabase/functions/_shared/startGame.ts supabase/functions/_shared/applyRoomMove.ts
+  src/__tests__/edge/startGame.test.ts src/__tests__/edge/applyRoomMove.test.ts` (this
+  plan's four new files; the two Deno wrapper `index.ts` files are globally ignored by
+  `eslint.config.js`) is clean with zero output. Not re-fixed here per scope boundary;
+  still carried forward for the same future lint-cleanup pass.
+- **`node scripts/check-edge-wrappers.mjs` could not be run** (Task 3's `<verify>` and
+  first acceptance criterion) — this script, along with
+  `supabase/functions/_shared/supabaseStore.ts`, is created by sibling plan 02-05
+  (`files_modified` in `02-05-PLAN.md`), which executes in parallel in a separate
+  worktree and had not merged into this worktree's base branch at execution time.
+  Neither file exists here. `supabase/functions/start-game/index.ts` and
+  `supabase/functions/apply-move/index.ts` were written to satisfy every invariant
+  `check-edge-wrappers.mjs` is specified to enforce (per `02-05-PLAN.md` Task 3's
+  action: contains `withSupabase`, contains `userClaims`, contains
+  `ctx.supabaseAdmin`, no `body.playerId`/`body.player_id` read, no inline
+  `applyMove(` call, under 80 lines) and import `createSupabaseRoomStore` from
+  `../_shared/supabaseStore.ts` exactly as 02-05 will provide it - neither file was
+  duplicated here to avoid a guaranteed merge conflict on the same new path. Verified
+  instead via the acceptance criteria that don't depend on the missing script
+  (`grep -c 'userClaims'` = 2, `grep -c 'as Move'` = 0, `npm run build` exits 0) plus
+  the lint check above. **Action required at Wave 3 integration:** once 02-05 merges,
+  re-run `node scripts/check-edge-wrappers.mjs` against these two wrappers to confirm
+  they pass the live checker unchanged.
