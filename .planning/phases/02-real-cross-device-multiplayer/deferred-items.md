@@ -43,3 +43,24 @@ boundary rules.
   src/__tests__/edge/db.test.ts` (this task's four new/changed source files) is clean
   with zero output. Not re-fixed here per scope boundary; still carried forward for the
   same future lint-cleanup pass.
+
+## Plan 02-05 (Task 3)
+
+- **`npm run lint` still exits 1** (Task 3 acceptance criterion expects exit 0) — the
+  same three pre-existing issues logged under Plan 02-01 above, in the same three files
+  (`App.tsx`, `GameContext.tsx`, `GameScreen.tsx`), none of which this plan touches or
+  modifies. `npx eslint supabase/functions/_shared/supabaseStore.ts
+  src/__tests__/edge/createRoom.test.ts src/__tests__/edge/joinRoom.test.ts
+  scripts/check-edge-wrappers.mjs` (this plan's own new/changed lintable files;
+  `supabase/functions/*/index.ts` is globally ignored by `eslint.config.js`) is clean
+  with zero output. Not re-fixed here per scope boundary and per the orchestrator's
+  explicit instruction not to touch `GameContext.tsx`; still carried forward for the
+  same future lint-cleanup pass.
+- **This worktree's branch (`worktree-agent-a99d9f6be0cc2d664`) was created from a stale
+  base commit** (`d606485`, an ancestor of `stage-1-refactor`'s tip `bc1c915`) rather
+  than from the tip that already includes plan 02-03's merged shared modules
+  (`db.ts`, `engine.ts`, `respond.ts`, `roomTypes.ts`). Fixed at the start of this
+  plan's execution via `git merge --ff-only stage-1-refactor` (a safe fast-forward,
+  since the worktree's HEAD was a strict ancestor - no rewrite, no lost work). Flagging
+  here in case the same stale-base issue affects sibling worktrees for 02-06/02-07/
+  02-08/02-09, which were reportedly branched the same way.
