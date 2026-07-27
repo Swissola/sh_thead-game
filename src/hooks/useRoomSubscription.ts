@@ -54,12 +54,17 @@ export function useRoomSubscription({
     // `roomCode`/`testMode` (mirroring the replaced poll effect's shape)
     // without subscribing to a stale closure over the callbacks/state.
     const localStateRef = useRef(localState);
-    localStateRef.current = localState;
     const onServerRoomRef = useRef(onServerRoom);
-    onServerRoomRef.current = onServerRoom;
     const onReconciledRef = useRef(onReconciled);
-    onReconciledRef.current = onReconciled;
     const lastAppliedVersionRef = useRef(-1);
+
+    // Refs must not be written during render (react-hooks/refs) - sync them
+    // in an effect that runs after every render instead.
+    useEffect(() => {
+        localStateRef.current = localState;
+        onServerRoomRef.current = onServerRoom;
+        onReconciledRef.current = onReconciled;
+    });
 
     useEffect(() => {
         if (!roomCode || testMode) return;

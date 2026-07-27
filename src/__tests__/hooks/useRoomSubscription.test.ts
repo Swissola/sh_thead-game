@@ -32,7 +32,7 @@ function makeFakeChannel() {
 function makeFakeSupabase() {
     const channels: ReturnType<typeof makeFakeChannel>[] = [];
     const supabase = {
-        channel: vi.fn((_name: string) => {
+        channel: vi.fn(() => {
             const ch = makeFakeChannel();
             channels.push(ch);
             return ch;
