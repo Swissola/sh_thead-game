@@ -89,7 +89,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
 
-**Plans:** 7/13 plans executed
+**Plans:** 8/13 plans executed
 Plans:
 **Wave 1**
 
@@ -106,7 +106,7 @@ Plans:
 - [x] 02-05-PLAN.md — create-room / join-room Edge Functions, the full reconnect seat-matching story, wrapper invariant checker
 - [x] 02-06-PLAN.md — start-game / apply-move Edge Functions: server-side deal and server-authoritative moves
 - [x] 02-07-PLAN.md — check-turn-timeout / heartbeat / remove-player: grace-period auto-pickup, server-verified liveness, host transfer
-- [ ] 02-08-PLAN.md — useRoomSubscription (Realtime replaces the poll) and usePresence
+- [x] 02-08-PLAN.md — useRoomSubscription (Realtime replaces the poll) and usePresence
 - [ ] 02-09-PLAN.md — Optimistic dispatch and authoritative reconciliation in GameContext
 
 **Wave 4** *(blocked on Wave 3)*

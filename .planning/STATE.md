@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-07-27T19:55:47.082Z"
-last_activity: "2026-07-27 -- Plan 02-07 (server-side disconnect handling) merged into stage-1-refactor"
+last_updated: "2026-07-27T20:59:00.000Z"
+last_activity: "2026-07-27 -- Plans 02-07 and 02-08 merged into stage-1-refactor"
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 20
-  completed_plans: 14
+  completed_plans: 15
   percent: 14
 ---
 
@@ -25,12 +25,14 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-07 — COMPLETE and merged (all 3 tasks: D-05 grace-period auto-pickup, D-08 heartbeat/host
-transfer, D-07 host-removes-player, plus the three Deno wrappers)
-Status: 7/13 plans complete and merged into stage-1-refactor (02-01..02-07); 02-08/02-09
-still executing in parallel in separate worktrees, not yet merged
-Last activity: 2026-07-27 -- Plan 02-07 (server-side disconnect handling) merged: all three
-Edge Function operations implemented, unit-tested, and passing scripts/check-edge-wrappers.mjs
+Plan: 02-08 — COMPLETE and merged (both tasks: useRoomSubscription, usePresence); 02-07 also
+COMPLETE and merged (D-05 grace-period auto-pickup, D-08 heartbeat/host transfer, D-07
+host-removes-player)
+Status: 8/13 plans complete and merged into stage-1-refactor (02-01..02-08); 02-09 still
+executing in its own worktree, not yet merged
+Last activity: 2026-07-27 -- Plans 02-07 (server-side disconnect handling) and 02-08 (Realtime
+room subscription + presence) both merged; useRoomSubscription/usePresence tested (18 new
+tests), heartbeat/turnTimeout/removePlayer tested and passing scripts/check-edge-wrappers.mjs
 
 Progress: [███████░░░] 70%
 
@@ -42,7 +44,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 
 **Velocity:**
 
-- Total plans completed: 14
+- Total plans completed: 15
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -51,6 +53,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | Phase 02 P07 | 1 | 25min | 3 tasks, 10 files |
+| Phase 02 P08 | 1 | 35min | 2 tasks, 5 files |
 
 **Recent Trend:**
 
@@ -72,6 +75,7 @@ Recent decisions affecting current work:
 - Pre-roadmap: Refactor-first sequencing — Phase 1 (rules engine) is a hard dependency for Phase 2 (multiplayer)
 - [Phase 02-07]: checkTurnTimeout takes no playerId - any authenticated player may trigger the lazy sweep, since authorisation is temporal (server clock) not identity-based
 - [Phase 02-07]: heartbeat folds transferHostIfStale into the same write, restricted to the lobby phase, rather than a separate scheduled job
+- [Phase 02-08]: useRoomSubscription signals reconciliation from the Realtime broadcast callback, not the functions.invoke() response, per RESEARCH.md Pattern 3
 
 ### Pending Todos
 
@@ -98,6 +102,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-27T19:55:47.075Z
-Stopped at: Completed 02-07-PLAN.md
+Last session: 2026-07-27T20:59:00.000Z
+Stopped at: Completed 02-07-PLAN.md and 02-08-PLAN.md
 Resume file: None

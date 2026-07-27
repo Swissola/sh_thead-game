@@ -116,3 +116,33 @@ boundary rules.
   this plan's execution via `git merge --ff-only stage-1-refactor` (confirmed a safe
   fast-forward: `git merge-base HEAD stage-1-refactor` equalled the worktree's
   pre-merge HEAD), followed by `npm install` since `node_modules` did not yet exist.
+
+## Plan 02-08
+
+- **`npm run lint` still exits 1** - the same three pre-existing issues logged under
+  Plan 02-01 above, in the same three files (`App.tsx`, `GameContext.tsx`,
+  `GameScreen.tsx`), none of which this plan touches or is permitted to touch
+  (`GameContext.tsx` is explicitly owned by sibling plan 02-09 this wave). This plan's
+  own two new hooks (`src/hooks/useRoomSubscription.ts`, `src/hooks/usePresence.ts`)
+  and their tests initially tripped two *new* `react-hooks` lint rules
+  (`react-hooks/refs` - writing `ref.current` during render; `react-hooks/set-state-in-effect`
+  - calling `setState` synchronously in an effect's bail-out branch) plus two
+  `no-unused-vars` hits in the fake-Supabase-client test helpers. All four were within
+  this plan's own touched files, so fixed directly (Rule 1) rather than deferred:
+  `useRoomSubscription.ts`'s three ref writes moved into their own no-deps effect;
+  `usePresence.ts`'s reset moved from the bail-out branch into the "connected" branch's
+  cleanup, since the initial `useState([])` already covers the bail-out case. Confirmed
+  clean via `npx eslint src/hooks/useRoomSubscription.ts src/hooks/usePresence.ts
+  src/__tests__/hooks/useRoomSubscription.test.ts src/__tests__/hooks/usePresence.test.ts`
+  (zero output). Not re-fixed here per scope boundary; the three pre-existing files
+  still carried forward for the same future lint-cleanup pass.
+- **`supabase/functions/_shared/heartbeat.ts` does not exist in this worktree** - it is
+  created by sibling plan 02-07, executing in parallel in a separate worktree, and had
+  not merged into this worktree's base branch at execution time. `usePresence.ts`
+  invokes the `heartbeat` Edge Function by name (`supabase.functions.invoke('heartbeat',
+  { body: { roomCode } })`) per the plan's own action text and per 02-07-PLAN.md's
+  documented `heartbeat(store, input: { playerId; roomCode })` contract (identity comes
+  from the verified JWT server-side, matching every other wrapper in this codebase -
+  `playerId` is never read from the request body). Not directly verifiable against the
+  live handler in this worktree; flagged for Wave 3/4 integration to confirm the
+  invoked function name and body shape match once 02-07 merges.
