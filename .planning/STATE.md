@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-last_updated: "2026-07-27T18:45:00.000Z"
-last_activity: 2026-07-27 -- 02-03 Task 3 hosted-project checkpoint completed, Wave 3 unblocked
+status: completed
+last_updated: "2026-07-27T19:55:47.082Z"
+last_activity: "2026-07-27 -- Task 3 hosted-project checkpoint completed: migration 0001 pushed"
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 20
-  completed_plans: 8
+  completed_plans: 14
   percent: 14
 ---
 
@@ -25,12 +25,14 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-03 — COMPLETE (all 3 tasks, including Task 3's hosted-project checkpoint)
-Status: 4/13 plans complete (02-01, 02-02, 02-03, 02-04); Wave 3 (02-05..02-09) unblocked
-Last activity: 2026-07-27 -- Task 3 hosted-project checkpoint completed: migration 0001 pushed
-to Supabase project kyoxrafrsxwybyryzgzd, anonymous sign-in verified live, .env.local wired up
+Plan: 02-07 — COMPLETE (all 3 tasks: D-05 grace-period auto-pickup, D-08 heartbeat/host
+transfer, D-07 host-removes-player, plus the three Deno wrappers)
+Status: 7/13 plans complete in this worktree's view (02-01..02-07); Wave 3 siblings 02-08/02-09
+executing in parallel in separate worktrees, not yet merged here
+Last activity: 2026-07-27 -- Plan 02-07 (server-side disconnect handling) completed: all three
+Edge Function operations implemented, unit-tested, and passing scripts/check-edge-wrappers.mjs
 
-Progress: [███░░░░░░░] 31%
+Progress: [███████░░░] 70%
 
 **Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
 present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
@@ -56,6 +58,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 02 P07 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -68,6 +71,8 @@ Recent decisions affecting current work:
 - Pre-roadmap: Capacitor chosen to wrap the existing React app for Android/iOS, no separate native UI
 - Pre-roadmap: Desktop ships as a responsive web app (PWA-installable), no Tauri/Electron
 - Pre-roadmap: Refactor-first sequencing — Phase 1 (rules engine) is a hard dependency for Phase 2 (multiplayer)
+- [Phase 02-07]: checkTurnTimeout takes no playerId - any authenticated player may trigger the lazy sweep, since authorisation is temporal (server clock) not identity-based
+- [Phase 02-07]: heartbeat folds transferHostIfStale into the same write, restricted to the lobby phase, rather than a separate scheduled job
 
 ### Pending Todos
 
@@ -94,6 +99,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-26T13:05:02.843Z
-Stopped at: Phase 02 UI-SPEC approved
-Resume file: .planning/phases/02-real-cross-device-multiplayer/02-UI-SPEC.md
+Last session: 2026-07-27T19:55:47.075Z
+Stopped at: Completed 02-07-PLAN.md
+Resume file: None
