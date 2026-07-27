@@ -40,16 +40,16 @@ key-decisions:
 patterns-established:
   - "Deno-targeted files under supabase/functions/_shared use explicit .ts specifiers on every relative import (Deno requires this for runtime-resolved imports); files under src/__tests__ importing them may omit the extension since Vitest/esbuild resolve either way."
 
-requirements-completed: []  # MPLAY-01/02/04 need Task 3 (hosted project + pushed schema) before they can be marked complete
+requirements-completed: [MPLAY-01, MPLAY-02, MPLAY-04]
 
 # Metrics
-duration: 10min
-completed: 2026-07-26
+duration: 10min (Tasks 1-2); Task 3 completed 2026-07-27
+completed: 2026-07-27
 ---
 
 # Phase 2 Plan 3: Rooms/Moves Schema and Deno Shared Modules Summary
 
-**Deny-by-default RLS schema (already committed) plus a testable `withVersionRetry`/`RoomStore` optimistic-concurrency helper and an extension-qualified `applyMove` re-export barrel for Deno Edge Functions — 2 of 3 tasks complete, blocked on a human-held Supabase access token for Task 3.**
+**Deny-by-default RLS schema plus a testable `withVersionRetry`/`RoomStore` optimistic-concurrency helper and an extension-qualified `applyMove` re-export barrel for Deno Edge Functions — all 3 tasks complete, including the hosted-project checkpoint.**
 
 ## Performance
 
@@ -81,7 +81,7 @@ This session executed Task 2 as full RED -> GREEN TDD:
 
 **Plan metadata:** this SUMMARY's commit (pending, see below)
 
-Task 3 was **not attempted** - see Checkpoint below.
+Task 3 (human-action checkpoint, no code commit) was completed 2026-07-27 - see Checkpoint below.
 
 ## Files Created/Modified
 
@@ -144,47 +144,46 @@ Task 3 was **not attempted** - see Checkpoint below.
 
 ## User Setup Required
 
-**Task 3 requires manual action and was not attempted in this session.** See the Checkpoint section below for exactly what's needed.
+Task 3 required manual dashboard action from the user (project creation, enabling anonymous
+sign-ins, generating and later revoking an access token) - completed 2026-07-27. See the
+Checkpoint section below for what was verified.
 
 ## Next Phase Readiness
 
 - `supabase/functions/_shared/{engine,db,respond}.ts` are ready for Wave 3's Edge Functions to import directly.
-- **Blocked:** Task 3 (link a hosted Supabase project, enable anonymous sign-ins, `supabase db push`, update `.env.local`) must complete before any Wave 3 Edge Function can be smoke-tested against a live database, and before MPLAY-01 (cross-device play) is actually achievable - local `npm run build`/`npm test` passing does not prove the schema exists anywhere two separate devices could reach.
-- Requirements `MPLAY-01`, `MPLAY-02`, `MPLAY-04` remain **not** marked complete pending Task 3.
+- Hosted project `kyoxrafrsxwybyryzgzd` has the `0001_rooms_and_rls` migration applied, confirmed on both Local and Remote via `supabase migration list`.
+- Anonymous sign-in confirmed working against the live project (a real `POST /auth/v1/signup` call returned a session with `is_anonymous: true`), not just "enabled" in a dashboard screenshot.
+- `.env.local` created, pointing at the hosted project URL and publishable key, local-stack values kept commented out for offline switching; confirmed still git-ignored.
+- Requirements `MPLAY-01`, `MPLAY-02`, `MPLAY-04` can now be marked complete - Wave 3 is unblocked.
 
 ---
 
-## Checkpoint: Task 3 Not Attempted (Blocking, Requires Human Action)
+## Checkpoint: Task 3 Complete (Human Action)
 
 **Type:** human-action
-**Gate:** blocking
-**Why not attempted:** Task 3 requires a real Supabase account, a hosted project, and a personal access token (`SUPABASE_ACCESS_TOKEN`) that only the user holds. No amount of automation from this agent can create a Supabase account or generate that token - this is exactly the kind of gate the plan flags `autonomous: false` for.
+**Gate:** blocking (satisfied)
 
-### How to verify / complete Task 3
+### What was done
 
-(Copied verbatim from `02-03-PLAN.md` Task 3's `<how-to-verify>`)
+1. User created a hosted Supabase project (ref `kyoxrafrsxwybyryzgzd`).
+2. User ran `supabase login` (browser OAuth, no token pasted into chat), then attempted `link`/`db push` from the wrong working directory (`C:\Users\marti\`, PowerShell's default cwd) - this created stray link metadata there but pushed no migration (no `supabase/migrations/` existed in that directory). Diagnosed via `find`/`ls`, stray `C:\Users\marti\supabase\` removed.
+3. Re-ran `npx supabase link --project-ref kyoxrafrsxwybyryzgzd` and `npx supabase db push` from the correct project root, reusing the already-stored CLI login - no access token ever entered this conversation.
+4. User initially pasted an `sbp_...` personal access token in place of the publishable key; flagged immediately as the wrong (account-level, not project-level) credential, instructed to revoke it in the dashboard, value never used.
+5. User then supplied the correct `sb_publishable_...` key.
+6. Verified anonymous sign-in live against the hosted project with a direct `curl -X POST .../auth/v1/signup` call - first attempt correctly failed with `anonymous_provider_disabled`, confirming the toggle wasn't actually on yet despite the user being unsure; user enabled it in the dashboard; re-test succeeded.
+7. Wrote `.env.local` with the hosted URL/publishable key, local-stack values commented out.
 
-1. Create a Supabase project at https://supabase.com/dashboard (any region) and note its project ref (the subdomain in the project URL).
-2. In the dashboard: Authentication -> Providers -> enable "Anonymous sign-ins". Without this, `signInAnonymously()` fails and MPLAY-03 cannot work.
-3. Generate an access token at Account -> Access Tokens and export it as `SUPABASE_ACCESS_TOKEN` so the CLI runs non-interactively.
-4. Run `npx supabase link --project-ref <ref>` then `npx supabase db push`. If the CLI still prompts for the database password interactively, paste it - this task is flagged non-autonomous precisely because that prompt cannot always be suppressed.
-5. Confirm `npx supabase db push` reports the migration applied, and that Dashboard -> Database -> Tables shows `rooms` and `moves` with RLS enabled and no write policies listed.
-6. Copy the project's URL and publishable key from Project Settings -> API into `.env.local`, replacing the local-stack values. Keep the local values commented out so switching back for offline work is one edit.
-7. Confirm `git status --porcelain .env.local` is still empty.
+### Acceptance criteria for Task 3 - all met
 
-### Acceptance criteria for Task 3
-
-- `npx supabase db push` reports the `0001_rooms_and_rls` migration as applied (or "up to date")
-- `npx supabase migration list` shows the migration present in both Local and Remote columns
-- The hosted project's `rooms` table has RLS enabled and exactly one policy (a `select` policy)
-- Anonymous sign-ins are enabled in the hosted project's Auth providers
-- `.env.local` points at the hosted project URL and is still git-ignored
-
-**Resume-signal:** Type "approved" once `supabase db push` has applied the migration to the hosted project, or describe the failure.
+- `npx supabase db push` reported the `0001_rooms_and_rls` migration applied - confirmed
+- `npx supabase migration list` shows the migration present in both Local and Remote columns - confirmed (`{"local":"0001","remote":"0001"}`)
+- The hosted project's `rooms` table has RLS enabled and exactly one policy (a `select` policy) - by construction of the pushed migration (same file verified locally in Task 1)
+- Anonymous sign-ins are enabled in the hosted project's Auth providers - confirmed via live sign-in test, not just a dashboard checkbox read
+- `.env.local` points at the hosted project URL and is still git-ignored - confirmed (`git status --porcelain .env.local` empty)
 
 ---
 *Phase: 02-real-cross-device-multiplayer*
-*Completed: 2026-07-26 (Tasks 1-2 only; Task 3 pending human action)*
+*Completed: 2026-07-27 (all 3 tasks)*
 
 ## Self-Check: PASSED
 

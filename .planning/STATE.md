@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-07-26T17:29:28.448Z"
-last_activity: 2026-07-26 -- Phase 02 execution started
+last_updated: "2026-07-27T18:45:00.000Z"
+last_activity: 2026-07-27 -- 02-03 Task 3 hosted-project checkpoint completed, Wave 3 unblocked
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 20
-  completed_plans: 7
+  completed_plans: 8
   percent: 14
 ---
 
@@ -25,18 +25,16 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-03, Task 3 of 3 — CHECKPOINT PENDING (human action required)
-Status: 3/13 plans complete (02-01, 02-02, 02-04); 02-03 has Tasks 1-2 merged, Task 3 blocked on a real hosted Supabase project link
-Last activity: 2026-07-26 -- Wave 2 paused at 02-03's hosted-project checkpoint
+Plan: 02-03 — COMPLETE (all 3 tasks, including Task 3's hosted-project checkpoint)
+Status: 4/13 plans complete (02-01, 02-02, 02-03, 02-04); Wave 3 (02-05..02-09) unblocked
+Last activity: 2026-07-27 -- Task 3 hosted-project checkpoint completed: migration 0001 pushed
+to Supabase project kyoxrafrsxwybyryzgzd, anonymous sign-in verified live, .env.local wired up
 
-Progress: [███░░░░░░░] 23%
+Progress: [███░░░░░░░] 31%
 
-**Note for any future resume/re-plan:** 02-03-SUMMARY.md exists on disk but documents
-PARTIAL completion (2/3 tasks) — do not treat its presence as proof the plan is done.
-Task 3 (`supabase link` + `supabase db push` against a real hosted project, using a
-user-supplied `SUPABASE_ACCESS_TOKEN`) has not been attempted. Wave 3 (02-05..02-09)
-must not start until Task 3 is confirmed complete — several of those plans' Edge
-Functions assume a real database to test against.
+**Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
+present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
+working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 may now start.
 
 ## Performance Metrics
 
