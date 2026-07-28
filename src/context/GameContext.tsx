@@ -50,7 +50,12 @@ export function GameProvider({ playerId, children }: { playerId: string; childre
     // Tracks the last-applied server version outside React state so
     // applyServerRoom's stale-version check (T-02-32) reads the current
     // value synchronously rather than a closure captured at render time.
-    const roomVersionRef = useRef(0);
+    // Starts at -1, not 0 - a freshly created room's first row is version 0
+    // (see create-room's Edge Function), and 0 <= 0 would wrongly treat that
+    // first application as stale/duplicate and silently drop it. Mirrors
+    // useRoomSubscription's own lastAppliedVersionRef, which already uses -1
+    // for the same reason.
+    const roomVersionRef = useRef(-1);
 
     // D-10 cleanup: roomCode is derived from gameState each render, not a separate
     // state field - removes the dual-purpose roomCode state bug present in App.tsx.
