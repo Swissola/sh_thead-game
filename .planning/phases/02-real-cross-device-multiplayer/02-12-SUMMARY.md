@@ -129,3 +129,15 @@ None - no external service configuration required.
 ---
 *Phase: 02-real-cross-device-multiplayer*
 *Completed: 2026-07-28*
+
+## Self-Check: PASSED
+
+- FOUND: `src/hooks/useTurnTimeoutSweep.ts`
+- FOUND: `src/__tests__/hooks/useTurnTimeoutSweep.test.ts`
+- FOUND: `.planning/phases/02-real-cross-device-multiplayer/02-12-SUMMARY.md`
+- FOUND commit `d08649e` (test: offline badge/reconnect toast RED)
+- FOUND commit `fb165fd` (feat: offline badge/reconnect toast GREEN)
+- FOUND commit `ca92de0` (test: turn-timeout sweep + state-2 badge RED)
+- FOUND commit `183c67c` (feat: turn-timeout sweep + state-2 badge GREEN)
+- FOUND commit `fc294c6` (test: Leave Game RED)
+- FOUND commit `cd7cb09` (feat: Leave Game GREEN + lint fix)
