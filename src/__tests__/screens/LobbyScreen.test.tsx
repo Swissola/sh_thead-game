@@ -238,4 +238,121 @@ describe('LobbyScreen', () => {
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Failed to start the game');
     });
+
+    describe('copy join link (D-15)', () => {
+        function stubClipboard() {
+            const writeText = vi.fn();
+            Object.defineProperty(navigator, 'clipboard', {
+                value: { writeText },
+                configurable: true,
+            });
+            return writeText;
+        }
+
+        it('writes <origin>/join/<ROOMCODE> to the clipboard when the join-link button is clicked', async () => {
+            const writeText = stubClipboard();
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            fireEvent.click(await screen.findByLabelText('Copy join link'));
+
+            expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/join/ABC123`);
+        });
+
+        it('swaps the join-link icon to Check immediately after clicking, and reverts after 2000ms', async () => {
+            vi.useFakeTimers();
+            try {
+                stubClipboard();
+                const { supabase } = makeFakeSupabase();
+                vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+                const state = buildGameState({
+                    roomCode: 'ABC123',
+                    phase: 'lobby',
+                    host: 'p0',
+                    players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+                });
+                renderLobby('p0', state);
+
+                const joinLinkButton = await screen.findByLabelText('Copy join link');
+                fireEvent.click(joinLinkButton);
+
+                // Assert immediately after the click rather than inside waitFor - per
+                // CLAUDE.md's testing note, polling can race past the real-timer clear.
+                expect(joinLinkButton.querySelector('.lucide-check')).toBeInTheDocument();
+
+                vi.advanceTimersByTime(2000);
+                expect(joinLinkButton.querySelector('.lucide-check')).not.toBeInTheDocument();
+                expect(joinLinkButton.querySelector('.lucide-link-2')).toBeInTheDocument();
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('clicking the join-link button does not change the room-code button icon, and vice versa', async () => {
+            stubClipboard();
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            const roomCodeButton = await screen.findByLabelText('Copy room code');
+            const joinLinkButton = await screen.findByLabelText('Copy join link');
+
+            fireEvent.click(joinLinkButton);
+            expect(joinLinkButton.querySelector('.lucide-check')).toBeInTheDocument();
+            expect(roomCodeButton.querySelector('.lucide-check')).not.toBeInTheDocument();
+
+            fireEvent.click(roomCodeButton);
+            expect(roomCodeButton.querySelector('.lucide-check')).toBeInTheDocument();
+            // Both are now checked, independently - the join-link check did not clear.
+            expect(joinLinkButton.querySelector('.lucide-check')).toBeInTheDocument();
+        });
+
+        it('the join-link button has aria-label="Copy join link" and the room-code button has aria-label="Copy room code"', async () => {
+            stubClipboard();
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            expect(await screen.findByLabelText('Copy join link')).toBeInTheDocument();
+            expect(await screen.findByLabelText('Copy room code')).toBeInTheDocument();
+        });
+
+        it('both copy buttons do nothing when there is no game state', async () => {
+            const writeText = stubClipboard();
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            render(
+                <GameProvider playerId="p0">
+                    <LobbyScreen />
+                </GameProvider>
+            );
+
+            const joinLinkButton = screen.getByLabelText('Copy join link');
+            const roomCodeButton = screen.getByLabelText('Copy room code');
+            fireEvent.click(joinLinkButton);
+            fireEvent.click(roomCodeButton);
+
+            expect(writeText).not.toHaveBeenCalled();
+        });
+    });
 });
