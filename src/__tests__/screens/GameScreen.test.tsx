@@ -5,6 +5,7 @@ import '../../storage';
 import { GameProvider, useGameContext } from '../../context/GameContext';
 import { GameScreen } from '../../screens/GameScreen';
 import { Toast } from '../../components/Toast';
+import * as supabaseClientModule from '../../supabase/client';
 import { buildGameState, buildPlayer, buildCard } from '../testUtils/buildGameState';
 
 // The hook's own timing/invocation behaviour is covered exhaustively by
@@ -667,6 +668,144 @@ describe('GameScreen', () => {
       const bobTile = (await screen.findByText('Bob')).closest('div.rounded-lg') as HTMLElement;
       expect(within(bobTile).getByText('Offline', { exact: true })).toBeInTheDocument();
       expect(within(bobTile).queryByText('Offline - auto-picking up')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Leave Game button and confirm dialog (D-14, plan 02-12)', () => {
+    it('renders a Leave Game button in the header for every phase GameScreen renders', async () => {
+      for (const phase of ['setup', 'playing', 'finished'] as const) {
+        const state = buildGameState({
+          phase,
+          players: [
+            buildPlayer({ id: 'test-player', name: 'Alice' }),
+            buildPlayer({ id: 'p1', name: 'Bob' }),
+          ],
+        });
+        const { unmount } = renderGame('test-player', state);
+
+        expect(await screen.findByRole('button', { name: 'Leave Game' })).toBeInTheDocument();
+
+        unmount();
+      }
+    });
+
+    it('clicking Leave Game opens a confirm dialog titled "Leave game?" with Keep Playing / Leave Game buttons', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+      renderGame('test-player', state);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Leave Game' }));
+
+      expect(await screen.findByText('Leave game?')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'You can rejoin any time with the same room code - your seat will be waiting.'
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByText('Keep Playing')).toBeInTheDocument();
+      // The dialog's confirm button carries literal text "Leave Game" (same
+      // copy as the header icon button, which only has an aria-label) -
+      // getByText resolves to the dialog button unambiguously.
+      expect(screen.getByText('Leave Game')).toBeInTheDocument();
+    });
+
+    it('"Keep Playing" closes the dialog and leaves gameState untouched', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+      renderGame('test-player', state);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Leave Game' }));
+      await screen.findByText('Leave game?');
+
+      fireEvent.click(screen.getByText('Keep Playing'));
+
+      await waitFor(() => {
+        expect(screen.queryByText('Leave game?')).not.toBeInTheDocument();
+      });
+      expect(screen.getByTestId('probe')).toHaveTextContent('phase:playing');
+    });
+
+    it('"Leave Game" clears gameState (so the menu can render) and makes zero Edge Function calls', async () => {
+      const getClientSpy = vi.spyOn(supabaseClientModule, 'getSupabaseClient');
+      const state = buildGameState({
+        phase: 'playing',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+      renderGame('test-player', state);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Leave Game' }));
+      await screen.findByText('Leave game?');
+
+      fireEvent.click(screen.getByText('Leave Game'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('probe')).toHaveTextContent('phase:none');
+      });
+      expect(getClientSpy).not.toHaveBeenCalled();
+
+      getClientSpy.mockRestore();
+    });
+
+    it('works identically in Test Mode', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+      renderGame('test-player', state, { testMode: true });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Leave Game' }));
+      await screen.findByText('Leave game?');
+      fireEvent.click(screen.getByText('Leave Game'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('probe')).toHaveTextContent('phase:none');
+      });
+    });
+
+    it('leaves the pre-existing pick-up confirmation dialog unaffected, keeping its own "Cancel" label', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        isFirstTurn: false,
+        currentTurn: 0,
+        deck: [],
+        discardPile: [buildCard({ id: 'discard-0', rank: '5', suit: '♣' })],
+        players: [
+          buildPlayer({
+            id: 'test-player',
+            name: 'Alice',
+            hand: [buildCard({ id: 'hand-0', rank: '6', suit: '♠' })],
+          }),
+          buildPlayer({
+            id: 'p1',
+            name: 'Bob',
+            hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })],
+          }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      const pickUpButton = await screen.findByRole('button', { name: /Pick Up Pile/ });
+      fireEvent.click(pickUpButton);
+
+      expect(await screen.findByText('Confirm Pick Up')).toBeInTheDocument();
+      expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
   });
 });
