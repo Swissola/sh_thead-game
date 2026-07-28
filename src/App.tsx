@@ -46,18 +46,17 @@ export function Router({ initialRoomCode = '' }: { initialRoomCode?: string } = 
         onReconciled: notifyReconciled,
     });
 
-    // D-10: drives the offline badge on LobbyScreen's player tiles (plan
-    // 02-11, same wave - see 02-10-SUMMARY.md Deviations for why the prop
-    // isn't wired to <LobbyScreen> below yet). Not passed to GameScreen
-    // either - that prop signature and its Router call site belong to plan
-    // 02-12. usePresence is still called here, exactly once, so the single
-    // Presence channel/heartbeat for this room exists regardless.
-    usePresence({ roomCode, playerId, testMode });
+    // D-10: drives the offline badge on LobbyScreen's player tiles. Not
+    // passed to GameScreen yet - that prop signature and its Router call
+    // site belong to plan 02-12. usePresence is called here, exactly once
+    // (never inside a screen), so only one Presence channel/heartbeat exists
+    // per room regardless of which screen is rendered.
+    const { isPlayerOffline } = usePresence({ roomCode, playerId, testMode });
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
             {!gameState && <MenuScreen initialRoomCode={initialRoomCode} />}
-            {gameState?.phase === 'lobby' && <LobbyScreen />}
+            {gameState?.phase === 'lobby' && <LobbyScreen isPlayerOffline={isPlayerOffline} />}
             {gameState && gameState.phase !== 'lobby' && <GameScreen />}
             <Toast toast={toast} onDismiss={dismissToast} />
         </div>

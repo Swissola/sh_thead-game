@@ -3,7 +3,6 @@ import { Users, Copy, Check, Crown, Link2, WifiOff, UserX } from 'lucide-react';
 import { useGameContext } from '../context/GameContext';
 import { getSupabaseClient } from '../supabase/client';
 import type { EdgeResult } from '../supabase/roomTypes';
-import { usePresence } from '../hooks/usePresence';
 
 /**
  * Room code display, player list, host-only start button, extracted from
@@ -13,12 +12,15 @@ import { usePresence } from '../hooks/usePresence';
  * Function - this screen no longer computes or writes game state itself, it
  * only invokes the function and applies whatever `ServerRoom` comes back via
  * `applyServerRoom`.
+ *
+ * `isPlayerOffline` is threaded down from Router's single `usePresence` call
+ * (plan 02-10) rather than called here - a second call would open a second
+ * Presence channel for the same room and double the heartbeat rate.
  */
-export function LobbyScreen() {
-    const { gameState, playerId, applyServerRoom, showToast, testMode } = useGameContext();
+export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: string) => boolean }) {
+    const { gameState, playerId, applyServerRoom, showToast } = useGameContext();
     const [copied, setCopied] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
-    const { isPlayerOffline } = usePresence({ roomCode: gameState?.roomCode ?? '', playerId, testMode });
 
     const copyRoomCode = () => {
         if (!gameState) return;

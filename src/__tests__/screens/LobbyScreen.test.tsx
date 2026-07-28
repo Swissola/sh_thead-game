@@ -18,63 +18,17 @@ function threeCards(prefix: string) {
     return [buildCard({ id: `${prefix}-0` }), buildCard({ id: `${prefix}-1` }), buildCard({ id: `${prefix}-2` })];
 }
 
-type SubscribeCb = (status: string) => void;
-type PresenceHandler = (payload?: { key: string }) => void;
-
-/** A fake presence `.channel()` return value - LobbyScreen's usePresence call
- * needs a non-throwing channel even in tests that don't care about presence,
- * and offline-marker tests drive it directly via the `_fire*` helpers. */
-function makeFakeChannel() {
-    const handlers: Record<string, PresenceHandler> = {};
-    let subscribeCb: SubscribeCb | null = null;
-    let presenceKeys: string[] = [];
-    const channel = {
-        on: vi.fn((_type: string, config: { event: string }, handler: PresenceHandler) => {
-            handlers[config.event] = handler;
-            return channel;
-        }),
-        subscribe: vi.fn((cb?: SubscribeCb) => {
-            subscribeCb = cb ?? null;
-            return channel;
-        }),
-        track: vi.fn().mockResolvedValue(undefined),
-        presenceState: vi.fn(() => Object.fromEntries(presenceKeys.map((k) => [k, [{}]]))),
-        _fireSubscribed() {
-            subscribeCb?.('SUBSCRIBED');
-        },
-        _fireSync(keys: string[]) {
-            presenceKeys = keys;
-            handlers['sync']?.();
-        },
-    };
-    return channel;
-}
-
 function makeFakeSupabase(invokeImpl?: (...args: unknown[]) => unknown) {
     const invoke = vi.fn(invokeImpl ?? (() => Promise.resolve({ data: {}, error: null })));
-    const channels: ReturnType<typeof makeFakeChannel>[] = [];
-    const supabase = {
-        functions: { invoke },
-        channel: vi.fn(() => {
-            const ch = makeFakeChannel();
-            channels.push(ch);
-            return ch;
-        }),
-        removeChannel: vi.fn(),
-    };
-    return { supabase, invoke, channels };
+    const supabase = { functions: { invoke } };
+    return { supabase, invoke };
 }
 
-/** Marks `ids` online on the first presence channel LobbyScreen's usePresence created. */
-async function markOnline(channels: ReturnType<typeof makeFakeChannel>[], ids: string[]) {
-    await waitFor(() => expect(channels.length).toBeGreaterThan(0));
-    await act(async () => {
-        channels[0]._fireSubscribed();
-        await Promise.resolve();
-    });
-    act(() => {
-        channels[0]._fireSync(ids);
-    });
+/** LobbyScreen no longer calls usePresence itself (plan 02-10 threads
+ * isPlayerOffline down from Router's single call instead) - this builds the
+ * same prop shape from a plain list of offline player ids. */
+function offlineChecker(offlineIds: string[]) {
+    return (playerId: string) => offlineIds.includes(playerId);
 }
 
 /** Seeds gameState via the context's setGameState in an effect on mount. */
@@ -99,22 +53,32 @@ function Probe() {
     );
 }
 
-function Harness({ state }: { state: ReturnType<typeof buildGameState> }) {
+function Harness({
+    state,
+    isPlayerOffline = () => false,
+}: {
+    state: ReturnType<typeof buildGameState>;
+    isPlayerOffline?: (playerId: string) => boolean;
+}) {
     const { toast, dismissToast } = useGameContext();
     return (
         <>
             <SeedGameState state={state} />
-            <LobbyScreen />
+            <LobbyScreen isPlayerOffline={isPlayerOffline} />
             <Probe />
             <Toast toast={toast} onDismiss={dismissToast} />
         </>
     );
 }
 
-function renderLobby(playerId: string, state: ReturnType<typeof buildGameState>) {
+function renderLobby(
+    playerId: string,
+    state: ReturnType<typeof buildGameState>,
+    isPlayerOffline?: (playerId: string) => boolean
+) {
     return render(
         <GameProvider playerId={playerId}>
-            <Harness state={state} />
+            <Harness state={state} isPlayerOffline={isPlayerOffline} />
         </GameProvider>
     );
 }
@@ -386,7 +350,7 @@ describe('LobbyScreen', () => {
 
             render(
                 <GameProvider playerId="p0">
-                    <LobbyScreen />
+                    <LobbyScreen isPlayerOffline={() => false} />
                 </GameProvider>
             );
 
@@ -401,7 +365,7 @@ describe('LobbyScreen', () => {
 
     describe('offline markers, host removal and host transfer (D-07, D-08, D-10)', () => {
         it('an offline player renders with opacity-60 and an Offline badge; a connected player renders unchanged', async () => {
-            const { supabase, channels } = makeFakeSupabase();
+            const { supabase } = makeFakeSupabase();
             vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
             const state = buildGameState({
                 roomCode: 'ABC123',
@@ -409,9 +373,7 @@ describe('LobbyScreen', () => {
                 host: 'p0',
                 players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
             });
-            renderLobby('p0', state);
-
-            await markOnline(channels, ['p0']); // Alice online, Bob offline
+            renderLobby('p0', state, offlineChecker(['p1'])); // Alice online, Bob offline
 
             const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
             expect(bobRow).toHaveClass('opacity-60');
@@ -423,7 +385,7 @@ describe('LobbyScreen', () => {
         });
 
         it('renders a remove button only for the host, absent on the host row, and disabled only for connected players', async () => {
-            const { supabase, channels } = makeFakeSupabase();
+            const { supabase } = makeFakeSupabase();
             vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
             const state = buildGameState({
                 roomCode: 'ABC123',
@@ -435,9 +397,7 @@ describe('LobbyScreen', () => {
                     buildPlayer({ id: 'p2', name: 'Carol' }),
                 ],
             });
-            renderLobby('p0', state);
-
-            await markOnline(channels, ['p0', 'p1']); // Bob online, Carol offline
+            renderLobby('p0', state, offlineChecker(['p2'])); // Bob online, Carol offline
 
             const aliceRow = screen.getByText('Alice').closest('div.flex') as HTMLElement;
             expect(within(aliceRow).queryByLabelText(/remove/i)).not.toBeInTheDocument();
@@ -456,7 +416,7 @@ describe('LobbyScreen', () => {
                 host: 'p0',
                 players: [buildPlayer({ id: 'p0', name: 'Alice' })],
             });
-            const { supabase, channels, invoke } = makeFakeSupabase(() =>
+            const { supabase, invoke } = makeFakeSupabase(() =>
                 Promise.resolve({
                     data: {
                         room: {
@@ -477,9 +437,7 @@ describe('LobbyScreen', () => {
                 host: 'p0',
                 players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
             });
-            renderLobby('p0', state);
-
-            await markOnline(channels, ['p0']); // Bob offline -> remove enabled
+            renderLobby('p0', state, offlineChecker(['p1'])); // Bob offline -> remove enabled
 
             const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
             fireEvent.click(within(bobRow).getByLabelText(/remove/i));
@@ -494,7 +452,7 @@ describe('LobbyScreen', () => {
         });
 
         it('a non-host viewer sees no remove buttons at all', async () => {
-            const { supabase, channels } = makeFakeSupabase();
+            const { supabase } = makeFakeSupabase();
             vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
             const state = buildGameState({
                 roomCode: 'ABC123',
@@ -502,9 +460,7 @@ describe('LobbyScreen', () => {
                 host: 'p0',
                 players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
             });
-            renderLobby('p1', state);
-
-            await markOnline(channels, ['p1']); // Alice offline, but the viewer is not host
+            renderLobby('p1', state, offlineChecker(['p0'])); // Alice offline, but the viewer is not host
 
             expect(screen.queryByLabelText(/remove/i)).not.toBeInTheDocument();
         });
@@ -528,7 +484,7 @@ describe('LobbyScreen', () => {
                 }, []);
                 return (
                     <>
-                        <LobbyScreen />
+                        <LobbyScreen isPlayerOffline={() => false} />
                         <button
                             onClick={() => {
                                 const next = { ...current, host: 'p1' };
@@ -560,7 +516,7 @@ describe('LobbyScreen', () => {
         });
 
         it('an EdgeError from remove-player surfaces as a toast', async () => {
-            const { supabase, channels } = makeFakeSupabase(() =>
+            const { supabase } = makeFakeSupabase(() =>
                 Promise.resolve({
                     data: {
                         error: {
@@ -578,9 +534,7 @@ describe('LobbyScreen', () => {
                 host: 'p0',
                 players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
             });
-            renderLobby('p0', state);
-
-            await markOnline(channels, ['p0']); // Bob offline -> remove enabled
+            renderLobby('p0', state, offlineChecker(['p1'])); // Bob offline -> remove enabled
 
             const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
             fireEvent.click(within(bobRow).getByLabelText(/remove/i));
