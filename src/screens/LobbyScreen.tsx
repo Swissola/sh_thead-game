@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { Users, Copy, Check, Crown } from 'lucide-react';
-import * as GameLogic from '../gameLogic';
-import type { GameState } from '../types';
 import { useGameContext } from '../context/GameContext';
+import { getSupabaseClient } from '../supabase/client';
+import type { EdgeResult } from '../supabase/roomTypes';
 
 /**
  * Room code display, player list, host-only start button, extracted from
  * App.tsx:999-1063 (pre-refactor line numbers).
+ *
+ * Plan 02-11 (MPLAY-04): dealing moved server-side into the `start-game` Edge
+ * Function - this screen no longer computes or writes game state itself, it
+ * only invokes the function and applies whatever `ServerRoom` comes back via
+ * `applyServerRoom`.
  */
 export function LobbyScreen() {
-    const { gameState, playerId, setGameState } = useGameContext();
+    const { gameState, playerId, applyServerRoom, showToast } = useGameContext();
     const [copied, setCopied] = useState(false);
 
     const copyRoomCode = () => {
@@ -22,31 +27,25 @@ export function LobbyScreen() {
     const startGame = async () => {
         if (!gameState || gameState.host !== playerId || gameState.players.length < 2) return;
 
-        const numDecks = Math.ceil(gameState.players.length / 4);
-        const deck = GameLogic.shuffleDeck(GameLogic.createDeck(numDecks));
-
-        const updatedPlayers = gameState.players.map((player) => ({
-            ...player,
-            hand: deck.splice(0, 3),
-            faceUp: deck.splice(0, 3),
-            faceDown: deck.splice(0, 3),
-            isReady: false,
-        }));
-
-        const updatedState: GameState = {
-            roomCode: gameState.roomCode,
-            host: gameState.host,
-            players: updatedPlayers,
-            deck,
-            phase: 'setup',
-            currentTurn: gameState.currentTurn,
-            discardPile: gameState.discardPile,
-            burnPile: gameState.burnPile,
-            lastAction: `Game started with ${numDecks} deck${numDecks > 1 ? 's' : ''}! Swap cards then ready up.`,
-            isFirstTurn: true,
-        };
-
-        await setGameState(updatedState);
+        try {
+            const { data, error } = await getSupabaseClient().functions.invoke('start-game', {
+                body: { roomCode: gameState.roomCode },
+            });
+            if (error) {
+                showToast('Failed to start the game - please retry.');
+                return;
+            }
+            const result = data as EdgeResult | undefined;
+            if (result?.error) {
+                showToast(result.error.message, result.error.code);
+                return;
+            }
+            if (result?.room) {
+                applyServerRoom(result.room);
+            }
+        } catch {
+            showToast('Failed to start the game - please retry.');
+        }
     };
 
     const isHost = gameState?.host === playerId;
