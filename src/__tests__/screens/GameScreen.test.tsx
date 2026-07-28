@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useCallback, useEffect, useState } from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '../../storage';
@@ -6,6 +6,14 @@ import { GameProvider, useGameContext } from '../../context/GameContext';
 import { GameScreen } from '../../screens/GameScreen';
 import { Toast } from '../../components/Toast';
 import { buildGameState, buildPlayer, buildCard } from '../testUtils/buildGameState';
+
+// The hook's own timing/invocation behaviour is covered exhaustively by
+// useTurnTimeoutSweep.test.ts - mocking it here keeps these assertions about
+// GameScreen's rendering, not re-testing interval arithmetic (plan 02-12).
+vi.mock('../../hooks/useTurnTimeoutSweep', () => ({
+    useTurnTimeoutSweep: vi.fn(() => ({ graceExpired: false })),
+}));
+import { useTurnTimeoutSweep } from '../../hooks/useTurnTimeoutSweep';
 
 /** Seeds gameState via the context's setGameState in an effect on mount. */
 function SeedGameState({ state }: { state: ReturnType<typeof buildGameState> }) {
@@ -540,6 +548,62 @@ describe('GameScreen', () => {
 
             await screen.findByText('Bob');
             expect(screen.queryByText('Offline')).not.toBeInTheDocument();
+        });
+    });
+
+    describe('grace-period auto-pickup badge state (D-10 state 2, D-05, plan 02-12)', () => {
+        beforeEach(() => {
+            vi.mocked(useTurnTimeoutSweep).mockReturnValue({ graceExpired: false });
+        });
+
+        it('shows the base Offline badge (state 1) when offline but the grace period has not expired', async () => {
+            const state = buildGameState({
+                phase: 'playing',
+                currentTurn: 1,
+                players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            const isPlayerOffline = (id: string) => id === 'p1';
+
+            renderGame('test-player', state, { isPlayerOffline });
+
+            const bobTile = (await screen.findByText('Bob')).closest('div.rounded-lg') as HTMLElement;
+            expect(within(bobTile).getByText('Offline')).toBeInTheDocument();
+            expect(within(bobTile).queryByText('Offline - auto-picking up')).not.toBeInTheDocument();
+        });
+
+        it('replaces the badge in place with "Offline - auto-picking up" once offline, their turn, and grace expired', async () => {
+            vi.mocked(useTurnTimeoutSweep).mockReturnValue({ graceExpired: true });
+            const state = buildGameState({
+                phase: 'playing',
+                currentTurn: 1,
+                players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            const isPlayerOffline = (id: string) => id === 'p1';
+
+            renderGame('test-player', state, { isPlayerOffline });
+
+            const bobTile = (await screen.findByText('Bob')).closest('div.rounded-lg') as HTMLElement;
+            // Single badge element, replaced in place - not a second badge
+            // rendered alongside the first.
+            expect(within(bobTile).getAllByText(/Offline/)).toHaveLength(1);
+            expect(within(bobTile).getByText('Offline - auto-picking up')).toBeInTheDocument();
+            expect(within(bobTile).queryByText('Offline', { exact: true })).not.toBeInTheDocument();
+        });
+
+        it('does not upgrade the badge to state 2 when grace has expired but it is not their turn', async () => {
+            vi.mocked(useTurnTimeoutSweep).mockReturnValue({ graceExpired: true });
+            const state = buildGameState({
+                phase: 'playing',
+                currentTurn: 0, // Alice's turn, not Bob's
+                players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            const isPlayerOffline = (id: string) => id === 'p1';
+
+            renderGame('test-player', state, { isPlayerOffline });
+
+            const bobTile = (await screen.findByText('Bob')).closest('div.rounded-lg') as HTMLElement;
+            expect(within(bobTile).getByText('Offline', { exact: true })).toBeInTheDocument();
+            expect(within(bobTile).queryByText('Offline - auto-picking up')).not.toBeInTheDocument();
         });
     });
 });
