@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useEffect } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import '../storage';
 
 vi.mock('../supabase/client', () => ({
@@ -58,6 +58,58 @@ function makeFakeSupabase() {
     };
 }
 
+/**
+ * Like makeFakeSupabase, but each named channel keeps its own registered
+ * presence handlers and a `_fireSubscribed`/`_fireSync` pair, so a test can
+ * drive usePresence's real subscribe->sync flow and prove isPlayerOffline
+ * actually reaches whichever screen Router passes it into (plan 02-12).
+ */
+function makeControllableFakeSupabase() {
+    const channels: Record<string, ReturnType<typeof makeChannel>> = {};
+
+    function makeChannel() {
+        const handlers: Record<string, (arg?: { key: string }) => void> = {};
+        let subscribeCb: ((status: string) => void) | null = null;
+        const channel = {
+            on: vi.fn(function (
+                this: unknown,
+                _type: string,
+                config: { event: string },
+                handler: (arg?: { key: string }) => void
+            ) {
+                handlers[config.event] = handler;
+                return this;
+            }),
+            subscribe: vi.fn(function (this: unknown, cb?: (status: string) => void) {
+                subscribeCb = cb ?? null;
+                return this;
+            }),
+            track: vi.fn().mockResolvedValue(undefined),
+            presenceState: vi.fn(() => ({})),
+            _fireSubscribed() {
+                subscribeCb?.('SUBSCRIBED');
+            },
+            _fireSync(keys: string[]) {
+                channel.presenceState = vi.fn(() => Object.fromEntries(keys.map((k) => [k, [{}]])));
+                handlers['sync']?.();
+            },
+        };
+        return channel;
+    }
+
+    const invoke = vi.fn().mockResolvedValue({ data: {}, error: null });
+    const supabase = {
+        channel: vi.fn((name: string) => {
+            const ch = makeChannel();
+            channels[name] = ch;
+            return ch;
+        }),
+        removeChannel: vi.fn(),
+        functions: { invoke },
+    };
+    return { supabase, channels };
+}
+
 describe('Router', () => {
     beforeEach(() => {
         localStorage.clear();
@@ -113,6 +165,39 @@ describe('Router', () => {
         expect(await screen.findByText(/Pick Up Pile/)).toBeInTheDocument();
         expect(screen.queryByText('Create Room')).not.toBeInTheDocument();
         expect(screen.queryByText('Game Lobby')).not.toBeInTheDocument();
+    });
+
+    it("threads Router's single usePresence call into GameScreen as isPlayerOffline (plan 02-12)", async () => {
+        const { supabase, channels } = makeControllableFakeSupabase();
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+        const playingState = buildGameState({
+            roomCode: 'ROOM99',
+            phase: 'playing',
+            players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+        });
+
+        render(
+            <GameProvider playerId="test-player">
+                <SeedGameState state={playingState} />
+                <Router />
+            </GameProvider>
+        );
+
+        await screen.findByText(/Pick Up Pile/);
+
+        const presenceChannel = channels['room-ROOM99-presence'];
+        await act(async () => {
+            presenceChannel._fireSubscribed();
+            await Promise.resolve();
+        });
+        // Only 'test-player' (self) is present in the sync payload - p1/Bob is
+        // absent, so GameScreen should render Bob's tile as offline.
+        act(() => {
+            presenceChannel._fireSync(['test-player']);
+        });
+
+        expect(await screen.findByText('Offline')).toBeInTheDocument();
     });
 
     it('never calls window.storage.get to poll for room updates (MPLAY-02) - the Realtime subscription replaces it', async () => {
