@@ -305,6 +305,162 @@ async function main() {
     malformed.status === 400 && malformed.json?.error?.code === 'BAD_REQUEST'
   );
 
+  // ---------------------------------------------------------------------
+  // Full room-lifecycle pass over all seven Edge Functions (Task 2).
+  //
+  // Uses a fresh room/fresh anonymous users throughout - independent of the
+  // Task 1 cases above - so the run is idempotent (T-02-47 adjacent: two
+  // consecutive runs collide with nothing and need no manual cleanup).
+  // READY_UP is deliberately the only move type this script submits: every
+  // other move's legality depends on the cards the server dealt, and
+  // working that out here would mean reimplementing the rules in the test.
+  // Deep move coverage is Vitest's job against `applyRoomMove`; this
+  // lifecycle exists to prove the `apply-move` wrapper carries a real move
+  // through the real engine and increments the version.
+  // ---------------------------------------------------------------------
+  const covered = new Set();
+  async function call(name, token, body) {
+    covered.add(name);
+    return callFunction(functionsUrl, anonKey, name, token, body);
+  }
+
+  const c = await createAnonSession(apiUrl, anonKey);
+
+  // 1. A create-room -> 200, a 6-character room code, lobby phase, one player.
+  const create = await call('create-room', a.token, { playerName: 'Alice' });
+  check(
+    '[create-room] 200, 6-character code, lobby phase, one player',
+    create.status === 200 &&
+      /^[A-Z0-9]{6}$/.test(create.json?.room?.roomCode ?? '') &&
+      create.json?.room?.state?.phase === 'lobby' &&
+      create.json?.room?.state?.players?.length === 1
+  );
+  const roomCode = create.json?.room?.roomCode;
+
+  // 2. B join-room with that code -> 200, two players, B present.
+  const join = await call('join-room', b.token, { playerName: 'Bob', roomCode });
+  check(
+    '[join-room] 200, two players, B present',
+    join.status === 200 &&
+      join.json?.room?.state?.players?.length === 2 &&
+      join.json?.room?.state?.players?.some((p) => p.id === b.userId)
+  );
+
+  // 3. C join-room -> three players; A remove-player targeting C -> 200, back
+  // to two players and C absent from state.players (D-07, host-gated).
+  const joinC = await call('join-room', c.token, { playerName: 'Carol', roomCode });
+  check(
+    '[join-room] a third player joins - three players',
+    joinC.status === 200 && joinC.json?.room?.state?.players?.length === 3
+  );
+  const removeC = await call('remove-player', a.token, { roomCode, targetPlayerId: c.userId });
+  check(
+    '[remove-player] 200, host removes C, back to two players, C absent',
+    removeC.status === 200 &&
+      removeC.json?.room?.state?.players?.length === 2 &&
+      !removeC.json?.room?.state?.players?.some((p) => p.id === c.userId)
+  );
+
+  // 4. B heartbeat -> 200, and playerSeen[B] is newer than it was before the call.
+  const seenBefore = removeC.json?.room?.playerSeen?.[b.userId];
+  const heartbeat = await call('heartbeat', b.token, { roomCode });
+  const seenAfter = heartbeat.json?.room?.playerSeen?.[b.userId];
+  check(
+    '[heartbeat] 200, playerSeen[B] refreshed to a newer timestamp',
+    heartbeat.status === 200 &&
+      !!seenAfter &&
+      (!seenBefore || Date.parse(seenAfter) > Date.parse(seenBefore))
+  );
+
+  // 5. A start-game -> 200, phase 'setup', every player holding 3/3/3 cards.
+  const start = await call('start-game', a.token, { roomCode });
+  const dealtOk = start.json?.room?.state?.players?.every(
+    (p) => p.hand?.length === 3 && p.faceUp?.length === 3 && p.faceDown?.length === 3
+  );
+  check(
+    '[start-game] 200, phase setup, 3/3/3 deal for every player',
+    start.status === 200 && start.json?.room?.state?.phase === 'setup' && !!dealtOk
+  );
+
+  // 6. A then B each submit READY_UP through apply-move -> 200 each, version
+  // strictly increasing, and after the second the phase is 'playing'.
+  const readyA = await call('apply-move', a.token, {
+    roomCode,
+    move: { type: 'READY_UP', playerId: a.userId },
+  });
+  check(
+    '[apply-move] A READY_UP -> 200, version increases',
+    readyA.status === 200 &&
+      typeof readyA.json?.room?.version === 'number' &&
+      readyA.json.room.version > (start.json?.room?.version ?? -1)
+  );
+
+  const readyB = await call('apply-move', b.token, {
+    roomCode,
+    move: { type: 'READY_UP', playerId: b.userId },
+  });
+  check(
+    '[apply-move] B READY_UP -> 200, version increases again, phase playing',
+    readyB.status === 200 &&
+      typeof readyB.json?.room?.version === 'number' &&
+      readyB.json.room.version > readyA.json.room.version &&
+      readyB.json?.room?.state?.phase === 'playing'
+  );
+
+  // 7. check-turn-timeout called immediately, well inside the grace period ->
+  // 200 with error.code TIMEOUT_NOT_ELAPSED and version unchanged.
+  const versionBeforeTimeout = readyB.json?.room?.version;
+  const timeout = await call('check-turn-timeout', a.token, { roomCode });
+  check(
+    '[check-turn-timeout] immediate call -> TIMEOUT_NOT_ELAPSED, no room returned',
+    timeout.status === 400 &&
+      timeout.json?.error?.code === 'TIMEOUT_NOT_ELAPSED' &&
+      !timeout.json?.room
+  );
+  const roomAfterTimeout = await a.client
+    .from('rooms')
+    .select('version')
+    .eq('room_code', roomCode)
+    .single();
+  check(
+    "[check-turn-timeout] the room's version is unchanged after the rejection",
+    roomAfterTimeout.data?.version === versionBeforeTimeout
+  );
+
+  // 8. Read the moves table for that room code with A's own client and assert
+  // at least two rows exist - the audit trail plan 02-03 created is actually
+  // being written.
+  const movesRows = await a.client.from('moves').select('*').eq('room_code', roomCode);
+  check(
+    '[moves audit trail] at least two rows recorded for this room',
+    Array.isArray(movesRows.data) && movesRows.data.length >= 2
+  );
+
+  // Coverage summary: one PASS line per function name, covering all seven, so
+  // the output can be read against check-edge-wrappers.mjs's list at a glance
+  // and a newly-added function that nobody smoke-tested is obvious.
+  const ALL_FUNCTIONS = [
+    'create-room',
+    'join-room',
+    'start-game',
+    'apply-move',
+    'check-turn-timeout',
+    'heartbeat',
+    'remove-player',
+  ];
+  const hadFailuresBeforeCoverage = failed > 0;
+  console.log('\n--- Function coverage ---');
+  for (const name of ALL_FUNCTIONS) {
+    if (!covered.has(name)) {
+      failed += 1;
+      console.error(`FAIL ${name}: never invoked by this suite`);
+    } else if (!hadFailuresBeforeCoverage) {
+      console.log(`PASS ${name}`);
+    } else {
+      console.error(`FAIL ${name}: suite had failing checks`);
+    }
+  }
+
   if (failed > 0) {
     console.error(`\n${failed} check(s) failed.`);
     process.exitCode = 1;
