@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-07-28T06:48:00.000Z"
-last_activity: "2026-07-28 -- Plan 02-09 merged into stage-1-refactor"
+last_updated: "2026-07-28T07:20:00.000Z"
+last_activity: "2026-07-28 -- Wave 4 (plans 02-10, 02-11) merged into stage-1-refactor"
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 20
-  completed_plans: 16
+  completed_plans: 18
   percent: 14
 ---
 
@@ -25,18 +25,22 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-09 — COMPLETE and merged (both tasks: submitMove edge-function invocation,
-optimistic dispatch/applyServerRoom/notifyReconciled in GameContext); 02-08 and 02-07 also
-COMPLETE and merged
-Status: 9/13 plans complete and merged into stage-1-refactor (02-01..02-09). Next up: 02-10
-(App.tsx/MenuScreen.tsx wiring to identity, Realtime and create/join edge functions) — wave 4,
-depends_on 02-04/02-05/02-08/02-09, all now satisfied
-Last activity: 2026-07-28 -- Resumed after a session-limit interruption: found 8 stale worktrees
-left over from prior sessions (7 already fully merged, 1 a superseded duplicate 02-09 attempt
-branched before 02-05..02-08 existed) and removed them all; completed and merged the live 02-09
-worktree (13 new tests, GameContext.tsx/useGameState.ts)
+Plan: 02-10 and 02-11 — COMPLETE and merged (wave 4, ran in parallel worktrees). 02-10: App.tsx
+identity gate/Realtime subscription/join-link parsing, MenuScreen create/join via Edge
+Functions, name pre-fill. 02-11: LobbyScreen dealing via start-game Edge Function, copy-join-link
+button, offline markers/host removal/host-transfer display.
+Status: 11/13 plans complete and merged into stage-1-refactor (02-01..02-11). Next up: 02-12
+(wave 5 — turn-timeout sweep wired into GameScreen/App.tsx), depends_on 02-02/02-07/02-08/02-09/
+02-10, all now satisfied. After that, 02-13 (wave 6, checkpoint — autonomous: false, needs user
+input) closes out the phase.
+Last activity: 2026-07-28 -- Wave 4 merged. Both known-failing MenuScreen tests fixed as
+expected by 02-10. Found and fixed a genuine cross-plan integration gap after merging: both
+plans' key_links specified Router calling usePresence once and threading isPlayerOffline down
+as a prop, but 02-11's LobbyScreen independently called usePresence itself instead (would have
+opened a second Presence channel/heartbeat per room) - rewired LobbyScreen to accept the prop
+per the original design, in a follow-up fix commit. All requirements MPLAY-01..06 now complete.
 
-Progress: [█████████░] 69%
+Progress: [████████░░] 85%
 
 **Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
 present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
@@ -57,6 +61,8 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 | Phase 02 P07 | 1 | 25min | 3 tasks, 10 files |
 | Phase 02 P08 | 1 | 35min | 2 tasks, 5 files |
 | Phase 02 P09 | 1 | - | 2 tasks, 4 files |
+| Phase 02 P10 | 1 | ~19min | 3 tasks, 4 files |
+| Phase 02 P11 | 1 | ~10min | 3 tasks, 2 files |
 
 **Recent Trend:**
 
@@ -81,6 +87,9 @@ Recent decisions affecting current work:
 - [Phase 02-08]: useRoomSubscription signals reconciliation from the Realtime broadcast callback, not the functions.invoke() response, per RESEARCH.md Pattern 3
 - [Phase 02-09]: submitMove never awaits the server before returning; the optimistic update is synchronous and the Realtime broadcast (applyServerRoom), not the invoke response, is the authoritative correction
 - [Phase 02-09]: 'RECONCILED' is a client-side toast sentinel, not added to the engine's closed ERROR_CODES (Phase 1 D-04) — reconciliation is a networking concept, not an illegal move
+- [Phase 02-10]: GameContext.roomVersionRef starts at -1, not 0 - a freshly created room's first row is version 0, and 0 <= 0 would wrongly treat that first application as stale and drop it
+- [Phase 02-11]: LobbyScreen no longer computes or writes game state itself - it only invokes start-game/remove-player and applies whatever ServerRoom comes back via applyServerRoom
+- [Wave 4 post-merge]: usePresence is called exactly once, in Router - screens receive isPlayerOffline as a prop rather than subscribing themselves, to avoid a second Presence channel/heartbeat per room
 
 ### Pending Todos
 
@@ -97,13 +106,8 @@ state in place (`playCards`, `App.tsx:461-834`), `playerId` is never actually
 set (`App.tsx:62`), and rules logic is duplicated across `App.tsx`/`Hand.tsx`/
 `Table.tsx` — all in scope for Phase 1, not new discoveries to re-investigate.
 
-- **2 known-failing tests in `src/__tests__/screens/MenuScreen.test.tsx`** ("Create Room...
-  room code (WR-03)" and "Join on a valid, waiting room... (WR-02)") since 02-09 merged.
-  `MenuScreen.tsx` still uses the legacy `window.storage`-based create/join flow; 02-09
-  removed the storage write from `GameContext.setGameState` that flow depended on. Plan
-  02-10 (`depends_on` 02-04/02-05/02-08/02-09, all now merged) explicitly rewires
-  `MenuScreen.tsx` onto the `create-room`/`join-room` edge functions and updates this test
-  file — expected to resolve there, not a new regression to chase separately.
+None currently — the 2 MenuScreen.test.tsx failures flagged after 02-09 were resolved by
+02-10 as expected. Full suite (323 tests) and build both green as of the wave 4 merge.
 
 ## Deferred Items
 
@@ -115,7 +119,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T06:48:00.000Z
-Stopped at: Completed and merged 02-09-PLAN.md; all stale worktrees cleaned up. Ready to
-plan/execute 02-10 (App.tsx + MenuScreen.tsx wiring).
+Last session: 2026-07-28T07:20:00.000Z
+Stopped at: Completed and merged wave 4 (02-10, 02-11) plus a post-merge integration fix.
+Ready to execute 02-12 (wave 5, turn-timeout sweep).
 Resume file: None
