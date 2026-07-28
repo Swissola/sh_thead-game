@@ -3,18 +3,38 @@ import { Users, Plus, ArrowRight } from 'lucide-react';
 import * as GameLogic from '../gameLogic';
 import type { GameState } from '../types';
 import { useGameContext } from '../context/GameContext';
+import { getSupabaseClient } from '../supabase/client';
+import { EDGE_ERROR_CODES, type EdgeErrorCode, type EdgeResult } from '../supabase/roomTypes';
+import { readLastUsedName, writeLastUsedName } from '../supabase/session';
+
+const GENERIC_RETRY_COPY = 'Failed to join room - please retry.';
 
 /**
- * WR-03: Math.random().toString(36).substr(2, 6) is not suitable for anything
- * access-control-adjacent, and can legitimately return fewer than 6 characters
- * (further shrinking the guess space) since .substr is also deprecated.
- * crypto.getRandomValues gives a full 6 cryptographically-random base36 digits.
+ * Maps an `EdgeError` code to the pre-existing copy those failures already
+ * used client-side, so this rewire onto the create-room/join-room Edge
+ * Functions does not regress any user-facing message (D-06). Any code not
+ * covered by a specific case - including a raw transport failure, which has
+ * no `EdgeErrorCode` at all - falls through to the generic retry copy.
  */
-function generateRoomCode(): string {
-    return Array.from(crypto.getRandomValues(new Uint8Array(6)))
-        .map((b) => (b % 36).toString(36))
-        .join('')
-        .toUpperCase();
+function mapEdgeErrorCode(code: EdgeErrorCode): string {
+    switch (code) {
+        case EDGE_ERROR_CODES.ROOM_NOT_FOUND:
+            return 'Room not found';
+        case EDGE_ERROR_CODES.GAME_ALREADY_STARTED:
+            return 'Game has already started';
+        case EDGE_ERROR_CODES.NAME_IN_USE:
+        case EDGE_ERROR_CODES.NAME_AMBIGUOUS:
+            return 'That name is already taken in this room - please use a different name';
+        default:
+            return GENERIC_RETRY_COPY;
+    }
+}
+
+export interface MenuScreenProps {
+    /** D-15: uppercased room code parsed from a `/join/:code` deep link by
+     * App.tsx, or '' when the app was opened normally. Seeds the room-code
+     * input's initial value only - never auto-submits (see Plan 02-10 Task 3). */
+    initialRoomCode?: string;
 }
 
 /**
@@ -22,12 +42,15 @@ function generateRoomCode(): string {
  * (pre-refactor line numbers). All blocking browser alerts converted to
  * showToast() calls per ENGINE-05/D-05/D-06/D-07.
  */
-export function MenuScreen() {
-    const [playerName, setPlayerName] = useState('');
+export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
+    // D-09: pre-fills the returning player's name from the last successful
+    // create/join on this device - still an ordinary controlled input, fully
+    // editable, same placeholder. Lazy initialiser so the read happens once.
+    const [playerName, setPlayerName] = useState(() => readLastUsedName());
     // Not named `roomCode` - the room's actual code lives on gameState.roomCode
     // once one exists; this local field is only the join-room text input.
-    const [roomCodeInput, setRoomCodeInput] = useState('');
-    const { setGameState, setTestMode, playerId, setControllingPlayer, showToast } = useGameContext();
+    const [roomCodeInput, setRoomCodeInput] = useState(() => initialRoomCode.toUpperCase());
+    const { setGameState, setTestMode, setControllingPlayer, showToast } = useGameContext();
 
     const createTestGame = () => {
         setTestMode(true);
@@ -112,33 +135,28 @@ export function MenuScreen() {
             return;
         }
 
-        // WR-03: check for a collision against an existing room before committing
-        // to the generated code, regenerating (bounded) on collision.
-        let code = generateRoomCode();
-        for (let attempts = 0; attempts < 5; attempts++) {
-            const existing = await window.storage.get(`game:${code}`, true);
-            if (!existing) break;
-            code = generateRoomCode();
-        }
-        const newGameState: GameState = {
-            roomCode: code,
-            host: playerId,
-            players: [
-                { id: playerId, name: playerName, hand: [], faceUp: [], faceDown: [], isReady: false },
-            ],
-            phase: 'lobby' as const,
-            currentTurn: 0,
-            deck: [],
-            discardPile: [],
-            burnPile: [],
-            lastAction: `${playerName} created the room`,
-            isFirstTurn: true,
-        };
-
+        // WR-03/Pitfall 3: code generation and collision-checking are now the
+        // server's job (create-room's own bounded generate-and-retry loop) -
+        // the client only supplies the trimmed name.
         try {
-            await setGameState(newGameState);
+            const { data, error } = await getSupabaseClient().functions.invoke('create-room', {
+                body: { playerName: playerName.trim() },
+            });
+            if (error) {
+                showToast(GENERIC_RETRY_COPY);
+                return;
+            }
+            const result = data as EdgeResult | undefined;
+            if (result?.error) {
+                showToast(mapEdgeErrorCode(result.error.code));
+                return;
+            }
+            if (result?.room) {
+                await setGameState(result.room.state);
+                writeLastUsedName(playerName.trim());
+            }
         } catch {
-            showToast('Failed to create room');
+            showToast(GENERIC_RETRY_COPY);
         }
     };
 
@@ -148,45 +166,28 @@ export function MenuScreen() {
             return;
         }
 
+        // WR-02: the read-modify-write race this loop used to work around is
+        // eliminated server-side by join-room's version-conditional update
+        // (withVersionRetry) - no client-side re-read/verify step is needed.
         try {
-            const result = await window.storage.get(`game:${roomCodeInput.toUpperCase()}`, true);
-            if (!result) {
-                showToast('Room not found');
-                return;
-            }
-
-            const state = JSON.parse(result.value);
-            if (state.phase !== 'lobby') {
-                showToast('Game has already started');
-                return;
-            }
-
-            state.players.push({
-                id: playerId,
-                name: playerName,
-                hand: [],
-                faceUp: [],
-                faceDown: [],
-                isReady: false,
+            const { data, error } = await getSupabaseClient().functions.invoke('join-room', {
+                body: { playerName: playerName.trim(), roomCode: roomCodeInput.trim().toUpperCase() },
             });
-            state.lastAction = `${playerName} joined the room`;
-
-            await setGameState(state);
-
-            // WR-02: the localStorage-only backend has no atomic read-modify-write, so
-            // two players joining the same room within the same poll window can race -
-            // whichever write lands second silently discards the other's join. A full
-            // fix needs a backend with compare-and-set/transactions; at minimum, detect
-            // the collision by re-reading and surface a retry prompt rather than
-            // leaving the dropped player with no room and no explanation.
-            const verifyResult = await window.storage.get(`game:${state.roomCode}`, true);
-            const verifiedState = verifyResult ? JSON.parse(verifyResult.value) : null;
-            const stillPresent = verifiedState?.players?.some((p: { id: string }) => p.id === playerId);
-            if (!stillPresent) {
-                showToast('Failed to join room - please retry.');
+            if (error) {
+                showToast(GENERIC_RETRY_COPY);
+                return;
+            }
+            const result = data as EdgeResult | undefined;
+            if (result?.error) {
+                showToast(mapEdgeErrorCode(result.error.code));
+                return;
+            }
+            if (result?.room) {
+                await setGameState(result.room.state);
+                writeLastUsedName(playerName.trim());
             }
         } catch {
-            showToast('Failed to join room');
+            showToast(GENERIC_RETRY_COPY);
         }
     };
 

@@ -4,36 +4,59 @@ import { Toast } from './components/Toast';
 import { MenuScreen } from './screens/MenuScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
 import { GameScreen } from './screens/GameScreen';
+import { ensurePlayerIdentity } from './supabase/session';
+import { useRoomSubscription } from './hooks/useRoomSubscription';
+import { usePresence } from './hooks/usePresence';
+
+/**
+ * D-15: parses a `/join/:code` pathname into its uppercased code segment, or
+ * '' for any other path. Pure so it can run inside a `useState` lazy
+ * initialiser (parsed exactly once, on mount, per the plan's requirement
+ * that later re-renders never re-read the URL).
+ */
+function parseJoinCode(pathname: string): string {
+    const match = pathname.match(/^\/join\/([^/]+)/);
+    return match ? decodeURIComponent(match[1]).toUpperCase() : '';
+}
 
 /**
  * D-09 orchestrator's router: decides which screen renders based on
  * GameState.phase, and owns the shared chrome (background wrapper, toast
  * container) so it isn't duplicated across Menu/Lobby/Game. Exported as a
  * named export so tests can render it directly inside a test-controlled
- * GameProvider without going through ShitheadGame's own playerId generation.
+ * GameProvider without going through ShitheadGame's own identity bootstrap.
+ *
+ * Plan 02-10 (MPLAY-02): the old timed-interval localStorage-polling read is
+ * gone, replaced by `useRoomSubscription`'s Realtime `postgres_changes`
+ * subscription, wired to the context's `applyServerRoom`/`notifyReconciled`
+ * seam added by Plan 02-09. `usePresence` is called exactly once here (never
+ * inside a screen) so only one Presence channel/heartbeat exists per room.
  */
-export function Router() {
-    const { gameState, testMode, toast, dismissToast, setGameState } = useGameContext();
+export function Router({ initialRoomCode = '' }: { initialRoomCode?: string } = {}) {
+    const { gameState, testMode, toast, dismissToast, applyServerRoom, notifyReconciled, playerId } =
+        useGameContext();
 
-    // Ported from App.tsx's pollGameState/poll effect (pre-refactor lines
-    // 331-353). Reuses the context's setGameState for the poll's write-back;
-    // this whole polling mechanism is replaced outright by Supabase Realtime
-    // in Phase 2 (MPLAY-02), so a bespoke read-only setter isn't worth adding
-    // for one phase's remaining lifetime.
-    useEffect(() => {
-        if (!gameState || testMode) return;
-        const interval = setInterval(async () => {
-            const result = await window.storage.get(`game:${gameState.roomCode}`, true);
-            if (result) {
-                setGameState(JSON.parse(result.value));
-            }
-        }, 2000);
-        return () => clearInterval(interval);
-    }, [gameState?.roomCode, testMode, setGameState]);
+    const roomCode = gameState?.roomCode ?? '';
+
+    useRoomSubscription({
+        roomCode,
+        testMode,
+        localState: gameState,
+        onServerRoom: applyServerRoom,
+        onReconciled: notifyReconciled,
+    });
+
+    // D-10: drives the offline badge on LobbyScreen's player tiles (plan
+    // 02-11, same wave - see 02-10-SUMMARY.md Deviations for why the prop
+    // isn't wired to <LobbyScreen> below yet). Not passed to GameScreen
+    // either - that prop signature and its Router call site belong to plan
+    // 02-12. usePresence is still called here, exactly once, so the single
+    // Presence channel/heartbeat for this room exists regardless.
+    usePresence({ roomCode, playerId, testMode });
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-            {!gameState && <MenuScreen />}
+            {!gameState && <MenuScreen initialRoomCode={initialRoomCode} />}
             {gameState?.phase === 'lobby' && <LobbyScreen />}
             {gameState && gameState.phase !== 'lobby' && <GameScreen />}
             <Toast toast={toast} onDismiss={dismissToast} />
@@ -42,11 +65,47 @@ export function Router() {
 }
 
 export default function ShitheadGame() {
-    const [playerId] = useState(() => crypto.randomUUID());
+    const [playerId, setPlayerId] = useState('');
+    const [identityResolved, setIdentityResolved] = useState(false);
+    // Lazy initialiser runs exactly once, synchronously, on the first render -
+    // satisfies "parsed once on mount; later re-renders do not re-read the URL".
+    const [initialRoomCode] = useState(() => parseJoinCode(window.location.pathname));
+
+    // Separate mount-only effect for the URL side-effect (history.replaceState)
+    // so a reload doesn't re-seed a stale join code, independent of the parse
+    // above which must stay side-effect-free.
+    useEffect(() => {
+        if (window.location.pathname.startsWith('/join/')) {
+            window.history.replaceState(null, '', '/');
+        }
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        ensurePlayerIdentity().then((result) => {
+            if (cancelled) return;
+            // D-02: an unrecoverable session resolves to a null id rather than
+            // throwing - fall through to rendering the menu with an empty id
+            // so the player still sees the app; the Edge Functions reject an
+            // unauthenticated call with a clear error.
+            setPlayerId(result.playerId ?? '');
+            setIdentityResolved(true);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    if (!identityResolved) {
+        // Neutral placeholder inside the existing page-background wrapper,
+        // mirroring the "wait for data" `if (!gameState) return null;`
+        // convention used across GameScreen/Table, but not a blank document.
+        return <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4" />;
+    }
 
     return (
         <GameProvider playerId={playerId}>
-            <Router />
+            <Router initialRoomCode={initialRoomCode} />
         </GameProvider>
     );
 }
