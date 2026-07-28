@@ -5,6 +5,7 @@ import type { GameState } from '../types';
 import { useGameContext } from '../context/GameContext';
 import { getSupabaseClient } from '../supabase/client';
 import { EDGE_ERROR_CODES, type EdgeErrorCode, type EdgeResult } from '../supabase/roomTypes';
+import { readLastUsedName, writeLastUsedName } from '../supabase/session';
 
 const GENERIC_RETRY_COPY = 'Failed to join room - please retry.';
 
@@ -42,7 +43,10 @@ export interface MenuScreenProps {
  * showToast() calls per ENGINE-05/D-05/D-06/D-07.
  */
 export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
-    const [playerName, setPlayerName] = useState('');
+    // D-09: pre-fills the returning player's name from the last successful
+    // create/join on this device - still an ordinary controlled input, fully
+    // editable, same placeholder. Lazy initialiser so the read happens once.
+    const [playerName, setPlayerName] = useState(() => readLastUsedName());
     // Not named `roomCode` - the room's actual code lives on gameState.roomCode
     // once one exists; this local field is only the join-room text input.
     const [roomCodeInput, setRoomCodeInput] = useState(() => initialRoomCode.toUpperCase());
@@ -149,6 +153,7 @@ export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
             }
             if (result?.room) {
                 await setGameState(result.room.state);
+                writeLastUsedName(playerName.trim());
             }
         } catch {
             showToast(GENERIC_RETRY_COPY);
@@ -179,6 +184,7 @@ export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
             }
             if (result?.room) {
                 await setGameState(result.room.state);
+                writeLastUsedName(playerName.trim());
             }
         } catch {
             showToast(GENERIC_RETRY_COPY);

@@ -6,7 +6,13 @@ vi.mock('../../supabase/client', () => ({
     getSupabaseClient: vi.fn(),
 }));
 
+vi.mock('../../supabase/session', () => ({
+    readLastUsedName: vi.fn(),
+    writeLastUsedName: vi.fn(),
+}));
+
 import { getSupabaseClient } from '../../supabase/client';
+import { readLastUsedName, writeLastUsedName } from '../../supabase/session';
 import { GameProvider, useGameContext } from '../../context/GameContext';
 import { MenuScreen } from '../../screens/MenuScreen';
 import { Toast } from '../../components/Toast';
@@ -55,6 +61,8 @@ describe('MenuScreen', () => {
     beforeEach(() => {
         localStorage.clear();
         vi.mocked(getSupabaseClient).mockReset();
+        vi.mocked(readLastUsedName).mockReset().mockReturnValue('');
+        vi.mocked(writeLastUsedName).mockReset();
     });
 
     it('clicking "Test Mode (3 Players)" sets testMode and a 3-player setup gameState, with zero functions.invoke calls', async () => {
@@ -287,5 +295,144 @@ describe('MenuScreen', () => {
         fireEvent.click(screen.getByText('Create Room'));
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Failed to join room - please retry.');
+    });
+
+    it('with a stored last-used name, the name input renders pre-filled with it on first paint (D-09)', () => {
+        vi.mocked(readLastUsedName).mockReturnValue('Bob');
+
+        renderMenu();
+
+        expect(screen.getByPlaceholderText('Enter your name')).toHaveValue('Bob');
+    });
+
+    it('with no stored name, the name input renders empty with the unchanged "Enter your name" placeholder', () => {
+        vi.mocked(readLastUsedName).mockReturnValue('');
+
+        renderMenu();
+
+        const input = screen.getByPlaceholderText('Enter your name');
+        expect(input).toHaveValue('');
+        expect(input).toBeInTheDocument();
+    });
+
+    it('the pre-filled name is editable and typing replaces it normally', () => {
+        vi.mocked(readLastUsedName).mockReturnValue('Bob');
+
+        renderMenu();
+
+        const input = screen.getByPlaceholderText('Enter your name');
+        fireEvent.change(input, { target: { value: 'Carol' } });
+
+        expect(input).toHaveValue('Carol');
+    });
+
+    it('a successful create writes the trimmed name back as the last-used name', async () => {
+        const room = buildGameState({
+            roomCode: 'ROOM01',
+            phase: 'lobby',
+            players: [buildPlayer({ id: 'server-assigned-id', name: 'Alice' })],
+        });
+        const { supabase } = makeFakeSupabase(() =>
+            Promise.resolve({
+                data: { room: { roomCode: 'ROOM01', state: room, version: 0, turnStartedAt: '', playerSeen: {} } },
+                error: null,
+            })
+        );
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+        renderMenu();
+
+        fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
+            target: { value: '  Alice  ' },
+        });
+        fireEvent.click(screen.getByText('Create Room'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('probe')).toHaveTextContent('phase:lobby');
+        });
+
+        expect(writeLastUsedName).toHaveBeenCalledWith('Alice');
+    });
+
+    it('a successful join writes the trimmed name back as the last-used name', async () => {
+        const room = buildGameState({
+            roomCode: 'ABC123',
+            phase: 'lobby',
+            players: [
+                buildPlayer({ id: 'host-player', name: 'Host' }),
+                buildPlayer({ id: 'server-assigned-id', name: 'Alice' }),
+            ],
+        });
+        const { supabase } = makeFakeSupabase(() =>
+            Promise.resolve({
+                data: { room: { roomCode: 'ABC123', state: room, version: 1, turnStartedAt: '', playerSeen: {} } },
+                error: null,
+            })
+        );
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+        renderMenu();
+
+        fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
+            target: { value: '  Alice  ' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('Room code'), {
+            target: { value: 'abc123' },
+        });
+        fireEvent.click(screen.getByText('Join'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('probe')).toHaveTextContent('phase:lobby');
+        });
+
+        expect(writeLastUsedName).toHaveBeenCalledWith('Alice');
+    });
+
+    it('a failed join (Room not found) does not write the name back as last-used', async () => {
+        const { supabase } = makeFakeSupabase(() =>
+            Promise.resolve({ data: { error: { code: 'ROOM_NOT_FOUND', message: 'not found' } }, error: null })
+        );
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+        renderMenu();
+
+        fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
+            target: { value: 'Alice' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('Room code'), {
+            target: { value: 'NOPE99' },
+        });
+        fireEvent.click(screen.getByText('Join'));
+
+        await screen.findByRole('alert');
+
+        expect(writeLastUsedName).not.toHaveBeenCalled();
+    });
+
+    it('an initialRoomCode prop pre-fills the room-code input, uppercased, and it remains editable', () => {
+        renderMenu('abc123');
+
+        const roomCodeInputEl = screen.getByPlaceholderText('Room code');
+        expect(roomCodeInputEl).toHaveValue('ABC123');
+
+        fireEvent.change(roomCodeInputEl, { target: { value: 'XYZ999' } });
+        expect(roomCodeInputEl).toHaveValue('XYZ999');
+    });
+
+    it('with no initialRoomCode, the room-code input renders empty', () => {
+        renderMenu();
+
+        expect(screen.getByPlaceholderText('Room code')).toHaveValue('');
+    });
+
+    it('pre-filling the room code does not auto-submit the join', () => {
+        const { invoke } = makeFakeSupabase();
+
+        renderMenu('abc123');
+
+        expect(invoke).not.toHaveBeenCalled();
+        // The Join button stays disabled until a name is entered too - a
+        // join-link alone never submits on its own.
+        expect(screen.getByText('Join').closest('button')).toBeDisabled();
     });
 });
