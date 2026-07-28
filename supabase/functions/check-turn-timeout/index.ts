@@ -7,6 +7,7 @@ import { withSupabase } from 'npm:@supabase/server';
 import { checkTurnTimeout } from '../_shared/turnTimeout.ts';
 import { createSupabaseRoomStore } from '../_shared/supabaseStore.ts';
 import { jsonResponse, edgeError } from '../_shared/respond.ts';
+import { localSecretKeyOverride } from '../_shared/envCompat.ts';
 import { EDGE_ERROR_CODES } from '../../../src/supabase/roomTypes.ts';
 
 interface CheckTurnTimeoutBody {
@@ -14,7 +15,7 @@ interface CheckTurnTimeoutBody {
 }
 
 export default {
-    fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+    fetch: withSupabase({ auth: 'user', env: localSecretKeyOverride() }, async (req, ctx) => {
         if (!ctx.userClaims) {
             return jsonResponse({ error: edgeError(EDGE_ERROR_CODES.UNAUTHENTICATED, 'Missing verified session') });
         }

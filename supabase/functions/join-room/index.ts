@@ -6,10 +6,11 @@ import { withSupabase } from 'npm:@supabase/server';
 import { joinRoom } from '../_shared/joinRoom.ts';
 import { createSupabaseRoomStore } from '../_shared/supabaseStore.ts';
 import { jsonResponse, edgeError } from '../_shared/respond.ts';
+import { localSecretKeyOverride } from '../_shared/envCompat.ts';
 import { EDGE_ERROR_CODES } from '../../../src/supabase/roomTypes.ts';
 
 export default {
-    fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+    fetch: withSupabase({ auth: 'user', env: localSecretKeyOverride() }, async (req, ctx) => {
         if (!ctx.userClaims) {
             return jsonResponse({ error: edgeError(EDGE_ERROR_CODES.UNAUTHENTICATED, 'Missing verified session') });
         }
@@ -23,8 +24,9 @@ export default {
 
         // Identity always comes from the verified JWT subject, never the
         // request body (T-02-13) - a spoofed id would otherwise let a
-        // modified client claim someone else's seat.
-        const playerId = ctx.userClaims.sub;
+        // modified client claim someone else's seat. `.id`, not `.sub` -
+        // see create-room/index.ts for why.
+        const playerId = ctx.userClaims.id;
         const playerName = typeof body.playerName === 'string' ? body.playerName : '';
         const roomCode = typeof body.roomCode === 'string' ? body.roomCode : '';
 

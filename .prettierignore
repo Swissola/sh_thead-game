@@ -3,3 +3,4 @@ dist/
 .git/
 coverage/
 supabase/functions/*/index.ts
+supabase/functions/_shared/envCompat.ts

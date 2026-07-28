@@ -10,6 +10,7 @@ import { withSupabase } from 'npm:@supabase/server';
 import { jsonResponse, edgeError } from '../_shared/respond.ts';
 import { createSupabaseRoomStore } from '../_shared/supabaseStore.ts';
 import { startGame } from '../_shared/startGame.ts';
+import { localSecretKeyOverride } from '../_shared/envCompat.ts';
 import { EDGE_ERROR_CODES } from '../../../src/supabase/roomTypes.ts';
 
 interface StartGameBody {
@@ -17,7 +18,7 @@ interface StartGameBody {
 }
 
 export default {
-    fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+    fetch: withSupabase({ auth: 'user', env: localSecretKeyOverride() }, async (req, ctx) => {
         if (!ctx.userClaims) {
             return jsonResponse({ error: edgeError(EDGE_ERROR_CODES.UNAUTHENTICATED, 'Not authenticated') });
         }
@@ -33,8 +34,9 @@ export default {
             return jsonResponse({ error: edgeError(EDGE_ERROR_CODES.BAD_REQUEST, 'roomCode is required') });
         }
 
-        // Identity comes only from the verified JWT subject - never the request body.
-        const playerId = ctx.userClaims.sub;
+        // Identity comes only from the verified JWT subject - never the request
+        // body. `.id`, not `.sub` - see create-room/index.ts for why.
+        const playerId = ctx.userClaims.id;
         const store = createSupabaseRoomStore(ctx.supabaseAdmin);
         const result = await startGame(store, { playerId, roomCode: body.roomCode });
         return jsonResponse(result);

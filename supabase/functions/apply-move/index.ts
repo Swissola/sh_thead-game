@@ -10,6 +10,7 @@ import { withSupabase } from 'npm:@supabase/server';
 import { jsonResponse, edgeError } from '../_shared/respond.ts';
 import { createSupabaseRoomStore } from '../_shared/supabaseStore.ts';
 import { applyRoomMove } from '../_shared/applyRoomMove.ts';
+import { localSecretKeyOverride } from '../_shared/envCompat.ts';
 import { EDGE_ERROR_CODES } from '../../../src/supabase/roomTypes.ts';
 
 interface ApplyMoveBody {
@@ -18,7 +19,7 @@ interface ApplyMoveBody {
 }
 
 export default {
-    fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+    fetch: withSupabase({ auth: 'user', env: localSecretKeyOverride() }, async (req, ctx) => {
         if (!ctx.userClaims) {
             return jsonResponse({ error: edgeError(EDGE_ERROR_CODES.UNAUTHENTICATED, 'Not authenticated') });
         }
@@ -36,8 +37,9 @@ export default {
 
         // Identity comes only from the verified JWT subject - never the request body.
         // move is deliberately left as `unknown`: applyRoomMove validates its shape and
-        // overrides playerId, so no cast to Move happens in this wrapper.
-        const playerId = ctx.userClaims.sub;
+        // overrides playerId, so no cast to Move happens in this wrapper. `.id`, not
+        // `.sub` - see create-room/index.ts for why.
+        const playerId = ctx.userClaims.id;
         const store = createSupabaseRoomStore(ctx.supabaseAdmin);
         const result = await applyRoomMove(store, { playerId, roomCode: body.roomCode, move: body.move });
         return jsonResponse(result);

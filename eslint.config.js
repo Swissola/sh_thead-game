@@ -7,7 +7,7 @@ import prettierConfig from 'eslint-config-prettier';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['dist', 'supabase/functions/*/index.ts']),
+  globalIgnores(['dist', 'supabase/functions/*/index.ts', 'supabase/functions/_shared/envCompat.ts']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
