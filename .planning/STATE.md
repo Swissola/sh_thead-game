@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-07-28T07:20:00.000Z"
-last_activity: "2026-07-28 -- Wave 4 (plans 02-10, 02-11) merged into stage-1-refactor"
+last_updated: "2026-07-28T12:43:00.000Z"
+last_activity: "2026-07-28 -- Wave 5 (plan 02-12) merged into stage-1-refactor"
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 14
 ---
 
@@ -25,22 +25,19 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-10 and 02-11 — COMPLETE and merged (wave 4, ran in parallel worktrees). 02-10: App.tsx
-identity gate/Realtime subscription/join-link parsing, MenuScreen create/join via Edge
-Functions, name pre-fill. 02-11: LobbyScreen dealing via start-game Edge Function, copy-join-link
-button, offline markers/host removal/host-transfer display.
-Status: 11/13 plans complete and merged into stage-1-refactor (02-01..02-11). Next up: 02-12
-(wave 5 — turn-timeout sweep wired into GameScreen/App.tsx), depends_on 02-02/02-07/02-08/02-09/
-02-10, all now satisfied. After that, 02-13 (wave 6, checkpoint — autonomous: false, needs user
-input) closes out the phase.
-Last activity: 2026-07-28 -- Wave 4 merged. Both known-failing MenuScreen tests fixed as
-expected by 02-10. Found and fixed a genuine cross-plan integration gap after merging: both
-plans' key_links specified Router calling usePresence once and threading isPlayerOffline down
-as a prop, but 02-11's LobbyScreen independently called usePresence itself instead (would have
-opened a second Presence channel/heartbeat per room) - rewired LobbyScreen to accept the prop
-per the original design, in a follow-up fix commit. All requirements MPLAY-01..06 now complete.
+Plan: 02-12 — COMPLETE and merged (wave 5). Presence-driven offline badge + reconnect toast on
+GameScreen player tiles, client-side check-turn-timeout trigger with a state-2 auto-picking-up
+badge, and a Leave Game button with confirm dialog.
+Status: 12/13 plans complete and merged into stage-1-refactor (02-01..02-12). Only 02-13 remains
+(wave 6) — closes VALIDATION.md's Wave 0 smoke-test question. Flagged `autonomous: false` in its
+own frontmatter, so it needs a checkpoint/human decision rather than running unattended; not yet
+started.
+Last activity: 2026-07-28 -- Wave 5's executor was terminated by a session-limit API error
+mid-read, before any commits; resumed the same agent from its transcript (no work lost) and it
+completed all 3 tasks cleanly. Merged with no conflicts - GameScreen correctly received
+isPlayerOffline as a prop from Router, following the pattern fixed after wave 4.
 
-Progress: [████████░░] 85%
+Progress: [█████████░] 92%
 
 **Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
 present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
@@ -63,6 +60,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 | Phase 02 P09 | 1 | - | 2 tasks, 4 files |
 | Phase 02 P10 | 1 | ~19min | 3 tasks, 4 files |
 | Phase 02 P11 | 1 | ~10min | 3 tasks, 2 files |
+| Phase 02 P12 | 1 | ~75min | 3 tasks, 4 files (session-limit interrupted, resumed) |
 
 **Recent Trend:**
 
@@ -90,6 +88,7 @@ Recent decisions affecting current work:
 - [Phase 02-10]: GameContext.roomVersionRef starts at -1, not 0 - a freshly created room's first row is version 0, and 0 <= 0 would wrongly treat that first application as stale and drop it
 - [Phase 02-11]: LobbyScreen no longer computes or writes game state itself - it only invokes start-game/remove-player and applies whatever ServerRoom comes back via applyServerRoom
 - [Wave 4 post-merge]: usePresence is called exactly once, in Router - screens receive isPlayerOffline as a prop rather than subscribing themselves, to avoid a second Presence channel/heartbeat per room
+- [Phase 02-12]: useTurnTimeoutSweep tracks its grace-expired flag together with an "arm key" string in one useState object, reset via React's render-body "adjusting state when a prop changes" pattern rather than an effect-body setState or a Date.now()-during-render call, to satisfy this project's strict react-hooks/React Compiler lint rules
 
 ### Pending Todos
 
@@ -106,8 +105,11 @@ state in place (`playCards`, `App.tsx:461-834`), `playerId` is never actually
 set (`App.tsx:62`), and rules logic is duplicated across `App.tsx`/`Hand.tsx`/
 `Table.tsx` — all in scope for Phase 1, not new discoveries to re-investigate.
 
-None currently — the 2 MenuScreen.test.tsx failures flagged after 02-09 were resolved by
-02-10 as expected. Full suite (323 tests) and build both green as of the wave 4 merge.
+None currently — full suite (352 tests) and build both green as of the wave 5 merge.
+`npm run lint` still exits 1 on two pre-existing, unrelated issues (`GameContext.tsx:142`
+react-refresh/only-export-components, `GameScreen.tsx:107` react-hooks/set-state-in-effect in
+the pre-existing celebration-modal effect) — confirmed present before 02-12 touched either
+file; logged in `deferred-items.md`, not yet cleaned up.
 
 ## Deferred Items
 
@@ -119,7 +121,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T07:20:00.000Z
-Stopped at: Completed and merged wave 4 (02-10, 02-11) plus a post-merge integration fix.
-Ready to execute 02-12 (wave 5, turn-timeout sweep).
+Last session: 2026-07-28T12:43:00.000Z
+Stopped at: Completed and merged wave 5 (02-12). Only 02-13 (wave 6, checkpoint) remains to
+close out Phase 02 — needs a human decision per its `autonomous: false` frontmatter before
+it can run, not a plain execute-phase dispatch.
 Resume file: None
