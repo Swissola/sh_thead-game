@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Copy, Check, Crown } from 'lucide-react';
+import { Users, Copy, Check, Crown, Link2 } from 'lucide-react';
 import { useGameContext } from '../context/GameContext';
 import { getSupabaseClient } from '../supabase/client';
 import type { EdgeResult } from '../supabase/roomTypes';
@@ -16,12 +16,22 @@ import type { EdgeResult } from '../supabase/roomTypes';
 export function LobbyScreen() {
     const { gameState, playerId, applyServerRoom, showToast } = useGameContext();
     const [copied, setCopied] = useState(false);
+    const [copiedLink, setCopiedLink] = useState(false);
 
     const copyRoomCode = () => {
         if (!gameState) return;
         navigator.clipboard.writeText(gameState.roomCode);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    // D-15: separate copiedLink state from copied so the two buttons don't
+    // share one boolean and flicker each other's icon.
+    const copyJoinLink = () => {
+        if (!gameState) return;
+        navigator.clipboard.writeText(`${window.location.origin}/join/${gameState.roomCode}`);
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
     };
 
     const startGame = async () => {
@@ -64,12 +74,24 @@ export function LobbyScreen() {
                         </span>
                         <button
                             onClick={copyRoomCode}
+                            aria-label="Copy room code"
                             className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
                         >
                             {copied ? (
                                 <Check size={20} className="text-green-400" />
                             ) : (
                                 <Copy size={20} className="text-slate-400" />
+                            )}
+                        </button>
+                        <button
+                            onClick={copyJoinLink}
+                            aria-label="Copy join link"
+                            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                            {copiedLink ? (
+                                <Check size={20} className="text-green-400" />
+                            ) : (
+                                <Link2 size={20} className="text-slate-400" />
                             )}
                         </button>
                     </div>

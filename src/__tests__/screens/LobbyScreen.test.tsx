@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useEffect } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '../../storage';
 
 vi.mock('../../supabase/client', () => ({
@@ -267,27 +267,33 @@ describe('LobbyScreen', () => {
         });
 
         it('swaps the join-link icon to Check immediately after clicking, and reverts after 2000ms', async () => {
+            stubClipboard();
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            // Resolve the async findByLabelText query on real timers first - only
+            // switch to fake timers once the element is in hand, so waitFor's
+            // internal polling is never starved of ticks.
+            const joinLinkButton = await screen.findByLabelText('Copy join link');
+
             vi.useFakeTimers();
             try {
-                stubClipboard();
-                const { supabase } = makeFakeSupabase();
-                vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
-                const state = buildGameState({
-                    roomCode: 'ABC123',
-                    phase: 'lobby',
-                    host: 'p0',
-                    players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
-                });
-                renderLobby('p0', state);
-
-                const joinLinkButton = await screen.findByLabelText('Copy join link');
                 fireEvent.click(joinLinkButton);
 
                 // Assert immediately after the click rather than inside waitFor - per
                 // CLAUDE.md's testing note, polling can race past the real-timer clear.
                 expect(joinLinkButton.querySelector('.lucide-check')).toBeInTheDocument();
 
-                vi.advanceTimersByTime(2000);
+                act(() => {
+                    vi.advanceTimersByTime(2000);
+                });
                 expect(joinLinkButton.querySelector('.lucide-check')).not.toBeInTheDocument();
                 expect(joinLinkButton.querySelector('.lucide-link-2')).toBeInTheDocument();
             } finally {
