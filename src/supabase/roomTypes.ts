@@ -11,26 +11,26 @@
  * illegal moves, edge codes describe network/lifecycle failures. Do not merge
  * the two sets.
  */
-import type { GameState } from '../types';
+import type { GameState } from '../types.ts';
 
 /** Raw Postgres row shape for the `rooms` table (snake_case, as PostgREST returns it). */
 export interface RoomRow {
-    room_code: string;
-    state: GameState;
-    version: number;
-    turn_started_at: string;
-    player_seen: Record<string, string>;
-    created_at: string;
-    updated_at: string;
+  room_code: string;
+  state: GameState;
+  version: number;
+  turn_started_at: string;
+  player_seen: Record<string, string>;
+  created_at: string;
+  updated_at: string;
 }
 
 /** Client-facing camelCase view of a room, used everywhere outside the raw DB layer. */
 export interface ServerRoom {
-    roomCode: string;
-    state: GameState;
-    version: number;
-    turnStartedAt: string;
-    playerSeen: Record<string, string>;
+  roomCode: string;
+  state: GameState;
+  version: number;
+  turnStartedAt: string;
+  playerSeen: Record<string, string>;
 }
 
 /**
@@ -40,13 +40,13 @@ export interface ServerRoom {
  * - a null/absent `player_seen` defaults to `{}` rather than throwing.
  */
 export function rowToServerRoom(row: RoomRow): ServerRoom {
-    return {
-        roomCode: row.room_code,
-        state: row.state,
-        version: Number(row.version),
-        turnStartedAt: row.turn_started_at,
-        playerSeen: row.player_seen ?? {},
-    };
+  return {
+    roomCode: row.room_code,
+    state: row.state,
+    version: Number(row.version),
+    turnStartedAt: row.turn_started_at,
+    playerSeen: row.player_seen ?? {},
+  };
 }
 
 /**
@@ -55,30 +55,30 @@ export function rowToServerRoom(row: RoomRow): ServerRoom {
  * `src/engine/errors.ts`'s `ERROR_CODES` - see module docstring.
  */
 export const EDGE_ERROR_CODES = Object.freeze({
-    UNAUTHENTICATED: 'UNAUTHENTICATED',
-    ROOM_NOT_FOUND: 'ROOM_NOT_FOUND',
-    ROOM_CODE_COLLISION: 'ROOM_CODE_COLLISION',
-    GAME_ALREADY_STARTED: 'GAME_ALREADY_STARTED',
-    NAME_AMBIGUOUS: 'NAME_AMBIGUOUS',
-    NAME_IN_USE: 'NAME_IN_USE',
-    NOT_IN_ROOM: 'NOT_IN_ROOM',
-    NOT_HOST: 'NOT_HOST',
-    NOT_ENOUGH_PLAYERS: 'NOT_ENOUGH_PLAYERS',
-    CONFLICT: 'CONFLICT',
-    TIMEOUT_NOT_ELAPSED: 'TIMEOUT_NOT_ELAPSED',
-    BAD_REQUEST: 'BAD_REQUEST',
+  UNAUTHENTICATED: 'UNAUTHENTICATED',
+  ROOM_NOT_FOUND: 'ROOM_NOT_FOUND',
+  ROOM_CODE_COLLISION: 'ROOM_CODE_COLLISION',
+  GAME_ALREADY_STARTED: 'GAME_ALREADY_STARTED',
+  NAME_AMBIGUOUS: 'NAME_AMBIGUOUS',
+  NAME_IN_USE: 'NAME_IN_USE',
+  NOT_IN_ROOM: 'NOT_IN_ROOM',
+  NOT_HOST: 'NOT_HOST',
+  NOT_ENOUGH_PLAYERS: 'NOT_ENOUGH_PLAYERS',
+  CONFLICT: 'CONFLICT',
+  TIMEOUT_NOT_ELAPSED: 'TIMEOUT_NOT_ELAPSED',
+  BAD_REQUEST: 'BAD_REQUEST',
 } as const);
 
 export type EdgeErrorCode = (typeof EDGE_ERROR_CODES)[keyof typeof EDGE_ERROR_CODES];
 
 export interface EdgeError {
-    code: EdgeErrorCode;
-    message: string;
+  code: EdgeErrorCode;
+  message: string;
 }
 
 export interface EdgeResult {
-    room?: ServerRoom;
-    error?: EdgeError;
+  room?: ServerRoom;
+  error?: EdgeError;
 }
 
 /** D-05's turn grace period: auto-`PICK_UP_PILE` after this many ms of inactivity. */

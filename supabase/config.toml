@@ -175,7 +175,13 @@ refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
 enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
-enable_anonymous_sign_ins = false
+# Enabled locally (was left at the supabase init default of false) so
+# scripts/smoke-edge-functions.mjs (plan 02-13) can mint two real, distinct
+# auth.uid() sessions against the LOCAL stack via signInAnonymously() - the
+# hosted project already has this toggled on in its dashboard (02-03's
+# checkpoint), but that dashboard setting has no effect on local `supabase
+# start`, which reads only this file.
+enable_anonymous_sign_ins = true
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.

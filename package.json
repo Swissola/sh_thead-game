@@ -22,7 +22,8 @@
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "db:reset": "supabase db reset",
-    "functions:serve": "supabase functions serve"
+    "functions:serve": "supabase functions serve",
+    "test:edge:smoke": "node scripts/smoke-edge-functions.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8",
