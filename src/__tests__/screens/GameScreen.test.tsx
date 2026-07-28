@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useEffect } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useCallback, useEffect, useState } from 'react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '../../storage';
 import { GameProvider, useGameContext } from '../../context/GameContext';
 import { GameScreen } from '../../screens/GameScreen';
+import { Toast } from '../../components/Toast';
 import { buildGameState, buildPlayer, buildCard } from '../testUtils/buildGameState';
 
 /** Seeds gameState via the context's setGameState in an effect on mount. */
@@ -14,6 +15,24 @@ function SeedGameState({ state }: { state: ReturnType<typeof buildGameState> }) 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     return null;
+}
+
+/** Flips the context's testMode flag on mount - used to exercise Test Mode's
+ * "no offline badges" behaviour without going through MenuScreen's UI. */
+function SetTestMode({ value }: { value: boolean }) {
+    const { setTestMode } = useGameContext();
+    useEffect(() => {
+        setTestMode(value);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return null;
+}
+
+/** Renders the real Toast component wired to context state, so reconnect-toast
+ * assertions prove an actual showToast call rather than mocking it. */
+function ToastProbe() {
+    const { toast, dismissToast } = useGameContext();
+    return <Toast toast={toast} onDismiss={dismissToast} />;
 }
 
 /**
@@ -36,11 +55,17 @@ function Probe() {
     );
 }
 
-function renderGame(playerId: string, state: ReturnType<typeof buildGameState>) {
+function renderGame(
+    playerId: string,
+    state: ReturnType<typeof buildGameState>,
+    options: { isPlayerOffline?: (id: string) => boolean; testMode?: boolean } = {}
+) {
     return render(
         <GameProvider playerId={playerId}>
             <SeedGameState state={state} />
-            <GameScreen />
+            {options.testMode && <SetTestMode value />}
+            <GameScreen isPlayerOffline={options.isPlayerOffline} />
+            <ToastProbe />
             <Probe />
         </GameProvider>
     );
@@ -391,6 +416,128 @@ describe('GameScreen', () => {
             expect(container.querySelector('[data-faceup-index="0"]')?.textContent).toContain('♦');
             expect(container.querySelector('[data-faceup-index="1"]')?.textContent).toContain('6');
             expect(container.querySelector('[data-faceup-index="1"]')?.textContent).toContain('♥');
+        });
+    });
+
+    describe('presence-driven offline badge and reconnect toast (D-10, plan 02-12)', () => {
+        it('greys out an offline opponent tile with an Offline badge; a connected opponent renders normally', async () => {
+            const state = buildGameState({
+                phase: 'playing',
+                players: [
+                    buildPlayer({ id: 'test-player', name: 'Alice' }),
+                    buildPlayer({ id: 'p1', name: 'Bob' }),
+                    buildPlayer({ id: 'p2', name: 'Charlie' }),
+                ],
+            });
+            const isPlayerOffline = (id: string) => id === 'p1';
+
+            renderGame('test-player', state, { isPlayerOffline });
+
+            const bobTile = (await screen.findByText('Bob')).closest('div.rounded-lg') as HTMLElement;
+            expect(bobTile.className).toContain('opacity-60');
+            expect(bobTile.className).toContain('border-slate-600');
+            expect(within(bobTile).getByText('Offline')).toBeInTheDocument();
+
+            const charlieTile = screen.getByText('Charlie').closest('div.rounded-lg') as HTMLElement;
+            expect(charlieTile.className).not.toContain('opacity-60');
+            expect(within(charlieTile).queryByText('Offline')).not.toBeInTheDocument();
+        });
+
+        it("never shows the offline badge on the local player's own tile, whatever presence reports", async () => {
+            const state = buildGameState({
+                phase: 'playing',
+                players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            const isPlayerOffline = () => true;
+
+            renderGame('test-player', state, { isPlayerOffline });
+
+            const aliceTile = (await screen.findByText('Alice')).closest('div.rounded-lg') as HTMLElement;
+            expect(within(aliceTile).queryByText('Offline')).not.toBeInTheDocument();
+        });
+
+        it('shows no offline badge for any tile in Test Mode, even when isPlayerOffline reports true', async () => {
+            const state = buildGameState({
+                phase: 'playing',
+                players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            const isPlayerOffline = () => true;
+
+            renderGame('test-player', state, { isPlayerOffline, testMode: true });
+
+            await screen.findByText('Bob');
+            expect(screen.queryByText('Offline')).not.toBeInTheDocument();
+        });
+
+        it('does not raise a reconnect toast for a player who is already online at mount', async () => {
+            const state = buildGameState({
+                phase: 'playing',
+                players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            const isPlayerOffline = () => false;
+
+            renderGame('test-player', state, { isPlayerOffline });
+
+            await screen.findByText('Bob');
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        });
+
+        it('raises a "{name} reconnected" toast exactly once when a player transitions from offline to online', async () => {
+            const state = buildGameState({
+                phase: 'playing',
+                players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+
+            // Mirrors usePresence's real isPlayerOffline (a useCallback keyed on
+            // onlinePlayerIds) - a new function reference each time the online
+            // set changes, so GameScreen's reconnect effect actually re-runs.
+            function Harness() {
+                const [offlineIds, setOfflineIds] = useState<string[]>(['p1']);
+                const isPlayerOffline = useCallback((id: string) => offlineIds.includes(id), [offlineIds]);
+                return (
+                    <>
+                        <GameScreen isPlayerOffline={isPlayerOffline} />
+                        <button onClick={() => setOfflineIds([])}>Clear offline</button>
+                    </>
+                );
+            }
+
+            render(
+                <GameProvider playerId="test-player">
+                    <SeedGameState state={state} />
+                    <Harness />
+                    <ToastProbe />
+                    <Probe />
+                </GameProvider>
+            );
+
+            await screen.findByText('Bob');
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+            fireEvent.click(screen.getByText('Clear offline'));
+
+            await waitFor(() => {
+                expect(screen.getByRole('alert')).toHaveTextContent('Bob reconnected');
+            });
+            expect(screen.getAllByRole('alert')).toHaveLength(1);
+        });
+
+        it('renders correctly when no isPlayerOffline prop is supplied', async () => {
+            const state = buildGameState({
+                phase: 'playing',
+                players: [buildPlayer({ id: 'test-player', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+
+            render(
+                <GameProvider playerId="test-player">
+                    <SeedGameState state={state} />
+                    <GameScreen />
+                    <Probe />
+                </GameProvider>
+            );
+
+            await screen.findByText('Bob');
+            expect(screen.queryByText('Offline')).not.toBeInTheDocument();
         });
     });
 });
