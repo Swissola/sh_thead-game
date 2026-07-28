@@ -1,16 +1,24 @@
 import { useState } from 'react';
-import { Users, Copy, Check, Crown } from 'lucide-react';
-import * as GameLogic from '../gameLogic';
-import type { GameState } from '../types';
+import { Users, Copy, Check, Crown, Link2, WifiOff, UserX } from 'lucide-react';
 import { useGameContext } from '../context/GameContext';
+import { getSupabaseClient } from '../supabase/client';
+import type { EdgeResult } from '../supabase/roomTypes';
+import { usePresence } from '../hooks/usePresence';
 
 /**
  * Room code display, player list, host-only start button, extracted from
  * App.tsx:999-1063 (pre-refactor line numbers).
+ *
+ * Plan 02-11 (MPLAY-04): dealing moved server-side into the `start-game` Edge
+ * Function - this screen no longer computes or writes game state itself, it
+ * only invokes the function and applies whatever `ServerRoom` comes back via
+ * `applyServerRoom`.
  */
 export function LobbyScreen() {
-    const { gameState, playerId, setGameState } = useGameContext();
+    const { gameState, playerId, applyServerRoom, showToast, testMode } = useGameContext();
     const [copied, setCopied] = useState(false);
+    const [copiedLink, setCopiedLink] = useState(false);
+    const { isPlayerOffline } = usePresence({ roomCode: gameState?.roomCode ?? '', playerId, testMode });
 
     const copyRoomCode = () => {
         if (!gameState) return;
@@ -19,36 +27,68 @@ export function LobbyScreen() {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    // D-15: separate copiedLink state from copied so the two buttons don't
+    // share one boolean and flicker each other's icon.
+    const copyJoinLink = () => {
+        if (!gameState) return;
+        navigator.clipboard.writeText(`${window.location.origin}/join/${gameState.roomCode}`);
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
+    };
+
     const startGame = async () => {
         if (!gameState || gameState.host !== playerId || gameState.players.length < 2) return;
 
-        const numDecks = Math.ceil(gameState.players.length / 4);
-        const deck = GameLogic.shuffleDeck(GameLogic.createDeck(numDecks));
-
-        const updatedPlayers = gameState.players.map((player) => ({
-            ...player,
-            hand: deck.splice(0, 3),
-            faceUp: deck.splice(0, 3),
-            faceDown: deck.splice(0, 3),
-            isReady: false,
-        }));
-
-        const updatedState: GameState = {
-            roomCode: gameState.roomCode,
-            host: gameState.host,
-            players: updatedPlayers,
-            deck,
-            phase: 'setup',
-            currentTurn: gameState.currentTurn,
-            discardPile: gameState.discardPile,
-            burnPile: gameState.burnPile,
-            lastAction: `Game started with ${numDecks} deck${numDecks > 1 ? 's' : ''}! Swap cards then ready up.`,
-            isFirstTurn: true,
-        };
-
-        await setGameState(updatedState);
+        try {
+            const { data, error } = await getSupabaseClient().functions.invoke('start-game', {
+                body: { roomCode: gameState.roomCode },
+            });
+            if (error) {
+                showToast('Failed to start the game - please retry.');
+                return;
+            }
+            const result = data as EdgeResult | undefined;
+            if (result?.error) {
+                showToast(result.error.message, result.error.code);
+                return;
+            }
+            if (result?.room) {
+                applyServerRoom(result.room);
+            }
+        } catch {
+            showToast('Failed to start the game - please retry.');
+        }
     };
 
+    // D-07: the host removes an AFK player. The disabled-for-connected-players
+    // state below is purely a UI affordance (T-02-38) - removePlayer itself
+    // independently re-checks caller === state.host and the lobby phase.
+    const removePlayerFromLobby = async (targetPlayerId: string) => {
+        if (!gameState) return;
+        try {
+            const { data, error } = await getSupabaseClient().functions.invoke('remove-player', {
+                body: { roomCode: gameState.roomCode, targetPlayerId },
+            });
+            if (error) {
+                showToast('Failed to remove player - please retry.');
+                return;
+            }
+            const result = data as EdgeResult | undefined;
+            if (result?.error) {
+                showToast(result.error.message, result.error.code);
+                return;
+            }
+            if (result?.room) {
+                applyServerRoom(result.room);
+            }
+        } catch {
+            showToast('Failed to remove player - please retry.');
+        }
+    };
+
+    // D-08: derived fresh from gameState on every render (not memoised or
+    // cached) so a server-side host transfer moves the Crown/Start Game
+    // button on the very next Realtime payload with no extra client logic.
     const isHost = gameState?.host === playerId;
 
     return (
@@ -65,12 +105,24 @@ export function LobbyScreen() {
                         </span>
                         <button
                             onClick={copyRoomCode}
+                            aria-label="Copy room code"
                             className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
                         >
                             {copied ? (
                                 <Check size={20} className="text-green-400" />
                             ) : (
                                 <Copy size={20} className="text-slate-400" />
+                            )}
+                        </button>
+                        <button
+                            onClick={copyJoinLink}
+                            aria-label="Copy join link"
+                            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                            {copiedLink ? (
+                                <Check size={20} className="text-green-400" />
+                            ) : (
+                                <Link2 size={20} className="text-slate-400" />
                             )}
                         </button>
                     </div>
@@ -84,20 +136,40 @@ export function LobbyScreen() {
                         </h2>
                     </div>
                     <div className="space-y-2">
-                        {gameState?.players.map((player) => (
-                            <div
-                                key={player.id}
-                                className="flex items-center gap-3 bg-slate-700 rounded-lg p-3"
-                            >
-                                {player.id === gameState.host && (
-                                    <Crown size={20} className="text-yellow-400" />
-                                )}
-                                <span className="text-white font-semibold flex-1">{player.name}</span>
-                                {player.id === playerId && (
-                                    <span className="text-xs bg-purple-600 px-2 py-1 rounded">You</span>
-                                )}
-                            </div>
-                        ))}
+                        {gameState?.players.map((player) => {
+                            const offline = isPlayerOffline(player.id);
+                            return (
+                                <div
+                                    key={player.id}
+                                    className={`flex items-center gap-3 bg-slate-700 rounded-lg p-3 ${offline ? 'opacity-60 border-2 border-slate-600' : ''}`}
+                                >
+                                    {player.id === gameState.host && (
+                                        <Crown size={20} className="text-yellow-400" />
+                                    )}
+                                    <span className="text-white font-semibold flex-1">{player.name}</span>
+                                    {offline && (
+                                        <span className="text-xs px-2 py-1 rounded bg-slate-600 text-slate-300 flex items-center gap-1">
+                                            <WifiOff size={12} />
+                                            Offline
+                                        </span>
+                                    )}
+                                    {player.id === playerId && (
+                                        <span className="text-xs bg-purple-600 px-2 py-1 rounded">You</span>
+                                    )}
+                                    {isHost && player.id !== gameState.host && (
+                                        <button
+                                            onClick={() => void removePlayerFromLobby(player.id)}
+                                            disabled={!offline}
+                                            aria-label={`Remove ${player.name}`}
+                                            title={offline ? 'Remove player' : 'Player is connected'}
+                                            className="p-1 hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        >
+                                            <UserX size={16} className="text-red-400" />
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
                 {isHost ? (
