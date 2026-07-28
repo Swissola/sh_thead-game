@@ -17,16 +17,23 @@ function generateRoomCode(): string {
         .toUpperCase();
 }
 
+export interface MenuScreenProps {
+    /** D-15: uppercased room code parsed from a `/join/:code` deep link by
+     * App.tsx, or '' when the app was opened normally. Seeds the room-code
+     * input's initial value only - never auto-submits (see Plan 02-10 Task 3). */
+    initialRoomCode?: string;
+}
+
 /**
  * Room creation/joining/test-mode entry, extracted from App.tsx:929-997
  * (pre-refactor line numbers). All blocking browser alerts converted to
  * showToast() calls per ENGINE-05/D-05/D-06/D-07.
  */
-export function MenuScreen() {
+export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
     const [playerName, setPlayerName] = useState('');
     // Not named `roomCode` - the room's actual code lives on gameState.roomCode
     // once one exists; this local field is only the join-room text input.
-    const [roomCodeInput, setRoomCodeInput] = useState('');
+    const [roomCodeInput, setRoomCodeInput] = useState(() => initialRoomCode.toUpperCase());
     const { setGameState, setTestMode, playerId, setControllingPlayer, showToast } = useGameContext();
 
     const createTestGame = () => {
