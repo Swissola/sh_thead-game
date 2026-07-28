@@ -1,7 +1,29 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useEffect } from 'react';
 import { render, screen } from '@testing-library/react';
 import '../storage';
+
+// LobbyScreen (plan 02-11) now calls usePresence, which lazily requests the
+// Supabase client - without this mock, rendering the lobby branch below
+// throws on missing VITE_SUPABASE_* env vars, same pattern as
+// LobbyScreen.test.tsx/useGameState.test.ts.
+vi.mock('../supabase/client', () => ({
+    getSupabaseClient: vi.fn(() => ({
+        functions: { invoke: vi.fn().mockResolvedValue({ data: {}, error: null }) },
+        channel: vi.fn(() => ({
+            on: vi.fn(function (this: unknown) {
+                return this;
+            }),
+            subscribe: vi.fn(function (this: unknown) {
+                return this;
+            }),
+            track: vi.fn().mockResolvedValue(undefined),
+            presenceState: vi.fn(() => ({})),
+        })),
+        removeChannel: vi.fn(),
+    })),
+}));
+
 import { GameProvider, useGameContext } from '../context/GameContext';
 import { Router } from '../App';
 import { buildGameState, buildPlayer } from './testUtils/buildGameState';

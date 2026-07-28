@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Users, Copy, Check, Crown, Link2 } from 'lucide-react';
+import { Users, Copy, Check, Crown, Link2, WifiOff, UserX } from 'lucide-react';
 import { useGameContext } from '../context/GameContext';
 import { getSupabaseClient } from '../supabase/client';
 import type { EdgeResult } from '../supabase/roomTypes';
+import { usePresence } from '../hooks/usePresence';
 
 /**
  * Room code display, player list, host-only start button, extracted from
@@ -14,9 +15,10 @@ import type { EdgeResult } from '../supabase/roomTypes';
  * `applyServerRoom`.
  */
 export function LobbyScreen() {
-    const { gameState, playerId, applyServerRoom, showToast } = useGameContext();
+    const { gameState, playerId, applyServerRoom, showToast, testMode } = useGameContext();
     const [copied, setCopied] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
+    const { isPlayerOffline } = usePresence({ roomCode: gameState?.roomCode ?? '', playerId, testMode });
 
     const copyRoomCode = () => {
         if (!gameState) return;
@@ -58,6 +60,35 @@ export function LobbyScreen() {
         }
     };
 
+    // D-07: the host removes an AFK player. The disabled-for-connected-players
+    // state below is purely a UI affordance (T-02-38) - removePlayer itself
+    // independently re-checks caller === state.host and the lobby phase.
+    const removePlayerFromLobby = async (targetPlayerId: string) => {
+        if (!gameState) return;
+        try {
+            const { data, error } = await getSupabaseClient().functions.invoke('remove-player', {
+                body: { roomCode: gameState.roomCode, targetPlayerId },
+            });
+            if (error) {
+                showToast('Failed to remove player - please retry.');
+                return;
+            }
+            const result = data as EdgeResult | undefined;
+            if (result?.error) {
+                showToast(result.error.message, result.error.code);
+                return;
+            }
+            if (result?.room) {
+                applyServerRoom(result.room);
+            }
+        } catch {
+            showToast('Failed to remove player - please retry.');
+        }
+    };
+
+    // D-08: derived fresh from gameState on every render (not memoised or
+    // cached) so a server-side host transfer moves the Crown/Start Game
+    // button on the very next Realtime payload with no extra client logic.
     const isHost = gameState?.host === playerId;
 
     return (
@@ -105,20 +136,40 @@ export function LobbyScreen() {
                         </h2>
                     </div>
                     <div className="space-y-2">
-                        {gameState?.players.map((player) => (
-                            <div
-                                key={player.id}
-                                className="flex items-center gap-3 bg-slate-700 rounded-lg p-3"
-                            >
-                                {player.id === gameState.host && (
-                                    <Crown size={20} className="text-yellow-400" />
-                                )}
-                                <span className="text-white font-semibold flex-1">{player.name}</span>
-                                {player.id === playerId && (
-                                    <span className="text-xs bg-purple-600 px-2 py-1 rounded">You</span>
-                                )}
-                            </div>
-                        ))}
+                        {gameState?.players.map((player) => {
+                            const offline = isPlayerOffline(player.id);
+                            return (
+                                <div
+                                    key={player.id}
+                                    className={`flex items-center gap-3 bg-slate-700 rounded-lg p-3 ${offline ? 'opacity-60 border-2 border-slate-600' : ''}`}
+                                >
+                                    {player.id === gameState.host && (
+                                        <Crown size={20} className="text-yellow-400" />
+                                    )}
+                                    <span className="text-white font-semibold flex-1">{player.name}</span>
+                                    {offline && (
+                                        <span className="text-xs px-2 py-1 rounded bg-slate-600 text-slate-300 flex items-center gap-1">
+                                            <WifiOff size={12} />
+                                            Offline
+                                        </span>
+                                    )}
+                                    {player.id === playerId && (
+                                        <span className="text-xs bg-purple-600 px-2 py-1 rounded">You</span>
+                                    )}
+                                    {isHost && player.id !== gameState.host && (
+                                        <button
+                                            onClick={() => void removePlayerFromLobby(player.id)}
+                                            disabled={!offline}
+                                            aria-label={`Remove ${player.name}`}
+                                            title={offline ? 'Remove player' : 'Player is connected'}
+                                            className="p-1 hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        >
+                                            <UserX size={16} className="text-red-400" />
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
                 {isHost ? (
