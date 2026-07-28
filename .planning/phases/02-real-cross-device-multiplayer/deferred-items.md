@@ -146,3 +146,43 @@ boundary rules.
   `playerId` is never read from the request body). Not directly verifiable against the
   live handler in this worktree; flagged for Wave 3/4 integration to confirm the
   invoked function name and body shape match once 02-07 merges.
+
+## Plan 02-12
+
+- **`npm run lint` still exits 1** - down to two pre-existing issues by this point (the
+  `App.tsx:32` `react-hooks/exhaustive-deps` warning logged under Plan 02-01 no longer
+  reproduces; `App.tsx` was substantially rewritten by 02-10's identity/Realtime work):
+  - `src/context/GameContext.tsx:142` - `react-refresh/only-export-components`
+  - `src/screens/GameScreen.tsx:107` - `react-hooks/set-state-in-effect`, in the
+    pre-existing celebration-modal effect (unrelated to this plan's offline-badge or
+    turn-timeout-sweep effects added lower in the same file)
+  - Confirmed pre-existing via `git show 2200042:src/screens/GameScreen.tsx` - the exact
+    `setCelebrationModal({...})` call inside the celebration effect is present verbatim
+    at this worktree's base commit, before any of this plan's edits. `GameContext.tsx`
+    was not touched by this plan at all (read-only). Not re-fixed here per scope
+    boundary; still carried forward for the same future lint-cleanup pass.
+  - This plan's own new hook (`src/hooks/useTurnTimeoutSweep.ts`) initially tripped
+    three *new* `react-hooks`/React Compiler rules this project's config enforces
+    strictly (`react-hooks/set-state-in-effect`, `react-hooks/refs` - no ref
+    reads/writes during render, `react-hooks/purity` - no impure calls like `Date.now()`
+    during render). Fixed directly (Rule 1, within this plan's own file): `graceExpired`
+    is tracked together with an "arm key" string in one `useState` object, reset via
+    React's documented "adjusting state when a prop changes" render-body pattern
+    (comparing the key and calling `setState` directly in the render body - not a ref,
+    not an effect) rather than an effect-body `setState` call or a `Date.now()`-based
+    pure render computation; the value is otherwise only ever updated from inside the
+    `setInterval` callback the effect registers. Confirmed clean via
+    `npx eslint src/hooks/useTurnTimeoutSweep.ts src/__tests__/hooks/useTurnTimeoutSweep.test.ts`
+    (zero output).
+- **Task 3's acceptance criterion `grep -c '>Cancel<' src/screens/GameScreen.tsx` is 1**
+  cannot be satisfied literally under this project's Prettier config (100-char
+  `printWidth`, 2-space `tabWidth`) - the pick-up dialog's "Cancel" button text has
+  always rendered on its own line (`>\n  Cancel\n<`), confirmed via
+  `git show 2200042:src/screens/GameScreen.tsx`, i.e. **before** this plan's Task 3
+  touched the file at all. The underlying intent (the pre-existing pick-up dialog's own
+  "Cancel" label was not renamed by this plan's new Leave Game dialog) holds and is
+  covered by a passing test (`getByText('Cancel')` still resolves after Task 3's
+  changes); the literal grep pattern is a plan-authoring assumption about formatting
+  that predates this plan and does not match the codebase's actual (and unmodified)
+  Prettier output. Not "fixed" by hand-collapsing the JSX against the formatter's own
+  output, since that would just be undone by the next `npm run format`.
