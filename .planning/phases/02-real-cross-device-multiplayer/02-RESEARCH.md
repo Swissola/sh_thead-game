@@ -363,7 +363,8 @@ if (!session) {
 **D-02 fallback (unrecoverable session):** manual rejoin by room code + name; `join-room` Edge Function implements D-06's exactly-one-disconnected-name-match rule before deciding "rejoin existing seat" vs "new player".
 
 ### Pattern 5: Presence for disconnect display (MPLAY-06) - separate from D-05's timeout
-**What:** A per-room Realtime channel where every connected client `track()`s its own presence; `sync`/`join`/`leave` events drive the D-10 offline badges. This is unrelated to and does not drive the D-05 turn-timeout - Presence can flicker (tab backgrounded, brief network blip) well before/without a full 60-second turn timeout, and conversely a player can remain "present" while simply not acting on their turn.
+**What:** A per-room Realtime channel where every connected client `track()`s its own presence; `sync`/`join`/`leave` events drive the D-10 offline badges. Realtime Presence itself still does not drive the D-05 turn-timeout - Presence can flicker (tab backgrounded, brief network blip) well before/without a full 60-second turn timeout, so it stays display-only.
+**Revised 2026-07-28:** D-05's grace-period pickup *does* now additionally require the current-turn player to be stale on `player_seen` (the server-verified heartbeat signal both D-06 and D-08 already use) - the original turn-duration-only check let a fully present player who simply hadn't acted yet be auto-picked-up, which is exactly the ambiguity this pattern's own next sentence used to warn about ("a player can remain 'present' while simply not acting on their turn" - true for ephemeral Realtime Presence, but `player_seen` is a different, server-verified signal, not that same ambiguous one). See `02-CONTEXT.md`'s D-05 entry for the corrected behaviour.
 **Example:**
 ```typescript
 // Source: supabase.com/docs/guides/realtime/presence (official docs, verified 2026-07-26)

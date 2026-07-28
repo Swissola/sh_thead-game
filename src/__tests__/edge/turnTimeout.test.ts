@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { checkTurnTimeout } from '../../../supabase/functions/_shared/turnTimeout';
 import type { RoomStore, RoomUpdatePatch, MoveLogEntry } from '../../../supabase/functions/_shared/db';
-import { EDGE_ERROR_CODES, TURN_GRACE_MS, type RoomRow } from '../../supabase/roomTypes';
+import { DISCONNECT_THRESHOLD_MS, EDGE_ERROR_CODES, TURN_GRACE_MS, type RoomRow } from '../../supabase/roomTypes';
 import { ERROR_CODES } from '../../engine/errors';
 import type { GameState } from '../../types';
 import { buildGameState, buildPlayer, buildCard } from '../testUtils/buildGameState';
@@ -177,5 +177,77 @@ describe('checkTurnTimeout (D-05)', () => {
 
         expect(result.error).toBeUndefined();
         expect(result.room?.state.lastAction).toContain('Alice');
+    });
+
+    describe('connectivity gate (revised after 02-13 Task 3)', () => {
+        it('returns TIMEOUT_NOT_ELAPSED and writes nothing when the turn timer has elapsed but the current-turn player is still connected', async () => {
+            const now = afterMs(TURN_GRACE_MS + 1);
+            const store = new FakeRoomStore(
+                makeRoomRow({
+                    state: playingState(),
+                    player_seen: { p0: afterMs(TURN_GRACE_MS + 1 - DISCONNECT_THRESHOLD_MS + 1000) },
+                }),
+                now
+            );
+
+            const result = await checkTurnTimeout(store, { roomCode: 'ABC123' });
+
+            expect(result.error?.code).toBe(EDGE_ERROR_CODES.TIMEOUT_NOT_ELAPSED);
+            expect(store.writeCount).toBe(0);
+        });
+
+        it('picks up as normal once the turn timer has elapsed and the current-turn player is also stale by DISCONNECT_THRESHOLD_MS', async () => {
+            const store = new FakeRoomStore(
+                makeRoomRow({
+                    state: playingState(),
+                    player_seen: { p0: afterMs(TURN_GRACE_MS + 1 - DISCONNECT_THRESHOLD_MS - 1000) },
+                }),
+                afterMs(TURN_GRACE_MS + 1)
+            );
+
+            const result = await checkTurnTimeout(store, { roomCode: 'ABC123' });
+
+            expect(result.error).toBeUndefined();
+            expect(result.room?.state.currentTurn).not.toBe(0);
+        });
+
+        it('picks up as normal when the current-turn player has no player_seen entry at all - no evidence of connectivity to withhold the pickup for', async () => {
+            const store = new FakeRoomStore(makeRoomRow({ state: playingState() }), afterMs(TURN_GRACE_MS + 1));
+
+            const result = await checkTurnTimeout(store, { roomCode: 'ABC123' });
+
+            expect(result.error).toBeUndefined();
+            expect(store.writeCount).toBe(1);
+        });
+
+        it('withholding the pickup for a connected player does not touch turn_started_at, so the next sweep still sees the same elapsed time', async () => {
+            const store = new FakeRoomStore(
+                makeRoomRow({
+                    state: playingState(),
+                    player_seen: { p0: afterMs(TURN_GRACE_MS + 1) },
+                }),
+                afterMs(TURN_GRACE_MS + 1)
+            );
+
+            await checkTurnTimeout(store, { roomCode: 'ABC123' });
+
+            expect(store.rooms.get('ABC123')?.turn_started_at).toBe(TURN_STARTED_AT);
+        });
+
+        it("a different player's stale player_seen entry does not affect the current-turn player's connectivity check", async () => {
+            const store = new FakeRoomStore(
+                makeRoomRow({
+                    state: playingState(),
+                    // p0 (currentTurn) is fresh; p1's staleness is irrelevant to p0's pickup.
+                    player_seen: { p0: afterMs(TURN_GRACE_MS + 1), p1: afterMs(0) },
+                }),
+                afterMs(TURN_GRACE_MS + 1)
+            );
+
+            const result = await checkTurnTimeout(store, { roomCode: 'ABC123' });
+
+            expect(result.error?.code).toBe(EDGE_ERROR_CODES.TIMEOUT_NOT_ELAPSED);
+            expect(store.writeCount).toBe(0);
+        });
     });
 });
