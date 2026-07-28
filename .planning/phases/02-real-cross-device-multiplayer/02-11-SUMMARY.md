@@ -123,3 +123,7 @@ None - no external service configuration required.
 ---
 *Phase: 02-real-cross-device-multiplayer*
 *Completed: 2026-07-28*
+
+## Self-Check: PASSED
+
+All claimed files (`02-11-SUMMARY.md`, `src/screens/LobbyScreen.tsx`, `src/__tests__/screens/LobbyScreen.test.tsx`, `src/__tests__/App.test.tsx`) exist on disk. All 7 claimed commit hashes (`ca8b8fe`, `3a0a59a`, `674d2e4`, `856a29d`, `a90a1b4`, `c267eaa`, `13f4cfe`) are present in this worktree branch's history.
