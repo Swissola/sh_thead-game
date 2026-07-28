@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { HelpCircle, RotateCw, WifiOff, X } from 'lucide-react';
+import { HelpCircle, LogOut, RotateCw, WifiOff, X } from 'lucide-react';
 import * as GameLogic from '../gameLogic';
 import type { Card as CardType, CardSelection } from '../types';
 import { Card } from '../components/Card';
@@ -40,6 +40,7 @@ export function GameScreen({
     setControllingPlayer,
     showToast,
     turnStartedAt,
+    setGameState,
   } = useGameContext();
 
   const { selectedCards, setSelectedCards, revealedFaceDown, setRevealedFaceDown } = useSelection();
@@ -58,6 +59,7 @@ export function GameScreen({
     show: boolean;
     playerIndex: number;
   } | null>(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [celebrationModal, setCelebrationModal] = useState<{
     show: boolean;
     playerName: string;
@@ -260,6 +262,19 @@ export function GameScreen({
     setPickUpConfirmation(null);
   };
 
+  // D-14: leaving is a purely local "stop looking at this room" - no Edge
+  // Function call, no server write. D-04 guarantees the seat is never freed,
+  // so the player's cards/seat/turn position stay in the room's state and
+  // D-01 auto-rejoin puts them straight back. Clearing gameState also drops
+  // the room code useRoomSubscription/usePresence are keyed on, so both
+  // channels tear themselves down through their existing cleanup.
+  const confirmLeaveGame = () => {
+    setSelectedCards([]);
+    setRevealedFaceDown(null);
+    setShowLeaveConfirm(false);
+    void setGameState(null);
+  };
+
   /**
    * Build the move object exactly as App.tsx:461-834 did, then dispatch it
    * through dispatchMove in one shot - applyMove computes the authoritative
@@ -449,6 +464,14 @@ export function GameScreen({
                   title="Rules"
                 >
                   <HelpCircle size={24} className="text-white" />
+                </button>
+                <button
+                  onClick={() => setShowLeaveConfirm(true)}
+                  className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                  title="Leave Game"
+                  aria-label="Leave Game"
+                >
+                  <LogOut size={24} className="text-white" />
                 </button>
                 <div className="text-right">
                   <p className="text-sm text-slate-400">
@@ -807,6 +830,33 @@ export function GameScreen({
                   className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
                 >
                   Pick Up Anyway
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {showLeaveConfirm &&
+        createPortal(
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-slate-800 border-2 border-purple-500 rounded-lg p-6 max-w-md shadow-2xl">
+              <h2 className="text-xl font-bold text-white mb-4">Leave game?</h2>
+              <p className="text-slate-300 mb-6">
+                You can rejoin any time with the same room code - your seat will be waiting.
+              </p>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setShowLeaveConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
+                >
+                  Keep Playing
+                </button>
+                <button
+                  onClick={confirmLeaveGame}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
+                >
+                  Leave Game
                 </button>
               </div>
             </div>

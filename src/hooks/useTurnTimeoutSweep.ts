@@ -24,6 +24,11 @@ export interface UseTurnTimeoutSweepResult {
   graceExpired: boolean;
 }
 
+interface SweepState {
+  armKey: string;
+  graceExpired: boolean;
+}
+
 /**
  * Client-side trigger for the check-turn-timeout Edge Function (D-05) - the
  * missing Browser/Client half of RESEARCH.md's Architectural Responsibility
@@ -37,10 +42,13 @@ export interface UseTurnTimeoutSweepResult {
  * caller was early (T-02-24). A client that lies about its clock achieves
  * nothing, which is why any authenticated player in the room may call it.
  *
- * Follows usePresence.ts's hook shape: useState for the derived value,
- * useRef for the interval handle (and here, an in-flight guard), one
- * useEffect that short-circuits, arms and tears down, returning a small
- * plain object.
+ * graceExpired only ever changes from inside the setInterval callback (an
+ * external-system update, not the effect body itself) - the officially
+ * documented shape for calling setState from an effect. The one exception
+ * is the arm-key comparison below: React's own "adjusting state when a prop
+ * changes" pattern (calling setState directly in the render body, not a
+ * ref, not an effect) resets graceExpired to false the instant a new turn
+ * starts, rather than waiting up to TURN_SWEEP_INTERVAL_MS for the next tick.
  */
 export function useTurnTimeoutSweep({
   roomCode,
@@ -50,15 +58,17 @@ export function useTurnTimeoutSweep({
   currentTurnPlayerId,
   playerId,
 }: UseTurnTimeoutSweepArgs): UseTurnTimeoutSweepResult {
-  const [graceExpired, setGraceExpired] = useState(false);
+  const armKey = `${roomCode}|${String(testMode)}|${phase}|${turnStartedAt}|${currentTurnPlayerId ?? ''}|${playerId}`;
+  const [state, setState] = useState<SweepState>({ armKey, graceExpired: false });
+
+  if (state.armKey !== armKey) {
+    setState({ armKey, graceExpired: false });
+  }
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inFlightRef = useRef(false);
 
   useEffect(() => {
-    // A changed turnStartedAt (new turn) resets the flag immediately,
-    // before waiting for the next tick to re-evaluate.
-    setGraceExpired(false);
-
     if (testMode || !roomCode || phase !== 'playing' || !turnStartedAt) {
       return;
     }
@@ -66,7 +76,9 @@ export function useTurnTimeoutSweep({
     const tick = () => {
       const elapsedMs = Date.now() - Date.parse(turnStartedAt);
       const expired = elapsedMs >= TURN_GRACE_MS;
-      setGraceExpired(expired);
+      setState((prev) =>
+        prev.graceExpired === expired ? prev : { ...prev, graceExpired: expired }
+      );
 
       if (!expired) return;
 
@@ -101,5 +113,5 @@ export function useTurnTimeoutSweep({
     };
   }, [roomCode, testMode, phase, turnStartedAt, currentTurnPlayerId, playerId]);
 
-  return { graceExpired };
+  return { graceExpired: state.graceExpired };
 }
