@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-07-27T20:59:00.000Z"
-last_activity: "2026-07-27 -- Plans 02-07 and 02-08 merged into stage-1-refactor"
+last_updated: "2026-07-28T06:48:00.000Z"
+last_activity: "2026-07-28 -- Plan 02-09 merged into stage-1-refactor"
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 20
-  completed_plans: 15
+  completed_plans: 16
   percent: 14
 ---
 
@@ -25,16 +25,18 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-08 — COMPLETE and merged (both tasks: useRoomSubscription, usePresence); 02-07 also
-COMPLETE and merged (D-05 grace-period auto-pickup, D-08 heartbeat/host transfer, D-07
-host-removes-player)
-Status: 8/13 plans complete and merged into stage-1-refactor (02-01..02-08); 02-09 still
-executing in its own worktree, not yet merged
-Last activity: 2026-07-27 -- Plans 02-07 (server-side disconnect handling) and 02-08 (Realtime
-room subscription + presence) both merged; useRoomSubscription/usePresence tested (18 new
-tests), heartbeat/turnTimeout/removePlayer tested and passing scripts/check-edge-wrappers.mjs
+Plan: 02-09 — COMPLETE and merged (both tasks: submitMove edge-function invocation,
+optimistic dispatch/applyServerRoom/notifyReconciled in GameContext); 02-08 and 02-07 also
+COMPLETE and merged
+Status: 9/13 plans complete and merged into stage-1-refactor (02-01..02-09). Next up: 02-10
+(App.tsx/MenuScreen.tsx wiring to identity, Realtime and create/join edge functions) — wave 4,
+depends_on 02-04/02-05/02-08/02-09, all now satisfied
+Last activity: 2026-07-28 -- Resumed after a session-limit interruption: found 8 stale worktrees
+left over from prior sessions (7 already fully merged, 1 a superseded duplicate 02-09 attempt
+branched before 02-05..02-08 existed) and removed them all; completed and merged the live 02-09
+worktree (13 new tests, GameContext.tsx/useGameState.ts)
 
-Progress: [███████░░░] 70%
+Progress: [█████████░] 69%
 
 **Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
 present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
@@ -54,6 +56,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 |-------|-------|-------|----------|
 | Phase 02 P07 | 1 | 25min | 3 tasks, 10 files |
 | Phase 02 P08 | 1 | 35min | 2 tasks, 5 files |
+| Phase 02 P09 | 1 | - | 2 tasks, 4 files |
 
 **Recent Trend:**
 
@@ -76,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 02-07]: checkTurnTimeout takes no playerId - any authenticated player may trigger the lazy sweep, since authorisation is temporal (server clock) not identity-based
 - [Phase 02-07]: heartbeat folds transferHostIfStale into the same write, restricted to the lobby phase, rather than a separate scheduled job
 - [Phase 02-08]: useRoomSubscription signals reconciliation from the Realtime broadcast callback, not the functions.invoke() response, per RESEARCH.md Pattern 3
+- [Phase 02-09]: submitMove never awaits the server before returning; the optimistic update is synchronous and the Realtime broadcast (applyServerRoom), not the invoke response, is the authoritative correction
+- [Phase 02-09]: 'RECONCILED' is a client-side toast sentinel, not added to the engine's closed ERROR_CODES (Phase 1 D-04) — reconciliation is a networking concept, not an illegal move
 
 ### Pending Todos
 
@@ -87,10 +92,18 @@ None yet.
 
 [Issues that affect future work]
 
-None yet. Note for Phase 1 planning: codebase audit found `App.tsx` mutates
+Note for Phase 1 planning: codebase audit found `App.tsx` mutates
 state in place (`playCards`, `App.tsx:461-834`), `playerId` is never actually
 set (`App.tsx:62`), and rules logic is duplicated across `App.tsx`/`Hand.tsx`/
 `Table.tsx` — all in scope for Phase 1, not new discoveries to re-investigate.
+
+- **2 known-failing tests in `src/__tests__/screens/MenuScreen.test.tsx`** ("Create Room...
+  room code (WR-03)" and "Join on a valid, waiting room... (WR-02)") since 02-09 merged.
+  `MenuScreen.tsx` still uses the legacy `window.storage`-based create/join flow; 02-09
+  removed the storage write from `GameContext.setGameState` that flow depended on. Plan
+  02-10 (`depends_on` 02-04/02-05/02-08/02-09, all now merged) explicitly rewires
+  `MenuScreen.tsx` onto the `create-room`/`join-room` edge functions and updates this test
+  file — expected to resolve there, not a new regression to chase separately.
 
 ## Deferred Items
 
@@ -102,6 +115,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-27T20:59:00.000Z
-Stopped at: Completed 02-07-PLAN.md and 02-08-PLAN.md
+Last session: 2026-07-28T06:48:00.000Z
+Stopped at: Completed and merged 02-09-PLAN.md; all stale worktrees cleaned up. Ready to
+plan/execute 02-10 (App.tsx + MenuScreen.tsx wiring).
 Resume file: None
