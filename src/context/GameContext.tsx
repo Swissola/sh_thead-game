@@ -1,9 +1,10 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react';
 import { applyMove } from '../engine/applyMove';
 import type { Move } from '../engine/moves';
 import type { GameState } from '../types';
+import type { ServerRoom } from '../supabase/roomTypes';
 import { useGameStateUpdater } from '../hooks/useGameState';
-import { useToast, type ToastState } from '../hooks/useToast';
+import { useToast, type ToastState, type ToastVariant } from '../hooks/useToast';
 
 /**
  * GameContextValue - the complete context surface consumed by Plan 01-05's
@@ -11,13 +12,22 @@ import { useToast, type ToastState } from '../hooks/useToast';
  * Approach A (RESEARCH.md): calls applyMove directly, no useReducer, so the
  * caller and the toast share one code path with no double-computation
  * (resolves Pitfall 3 - useReducer cannot report per-dispatch failure).
+ *
+ * Plan 02-09 extends this with the MPLAY-05 optimistic-dispatch/reconcile
+ * pair: dispatchMove now submits to the server after applying locally,
+ * applyServerRoom is the D-11 "always snap to server truth" seam fed by
+ * useRoomSubscription, and notifyReconciled raises the distinct D-12 toast.
  */
 export interface GameContextValue {
     gameState: GameState | null;
     dispatchMove: (move: Move) => void;
     setGameState: (state: GameState | null) => Promise<void>;
+    applyServerRoom: (room: ServerRoom) => void;
+    notifyReconciled: () => void;
+    roomVersion: number;
+    turnStartedAt: string;
     toast: ToastState | null;
-    showToast: (message: string, code?: string) => void;
+    showToast: (message: string, code?: string, variant?: ToastVariant) => void;
     dismissToast: () => void;
     currentPlayerId: string;
     playerId: string;
@@ -33,12 +43,21 @@ export function GameProvider({ playerId, children }: { playerId: string; childre
     const [gameState, setGameStateInternal] = useState<GameState | null>(null);
     const [testMode, setTestMode] = useState(false);
     const [controllingPlayer, setControllingPlayer] = useState(0);
+    const [roomVersion, setRoomVersion] = useState(0);
+    const [turnStartedAt, setTurnStartedAt] = useState('');
     const { toast, show: showToast, dismiss: dismissToast } = useToast();
+
+    // Tracks the last-applied server version outside React state so
+    // applyServerRoom's stale-version check (T-02-32) reads the current
+    // value synchronously rather than a closure captured at render time.
+    const roomVersionRef = useRef(0);
 
     // D-10 cleanup: roomCode is derived from gameState each render, not a separate
     // state field - removes the dual-purpose roomCode state bug present in App.tsx.
     const roomCode = gameState?.roomCode ?? '';
-    const updateGameState = useGameStateUpdater(testMode, roomCode, setGameStateInternal, showToast);
+    // Plan 02-09: the storage write is gone - submitMove applies the optimistic
+    // state locally then submits to the apply-move Edge Function (MPLAY-05).
+    const submitMove = useGameStateUpdater(testMode, roomCode, setGameStateInternal, showToast);
 
     // D-10 cleanup: computed once here, replacing the four duplicate
     // `const currentPlayerId = testMode ? ... : playerId` lines in App.tsx.
@@ -52,35 +71,55 @@ export function GameProvider({ playerId, children }: { playerId: string; childre
                 showToast(result.error.message, result.error.code);
                 return;
             }
-            // CR-02: updateGameState is async and already handles/reports its own
-            // storage-write failures via showToast - `void` marks this as an
-            // intentional fire-and-forget rather than an accidental floating promise.
-            void updateGameState(result.state);
+            // The client-side legal-move filter above is what makes D-11's races
+            // rare in the first place - submitMove applies result.state locally
+            // for instant feedback, then submits it to the server. Neither the
+            // server's acceptance nor its rejection is awaited here: the
+            // Realtime broadcast (applyServerRoom) is the authoritative
+            // correction regardless of how apply-move responds.
+            submitMove(move, result.state);
         },
-        [gameState, updateGameState, showToast]
+        [gameState, submitMove, showToast]
     );
 
-    // D-10 cleanup: the single persistence path for room creation/joining/starting -
-    // Plan 01-05's MenuScreen/LobbyScreen call this instead of duplicating
-    // window.storage.set calls outside the useGameStateUpdater seam.
-    const setGameState = useCallback(
-        async (state: GameState | null) => {
-            if (state === null) {
-                setGameStateInternal(null);
-                return;
-            }
-            if (!testMode) {
-                await window.storage.set(`game:${state.roomCode}`, JSON.stringify(state), true);
-            }
-            setGameStateInternal(state);
-        },
-        [testMode]
-    );
+    // D-10 cleanup: the single local-state setter for room creation/joining/starting -
+    // Plan 01-05's MenuScreen/LobbyScreen call this rather than setting state directly.
+    //
+    // Plan 02-09 (MPLAY-04): client code is no longer a writer of game state in
+    // any mode - the only write path left is an Edge Function. This stays
+    // async so existing `await setGameState(...)` call sites keep compiling.
+    const setGameState = useCallback(async (state: GameState | null) => {
+        setGameStateInternal(state);
+    }, []);
+
+    // D-11's "always snap to server truth": ignores anything at or below the
+    // last-applied version (T-02-32 - the optimistic value is never treated
+    // as authoritative), otherwise replaces gameState with the server's copy
+    // and records its version/turnStartedAt for GameScreen's timeout check.
+    const applyServerRoom = useCallback((room: ServerRoom) => {
+        if (room.version <= roomVersionRef.current) return;
+        roomVersionRef.current = room.version;
+        setGameStateInternal(room.state);
+        setRoomVersion(room.version);
+        setTurnStartedAt(room.turnStartedAt);
+    }, []);
+
+    // D-12's deliberate departure from Phase 1's one-style-for-all-errors
+    // rule: 'RECONCILED' is a client-side networking sentinel, not a member
+    // of the engine's closed ERROR_CODES set (Phase 1 D-04) - reconciliation
+    // is not an illegal move.
+    const notifyReconciled = useCallback(() => {
+        showToast("Your move didn't stick - synced with the latest game state.", 'RECONCILED', 'reconcile');
+    }, [showToast]);
 
     const value: GameContextValue = {
         gameState,
         dispatchMove,
         setGameState,
+        applyServerRoom,
+        notifyReconciled,
+        roomVersion,
+        turnStartedAt,
         toast,
         showToast,
         dismissToast,
