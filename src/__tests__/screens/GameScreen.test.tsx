@@ -465,7 +465,9 @@ describe('GameScreen', () => {
 
             renderGame('test-player', state, { isPlayerOffline, testMode: true });
 
-            await screen.findByText('Bob');
+            // Test Mode's "CONTROL PLAYER" <select> also lists each player's name
+            // as an option, so "Bob" is not unique here - wait on that instead.
+            await screen.findAllByText('Bob');
             expect(screen.queryByText('Offline')).not.toBeInTheDocument();
         });
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { HelpCircle, X } from 'lucide-react';
+import { HelpCircle, WifiOff, X } from 'lucide-react';
 import * as GameLogic from '../gameLogic';
 import type { Card as CardType, CardSelection } from '../types';
 import { Card } from '../components/Card';
@@ -26,9 +26,19 @@ const getOrdinalLabel = (n: number): string => {
  * 01-07 - dispatches through GameContext's dispatchMove (D-08) rather than
  * mutating gameState directly.
  */
-export function GameScreen() {
-    const { gameState, dispatchMove, currentPlayerId, testMode, controllingPlayer, setControllingPlayer } =
-        useGameContext();
+export function GameScreen({
+    isPlayerOffline = () => false,
+}: { isPlayerOffline?: (id: string) => boolean } = {}) {
+    const {
+        gameState,
+        dispatchMove,
+        currentPlayerId,
+        playerId,
+        testMode,
+        controllingPlayer,
+        setControllingPlayer,
+        showToast,
+    } = useGameContext();
 
     const { selectedCards, setSelectedCards, revealedFaceDown, setRevealedFaceDown } = useSelection();
     const { handSortMode, setHandSortMode } = useHandSorting('original');
@@ -110,6 +120,35 @@ export function GameScreen() {
             if (celebrationTimeoutRef.current) clearTimeout(celebrationTimeoutRef.current);
         };
     }, []);
+
+    // D-10: tracks each player's last-known offline value so only a genuine
+    // true->false transition raises a reconnect toast - not a re-render, and
+    // not the initial mount (every player who is already online at mount
+    // would otherwise raise a spurious toast). Seeded once on first run.
+    const lastOfflineRef = useRef<Record<string, boolean>>({});
+    const offlineSeededRef = useRef(false);
+
+    useEffect(() => {
+        if (!gameState) return;
+
+        const nextOffline: Record<string, boolean> = {};
+        for (const player of gameState.players) {
+            nextOffline[player.id] = !testMode && player.id !== playerId && isPlayerOffline(player.id);
+        }
+
+        if (!offlineSeededRef.current) {
+            offlineSeededRef.current = true;
+            lastOfflineRef.current = nextOffline;
+            return;
+        }
+
+        for (const player of gameState.players) {
+            if (lastOfflineRef.current[player.id] && !nextOffline[player.id]) {
+                showToast(`${player.name} reconnected`, 'RECONNECTED', 'reconnect');
+            }
+        }
+        lastOfflineRef.current = nextOffline;
+    }, [gameState, testMode, playerId, isPlayerOffline, showToast]);
 
     // Intercept console.log in test mode, ported from App.tsx:356-386.
     useEffect(() => {
@@ -593,6 +632,13 @@ export function GameScreen() {
                             gameState.phase === 'playing' && gameState.players[gameState.currentTurn]?.id === player.id;
                         const isControlling = testMode && index === controllingPlayer;
                         const isClickable = testMode;
+                        // !testMode guard matters: usePresence reports an empty online
+                        // set in Test Mode (CLAUDE.md - Test Mode never touches the
+                        // network), so without it every tile would render offline.
+                        // Compared against playerId, not currentPlayerId, so the local
+                        // player's own tile never greys out, even in Test Mode where
+                        // currentPlayerId follows whichever player is being controlled.
+                        const isOffline = !testMode && player.id !== playerId && isPlayerOffline(player.id);
 
                         return (
                             <div
@@ -608,6 +654,7 @@ export function GameScreen() {
                                     : 'bg-slate-800 border-slate-700'
                                     } ${isTheirTurn ? 'border-yellow-500 shadow-lg' : ''
                                     } ${isClickable ? 'cursor-pointer hover:border-green-400' : ''
+                                    } ${isOffline ? 'opacity-60 border-slate-600' : ''
                                     }`}
                             >
                                 <div className="flex items-center justify-between mb-2">
@@ -615,7 +662,15 @@ export function GameScreen() {
                                         {player.name}
                                         {isControlling && <span className="ml-2 text-xs text-green-400">(You)</span>}
                                     </p>
-                                    {isTheirTurn && <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />}
+                                    <div className="flex items-center gap-2">
+                                        {isOffline && (
+                                            <span className="text-xs px-2 py-1 rounded bg-slate-600 text-slate-300 flex items-center gap-1">
+                                                <WifiOff size={12} />
+                                                Offline
+                                            </span>
+                                        )}
+                                        {isTheirTurn && <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />}
+                                    </div>
                                 </div>
                                 <div className="text-xs text-slate-400 space-y-1">
                                     <div>Hand: {player.hand.filter((c): c is CardType => c !== null).length}</div>
