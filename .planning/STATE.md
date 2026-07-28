@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-07-28T12:43:00.000Z"
-last_activity: "2026-07-28 -- Wave 5 (plan 02-12) merged into stage-1-refactor"
+last_updated: "2026-07-28T19:25:00.000Z"
+last_activity: "2026-07-28 -- Plan 02-13 Tasks 1-2 merged; Task 3 (human checkpoint) awaiting the operator"
 progress:
   total_phases: 7
   completed_phases: 1
@@ -25,17 +25,23 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-12 — COMPLETE and merged (wave 5). Presence-driven offline badge + reconnect toast on
-GameScreen player tiles, client-side check-turn-timeout trigger with a state-2 auto-picking-up
-badge, and a Leave Game button with confirm dialog.
-Status: 12/13 plans complete and merged into stage-1-refactor (02-01..02-12). Only 02-13 remains
-(wave 6) — closes VALIDATION.md's Wave 0 smoke-test question. Flagged `autonomous: false` in its
-own frontmatter, so it needs a checkpoint/human decision rather than running unattended; not yet
-started.
-Last activity: 2026-07-28 -- Wave 5's executor was terminated by a session-limit API error
-mid-read, before any commits; resumed the same agent from its transcript (no work lost) and it
-completed all 3 tasks cleanly. Merged with no conflicts - GameScreen correctly received
-isPlayerOffline as a prop from Router, following the pattern fixed after wave 4.
+Plan: 02-13 — Tasks 1-2 COMPLETE and merged (wave 6). `scripts/smoke-edge-functions.mjs` now
+proves all seven Edge Functions against a live served stack (auth/identity invariants, and a
+full create→join→heartbeat→remove→start→ready-up→timeout-check lifecycle). Task 3 is a
+BLOCKING human-verify checkpoint (two-device play test against the hosted project) — not
+started, awaiting the operator.
+Status: 12/13 plans fully complete and merged (02-01..02-12); 02-13 is 2/3 tasks merged, its
+final task pending human sign-off. This is the last plan in the phase.
+Last activity: 2026-07-28 -- Plan 02-13's executor hit the account's weekly usage limit mid-task
+(twice — once on first dispatch before any commits, once again mid-debug of Task 2's audit-trail
+read-back after being resumed). Both times resumed the same agent from its transcript once the
+limit reset rather than losing progress. Running the smoke suite for real against `supabase
+functions serve` surfaced four genuine pre-existing bugs no static check or Vitest could reach:
+a missing `.ts` extension blocking every function from booting under Deno, anonymous sign-in
+left disabled on the local stack (only the hosted dashboard toggle was ever flipped), all seven
+wrappers reading the wrong JWT-claims field (`.sub` instead of `.id`) so `playerId` was silently
+`undefined`, and missing local Postgres table-level grants beneath otherwise-correct RLS
+policies. All four fixed and merged (migration `0002_local_dev_grants.sql`).
 
 Progress: [█████████░] 92%
 
@@ -61,6 +67,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 | Phase 02 P10 | 1 | ~19min | 3 tasks, 4 files |
 | Phase 02 P11 | 1 | ~10min | 3 tasks, 2 files |
 | Phase 02 P12 | 1 | ~75min | 3 tasks, 4 files (session-limit interrupted, resumed) |
+| Phase 02 P13 | 0.67 | - | 2/3 tasks, 17 files (weekly-limit interrupted twice, resumed both times) |
 
 **Recent Trend:**
 
@@ -89,6 +96,8 @@ Recent decisions affecting current work:
 - [Phase 02-11]: LobbyScreen no longer computes or writes game state itself - it only invokes start-game/remove-player and applies whatever ServerRoom comes back via applyServerRoom
 - [Wave 4 post-merge]: usePresence is called exactly once, in Router - screens receive isPlayerOffline as a prop rather than subscribing themselves, to avoid a second Presence channel/heartbeat per room
 - [Phase 02-12]: useTurnTimeoutSweep tracks its grace-expired flag together with an "arm key" string in one useState object, reset via React's render-body "adjusting state when a prop changes" pattern rather than an effect-body setState or a Date.now()-during-render call, to satisfy this project's strict react-hooks/React Compiler lint rules
+- [Phase 02-13]: chose scripted `supabase functions serve` + `fetch` over the Deno test runner for Edge Function integration testing - stubbing out `withSupabase({ auth: 'user' })`'s JWT validation to unit-test with `deno test` would test everything except the thing worth testing
+- [Phase 02-13]: `npm:@supabase/server`'s `verifyAuth` short-circuits an unauthenticated request with its own `INVALID_CREDENTIALS` shape before `ctx.userClaims`'s missing-token branch is ever reached - that branch is dead code under single `auth: 'user'` mode; the smoke suite asserts the real observable contract (401, request never reaches game logic) instead of the plan's literal `UNAUTHENTICATED` code
 
 ### Pending Todos
 
@@ -105,11 +114,22 @@ state in place (`playCards`, `App.tsx:461-834`), `playerId` is never actually
 set (`App.tsx:62`), and rules logic is duplicated across `App.tsx`/`Hand.tsx`/
 `Table.tsx` — all in scope for Phase 1, not new discoveries to re-investigate.
 
-None currently — full suite (352 tests) and build both green as of the wave 5 merge.
-`npm run lint` still exits 1 on two pre-existing, unrelated issues (`GameContext.tsx:142`
-react-refresh/only-export-components, `GameScreen.tsx:107` react-hooks/set-state-in-effect in
-the pre-existing celebration-modal effect) — confirmed present before 02-12 touched either
-file; logged in `deferred-items.md`, not yet cleaned up.
+None currently — full suite (352 tests), build, and `check-edge-wrappers.mjs` all green as of
+the 02-13 Tasks 1-2 merge. `npm run lint` still exits 1 on two pre-existing, unrelated issues
+(`GameContext.tsx:142` react-refresh/only-export-components, `GameScreen.tsx:107`
+react-hooks/set-state-in-effect in the pre-existing celebration-modal effect) — confirmed
+present before 02-12 touched either file; logged in `deferred-items.md`, not yet cleaned up.
+
+- **02-13 Task 3 is a blocking checkpoint awaiting the human operator** — a two-device manual
+  play test against the hosted Supabase project. This is the only thing standing between the
+  current state and Phase 02 being fully complete. Full checkpoint details (how-to-verify steps,
+  acceptance criteria, resume-signal) are in `.planning/phases/02-real-cross-device-multiplayer/
+  02-13-PLAN.md`'s Task 3. No SUMMARY.md for 02-13 yet — write it only after sign-off.
+- **`.claude/worktrees/agent-aea2c752cd368982d` is an orphaned directory** — `git worktree
+  remove --force` unregistered it from git but the OS refused to delete the directory itself
+  ("device or resource busy" / "permission denied", likely a Docker bind-mount or antivirus
+  lock). Confirmed harmless (not double-counted by vitest, doesn't affect builds); safe to
+  delete by hand once whatever holds the lock releases it.
 
 ## Deferred Items
 
@@ -121,8 +141,11 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T12:43:00.000Z
-Stopped at: Completed and merged wave 5 (02-12). Only 02-13 (wave 6, checkpoint) remains to
-close out Phase 02 — needs a human decision per its `autonomous: false` frontmatter before
-it can run, not a plain execute-phase dispatch.
+Last session: 2026-07-28T19:25:00.000Z
+Stopped at: Merged 02-13 Tasks 1-2. Task 3 (two-device manual play test, blocking) is the only
+work left in the entire phase — needs the human operator to run it against the hosted Supabase
+project and report back per the resume-signal ("approved" or a description of what didn't
+behave as written). Once signed off, a session needs to: tick the two Manual-Only Verifications
+rows in 02-VALIDATION.md with the date performed, record any grace-period timing feedback,
+write 02-13-SUMMARY.md, then close out Phase 02 in STATE.md/ROADMAP.md.
 Resume file: None
