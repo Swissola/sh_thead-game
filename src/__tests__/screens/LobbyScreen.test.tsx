@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useEffect } from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { useEffect, useState } from 'react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import '../../storage';
 
 vi.mock('../../supabase/client', () => ({
@@ -18,26 +18,63 @@ function threeCards(prefix: string) {
     return [buildCard({ id: `${prefix}-0` }), buildCard({ id: `${prefix}-1` }), buildCard({ id: `${prefix}-2` })];
 }
 
+type SubscribeCb = (status: string) => void;
+type PresenceHandler = (payload?: { key: string }) => void;
+
 /** A fake presence `.channel()` return value - LobbyScreen's usePresence call
- * needs a non-throwing channel even in tests that don't care about presence. */
+ * needs a non-throwing channel even in tests that don't care about presence,
+ * and offline-marker tests drive it directly via the `_fire*` helpers. */
 function makeFakeChannel() {
+    const handlers: Record<string, PresenceHandler> = {};
+    let subscribeCb: SubscribeCb | null = null;
+    let presenceKeys: string[] = [];
     const channel = {
-        on: vi.fn(() => channel),
-        subscribe: vi.fn(() => channel),
+        on: vi.fn((_type: string, config: { event: string }, handler: PresenceHandler) => {
+            handlers[config.event] = handler;
+            return channel;
+        }),
+        subscribe: vi.fn((cb?: SubscribeCb) => {
+            subscribeCb = cb ?? null;
+            return channel;
+        }),
         track: vi.fn().mockResolvedValue(undefined),
-        presenceState: vi.fn(() => ({})),
+        presenceState: vi.fn(() => Object.fromEntries(presenceKeys.map((k) => [k, [{}]]))),
+        _fireSubscribed() {
+            subscribeCb?.('SUBSCRIBED');
+        },
+        _fireSync(keys: string[]) {
+            presenceKeys = keys;
+            handlers['sync']?.();
+        },
     };
     return channel;
 }
 
 function makeFakeSupabase(invokeImpl?: (...args: unknown[]) => unknown) {
     const invoke = vi.fn(invokeImpl ?? (() => Promise.resolve({ data: {}, error: null })));
+    const channels: ReturnType<typeof makeFakeChannel>[] = [];
     const supabase = {
         functions: { invoke },
-        channel: vi.fn(() => makeFakeChannel()),
+        channel: vi.fn(() => {
+            const ch = makeFakeChannel();
+            channels.push(ch);
+            return ch;
+        }),
         removeChannel: vi.fn(),
     };
-    return { supabase, invoke };
+    return { supabase, invoke, channels };
+}
+
+/** Marks `ids` online on the first presence channel LobbyScreen's usePresence created. */
+async function markOnline(channels: ReturnType<typeof makeFakeChannel>[], ids: string[]) {
+    await waitFor(() => expect(channels.length).toBeGreaterThan(0));
+    await act(async () => {
+        channels[0]._fireSubscribed();
+        await Promise.resolve();
+    });
+    act(() => {
+        channels[0]._fireSync(ids);
+    });
 }
 
 /** Seeds gameState via the context's setGameState in an effect on mount. */
@@ -359,6 +396,198 @@ describe('LobbyScreen', () => {
             fireEvent.click(roomCodeButton);
 
             expect(writeText).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('offline markers, host removal and host transfer (D-07, D-08, D-10)', () => {
+        it('an offline player renders with opacity-60 and an Offline badge; a connected player renders unchanged', async () => {
+            const { supabase, channels } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            await markOnline(channels, ['p0']); // Alice online, Bob offline
+
+            const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
+            expect(bobRow).toHaveClass('opacity-60');
+            expect(within(bobRow).getByText('Offline')).toBeInTheDocument();
+
+            const aliceRow = screen.getByText('Alice').closest('div.flex') as HTMLElement;
+            expect(aliceRow).not.toHaveClass('opacity-60');
+            expect(within(aliceRow).queryByText('Offline')).not.toBeInTheDocument();
+        });
+
+        it('renders a remove button only for the host, absent on the host row, and disabled only for connected players', async () => {
+            const { supabase, channels } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice' }),
+                    buildPlayer({ id: 'p1', name: 'Bob' }),
+                    buildPlayer({ id: 'p2', name: 'Carol' }),
+                ],
+            });
+            renderLobby('p0', state);
+
+            await markOnline(channels, ['p0', 'p1']); // Bob online, Carol offline
+
+            const aliceRow = screen.getByText('Alice').closest('div.flex') as HTMLElement;
+            expect(within(aliceRow).queryByLabelText(/remove/i)).not.toBeInTheDocument();
+
+            const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
+            expect(within(bobRow).getByLabelText(/remove/i)).toBeDisabled();
+
+            const carolRow = screen.getByText('Carol').closest('div.flex') as HTMLElement;
+            expect(within(carolRow).getByLabelText(/remove/i)).toBeEnabled();
+        });
+
+        it('clicking remove invokes remove-player with the room code and target id, and applies the returned room', async () => {
+            const updatedState = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' })],
+            });
+            const { supabase, channels, invoke } = makeFakeSupabase(() =>
+                Promise.resolve({
+                    data: {
+                        room: {
+                            roomCode: 'ABC123',
+                            state: updatedState,
+                            version: 3,
+                            turnStartedAt: '2026-01-01T00:00:00.000Z',
+                            playerSeen: {},
+                        },
+                    },
+                    error: null,
+                })
+            );
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            await markOnline(channels, ['p0']); // Bob offline -> remove enabled
+
+            const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
+            fireEvent.click(within(bobRow).getByLabelText(/remove/i));
+
+            expect(invoke).toHaveBeenCalledWith('remove-player', {
+                body: { roomCode: 'ABC123', targetPlayerId: 'p1' },
+            });
+
+            await waitFor(() => {
+                expect(screen.getByTestId('probe')).toHaveTextContent('Alice(hand:1,faceUp:0,faceDown:0)');
+            });
+        });
+
+        it('a non-host viewer sees no remove buttons at all', async () => {
+            const { supabase, channels } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p1', state);
+
+            await markOnline(channels, ['p1']); // Alice offline, but the viewer is not host
+
+            expect(screen.queryByLabelText(/remove/i)).not.toBeInTheDocument();
+        });
+
+        it('when state.host changes, the Start Game button follows automatically on the next render with no extra client logic', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const initialState = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+
+            function TransferHarness() {
+                const { setGameState, toast, dismissToast } = useGameContext();
+                const [current, setCurrent] = useState(initialState);
+                useEffect(() => {
+                    void setGameState(current);
+                    // eslint-disable-next-line react-hooks/exhaustive-deps
+                }, []);
+                return (
+                    <>
+                        <LobbyScreen />
+                        <button
+                            onClick={() => {
+                                const next = { ...current, host: 'p1' };
+                                setCurrent(next);
+                                void setGameState(next);
+                            }}
+                        >
+                            transfer host
+                        </button>
+                        <Toast toast={toast} onDismiss={dismissToast} />
+                    </>
+                );
+            }
+
+            render(
+                <GameProvider playerId="p1">
+                    <TransferHarness />
+                </GameProvider>
+            );
+
+            expect(await screen.findByText('Waiting for host to start the game...')).toBeInTheDocument();
+            expect(screen.queryByText('Start Game')).not.toBeInTheDocument();
+
+            fireEvent.click(screen.getByText('transfer host'));
+
+            await waitFor(() => {
+                expect(screen.getByText('Start Game')).toBeInTheDocument();
+            });
+        });
+
+        it('an EdgeError from remove-player surfaces as a toast', async () => {
+            const { supabase, channels } = makeFakeSupabase(() =>
+                Promise.resolve({
+                    data: {
+                        error: {
+                            code: 'GAME_ALREADY_STARTED',
+                            message: 'Cannot remove a player once the game has started',
+                        },
+                    },
+                    error: null,
+                })
+            );
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            await markOnline(channels, ['p0']); // Bob offline -> remove enabled
+
+            const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
+            fireEvent.click(within(bobRow).getByLabelText(/remove/i));
+
+            expect(await screen.findByRole('alert')).toHaveTextContent(
+                'Cannot remove a player once the game has started'
+            );
         });
     });
 });
