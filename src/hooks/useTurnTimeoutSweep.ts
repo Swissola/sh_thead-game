@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSupabaseClient } from '../supabase/client';
-import { TURN_GRACE_MS } from '../supabase/roomTypes';
+import { EDGE_ERROR_CODES, TURN_GRACE_MS, type EdgeResult } from '../supabase/roomTypes';
 
 /**
  * D-05's client-side lazy trigger cadence - a purely client-side
@@ -98,6 +98,27 @@ export function useTurnTimeoutSweep({
       const supabase = getSupabaseClient();
       const request = supabase.functions.invoke('check-turn-timeout', { body: { roomCode } });
       void request
+        .then(({ data, error }) => {
+          // Three-way branch matching useGameState.ts's canonical shape for an
+          // invoke result: a resolved top-level error (transport/5xx,
+          // surfaced without throwing), or an EdgeResult carried in `data`.
+          if (error) {
+            // No EdgeResult to inspect on this shape, so there is no code to
+            // whitelist against - this is precisely the shape an unexpected
+            // server-side failure takes, and must not stay silent.
+            console.warn('check-turn-timeout sweep failed with a transport error', error);
+            return;
+          }
+          const result = data as EdgeResult | undefined;
+          const code = result?.error?.code;
+          if (code && code !== EDGE_ERROR_CODES.TIMEOUT_NOT_ELAPSED && code !== EDGE_ERROR_CODES.CONFLICT) {
+            // TIMEOUT_NOT_ELAPSED is the every-tick normal case and CONFLICT is
+            // withVersionRetry losing a race it will retry on the next tick -
+            // both expected-quiet. Anything else means the server rejected a
+            // sweep for a reason nobody predicted.
+            console.warn(`check-turn-timeout sweep returned unexpected error code ${code}`, result?.error?.message);
+          }
+        })
         .catch(() => {})
         .finally(() => {
           inFlightRef.current = false;
