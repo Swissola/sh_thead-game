@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-last_updated: "2026-07-28T19:25:00.000Z"
-last_activity: "2026-07-28 -- Plan 02-13 Tasks 1-2 merged; Task 3 (human checkpoint) awaiting the operator"
+status: completed
+last_updated: "2026-07-29T18:28:20.802Z"
+last_activity: 2026-07-28 -- Plan 02-13's executor hit the account's weekly usage limit mid-task
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 20
-  completed_plans: 19
+  total_plans: 22
+  completed_plans: 20
   percent: 14
 ---
 
@@ -43,7 +43,7 @@ wrappers reading the wrong JWT-claims field (`.sub` instead of `.id`) so `player
 `undefined`, and missing local Postgres table-level grants beneath otherwise-correct RLS
 policies. All four fixed and merged (migration `0002_local_dev_grants.sql`).
 
-Progress: [█████████░] 92%
+Progress: [█████████░] 91%
 
 **Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
 present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
@@ -75,6 +75,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 02 P14 | 12min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,8 @@ Recent decisions affecting current work:
 - [Phase 02-12]: useTurnTimeoutSweep tracks its grace-expired flag together with an "arm key" string in one useState object, reset via React's render-body "adjusting state when a prop changes" pattern rather than an effect-body setState or a Date.now()-during-render call, to satisfy this project's strict react-hooks/React Compiler lint rules
 - [Phase 02-13]: chose scripted `supabase functions serve` + `fetch` over the Deno test runner for Edge Function integration testing - stubbing out `withSupabase({ auth: 'user' })`'s JWT validation to unit-test with `deno test` would test everything except the thing worth testing
 - [Phase 02-13]: `npm:@supabase/server`'s `verifyAuth` short-circuits an unauthenticated request with its own `INVALID_CREDENTIALS` shape before `ctx.userClaims`'s missing-token branch is ever reached - that branch is dead code under single `auth: 'user'` mode; the smoke suite asserts the real observable contract (401, request never reaches game logic) instead of the plan's literal `UNAUTHENTICATED` code
+- [Phase 02]: [Phase 02-14] Auto-play the lowest-RANK_VALUES card via getAvailableCardSource when PICK_UP_PILE returns PILE_EMPTY; faceDown source selects index 0 without reading rank
+- [Phase 02]: [Phase 02-14] useTurnTimeoutSweep warns (console.warn) on any sweep EdgeResult error code outside TIMEOUT_NOT_ELAPSED/CONFLICT and on a resolved top-level transport error, never toasts
 
 ### Pending Todos
 
@@ -125,6 +128,7 @@ present before 02-12 touched either file; logged in `deferred-items.md`, not yet
   current state and Phase 02 being fully complete. Full checkpoint details (how-to-verify steps,
   acceptance criteria, resume-signal) are in `.planning/phases/02-real-cross-device-multiplayer/
   02-13-PLAN.md`'s Task 3. No SUMMARY.md for 02-13 yet — write it only after sign-off.
+
 - **`.claude/worktrees/agent-aea2c752cd368982d` is an orphaned directory** — `git worktree
   remove --force` unregistered it from git but the OS refused to delete the directory itself
   ("device or resource busy" / "permission denied", likely a Docker bind-mount or antivirus
@@ -141,8 +145,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T19:25:00.000Z
-Stopped at: Merged 02-13 Tasks 1-2. Task 3 (two-device manual play test, blocking) is the only
+Last session: 2026-07-29T18:28:20.795Z
+Stopped at: Completed 02-14-PLAN.md (D-05 empty-pile fallback + sweep warn narrowing); 02-13 Task 3 checkpoint still awaits the human operator
 work left in the entire phase — needs the human operator to run it against the hosted Supabase
 project and report back per the resume-signal ("approved" or a description of what didn't
 behave as written). Once signed off, a session needs to: tick the two Manual-Only Verifications

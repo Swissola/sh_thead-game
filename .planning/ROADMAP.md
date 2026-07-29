@@ -90,7 +90,7 @@ Plans:
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
 
-**Plans:** 8/15 plans executed
+**Plans:** 13/15 plans executed
 Plans:
 **Wave 1**
 
@@ -108,16 +108,16 @@ Plans:
 - [x] 02-06-PLAN.md — start-game / apply-move Edge Functions: server-side deal and server-authoritative moves
 - [x] 02-07-PLAN.md — check-turn-timeout / heartbeat / remove-player: grace-period auto-pickup, server-verified liveness, host transfer
 - [x] 02-08-PLAN.md — useRoomSubscription (Realtime replaces the poll) and usePresence
-- [ ] 02-09-PLAN.md — Optimistic dispatch and authoritative reconciliation in GameContext
+- [x] 02-09-PLAN.md — Optimistic dispatch and authoritative reconciliation in GameContext
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 02-10-PLAN.md — App.tsx identity gate and Realtime wiring; MenuScreen create/join via Edge Functions, name pre-fill, join-link
-- [ ] 02-11-PLAN.md — LobbyScreen: server-backed start, join-link copy, host removal, offline markers
+- [x] 02-10-PLAN.md — App.tsx identity gate and Realtime wiring; MenuScreen create/join via Edge Functions, name pre-fill, join-link
+- [x] 02-11-PLAN.md — LobbyScreen: server-backed start, join-link copy, host removal, offline markers
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 02-12-PLAN.md — GameScreen: two-state offline badge, reconnect toast, check-turn-timeout client trigger, Leave Game
+- [x] 02-12-PLAN.md — GameScreen: two-state offline badge, reconnect toast, check-turn-timeout client trigger, Leave Game
 
 **Wave 6** *(blocked on Wave 5)*
 
@@ -125,7 +125,7 @@ Plans:
 
 **Wave 7** *(gap closure — blocked on Wave 6)*
 
-- [ ] 02-14-PLAN.md — Gap closure (blocker): empty-pile turn-timeout stall — auto-play the lowest card via applyMove, and stop the sweep swallowing unexpected failures
+- [x] 02-14-PLAN.md — Gap closure (blocker): empty-pile turn-timeout stall — auto-play the lowest card via applyMove, and stop the sweep swallowing unexpected failures
 
 **Wave 8** *(gap closure — blocked on Wave 7)*
 
@@ -215,7 +215,7 @@ rework lands).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
-| 2. Real Cross-Device Multiplayer | 7/13 | In Progress|  |
+| 2. Real Cross-Device Multiplayer | 13/15 | In Progress|  |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
