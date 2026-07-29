@@ -47,7 +47,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. The new engine and screen components are covered by automated tests
 
 **Plans:** 7/7 plans complete
-Plans:
+
+Plans:
 **Wave 1**
 
 - [x] 01-01-PLAN.md — Test infra (setupFiles/jest-dom, buildGameState fixtures), gameLogic.ts dedup (sortHand/canAddToSelection/createDeck/shuffleDeck), applyMove contract types (moves.ts/errors.ts)
@@ -89,7 +90,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
 
-**Plans:** 8/13 plans executed
+**Plans:** 8/15 plans executed
 Plans:
 **Wave 1**
 
@@ -121,6 +122,14 @@ Plans:
 **Wave 6** *(blocked on Wave 5)*
 
 - [ ] 02-13-PLAN.md — Edge Function functional smoke suite over all seven wrappers, plus the two-device cross-device play test
+
+**Wave 7** *(gap closure — blocked on Wave 6)*
+
+- [ ] 02-14-PLAN.md — Gap closure (blocker): empty-pile turn-timeout stall — auto-play the lowest card via applyMove, and stop the sweep swallowing unexpected failures
+
+**Wave 8** *(gap closure — blocked on Wave 7)*
+
+- [ ] 02-15-PLAN.md — Gap closure (major): version-exempt player_seen write path so heartbeats and D-01 auto-rejoins stop polluting the reconciliation stream
 
 ### Phase 3: Responsive UI
 
