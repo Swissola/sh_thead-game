@@ -32,6 +32,8 @@ class FakeRoomStore implements RoomStore {
     writeCount = 0;
     /** Number of leading updateRoom calls that report 0 affected rows before succeeding. */
     failWritesRemaining = 0;
+    /** Counts touchPlayerSeen calls separately from writeCount - see class docstring. */
+    touchCount = 0;
     nowValue = '2026-07-27T00:00:01.000Z';
 
     constructor(seed?: RoomRow) {
@@ -63,6 +65,15 @@ class FakeRoomStore implements RoomStore {
 
     async appendMove(entry: MoveLogEntry): Promise<void> {
         this.moves.push(entry);
+    }
+
+    async touchPlayerSeen(roomCode: string, playerId: string, seenAt: string): Promise<RoomRow | null> {
+        this.touchCount++;
+        const row = this.rooms.get(roomCode);
+        if (!row) return null;
+        const updated = { ...row, player_seen: { ...row.player_seen, [playerId]: seenAt } };
+        this.rooms.set(roomCode, updated);
+        return updated;
     }
 
     now(): string {

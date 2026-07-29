@@ -41,6 +41,8 @@ class FakeRoomStore implements RoomStore {
     writeCount = 0;
     /** Number of leading updateRoom calls that report 0 affected rows before succeeding. */
     failWritesRemaining = 0;
+    /** Counts touchPlayerSeen calls separately from writeCount - see class docstring. */
+    touchCount = 0;
     nowValue = '2026-07-26T00:00:01.000Z';
 
     constructor(seed?: RoomRow) {
@@ -72,6 +74,15 @@ class FakeRoomStore implements RoomStore {
 
     async appendMove(entry: unknown): Promise<void> {
         this.moves.push(entry);
+    }
+
+    async touchPlayerSeen(roomCode: string, playerId: string, seenAt: string): Promise<RoomRow | null> {
+        this.touchCount++;
+        const row = this.rooms.get(roomCode);
+        if (!row) return null;
+        const updated = { ...row, player_seen: { ...row.player_seen, [playerId]: seenAt } };
+        this.rooms.set(roomCode, updated);
+        return updated;
     }
 
     now(): string {
@@ -140,6 +151,30 @@ describe('withVersionRetry', () => {
         expect(result.error?.code).toBe(EDGE_ERROR_CODES.CONFLICT);
         expect(store.readCount).toBe(MAX_WRITE_ATTEMPTS);
         expect(store.writeCount).toBe(MAX_WRITE_ATTEMPTS);
+    });
+});
+
+describe('FakeRoomStore.touchPlayerSeen (port contract)', () => {
+    it('leaves version unchanged and preserves an unrelated player_seen entry', async () => {
+        const store = new FakeRoomStore(makeRoomRow({ version: 3, player_seen: { p0: '2026-07-26T00:00:00.000Z' } }));
+
+        const updated = await store.touchPlayerSeen('ABC123', 'p1', '2026-07-26T00:05:00.000Z');
+
+        expect(updated?.version).toBe(3);
+        expect(updated?.player_seen).toEqual({
+            p0: '2026-07-26T00:00:00.000Z',
+            p1: '2026-07-26T00:05:00.000Z',
+        });
+        expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(1);
+    });
+
+    it('returns null when no room matches the code', async () => {
+        const store = new FakeRoomStore();
+
+        const updated = await store.touchPlayerSeen('MISSING', 'p1', '2026-07-26T00:05:00.000Z');
+
+        expect(updated).toBeNull();
     });
 });
 

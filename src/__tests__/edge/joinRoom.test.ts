@@ -43,6 +43,9 @@ function makeRoomRow(overrides: Partial<RoomRow> = {}): RoomRow {
 /** In-memory fake so joinRoom is unit-tested without a Deno runtime or a live database. */
 class FakeRoomStore implements RoomStore {
     rooms = new Map<string, RoomRow>();
+    writeCount = 0;
+    /** Counts touchPlayerSeen calls separately from writeCount - see class docstring. */
+    touchCount = 0;
     nowValue = NOW_ISO;
 
     constructor(seed?: RoomRow) {
@@ -60,6 +63,7 @@ class FakeRoomStore implements RoomStore {
     }
 
     async updateRoom(roomCode: string, expectedVersion: number, patch: RoomUpdatePatch): Promise<number> {
+        this.writeCount++;
         const row = this.rooms.get(roomCode);
         if (!row || row.version !== expectedVersion) return 0;
         this.rooms.set(roomCode, { ...row, ...patch });
@@ -68,6 +72,15 @@ class FakeRoomStore implements RoomStore {
 
     async appendMove(): Promise<void> {
         // not used by joinRoom
+    }
+
+    async touchPlayerSeen(roomCode: string, playerId: string, seenAt: string): Promise<RoomRow | null> {
+        this.touchCount++;
+        const row = this.rooms.get(roomCode);
+        if (!row) return null;
+        const updated = { ...row, player_seen: { ...row.player_seen, [playerId]: seenAt } };
+        this.rooms.set(roomCode, updated);
+        return updated;
     }
 
     now(): string {

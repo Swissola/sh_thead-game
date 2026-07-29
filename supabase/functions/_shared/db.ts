@@ -38,6 +38,16 @@ export interface RoomStore {
     /** Conditioned on the row's current version; returns the affected row count (0 or 1). */
     updateRoom(roomCode: string, expectedVersion: number, patch: RoomUpdatePatch): Promise<number>;
     appendMove(entry: MoveLogEntry): Promise<void>;
+    /**
+     * Merges a single `player_seen[playerId] = seenAt` entry, row-atomically,
+     * without touching the room's version. Version-exempt by design:
+     * `withVersionRetry` above remains the only version-bumping write path -
+     * this member exists specifically for callers (heartbeat, joinRoom's D-01
+     * auto-rejoin) whose write does not change `state` and must not be
+     * mistaken for one by a client's reconciliation check. Returns the
+     * updated row, or `null` if no room matched `roomCode`.
+     */
+    touchPlayerSeen(roomCode: string, playerId: string, seenAt: string): Promise<RoomRow | null>;
     /** Server clock as an ISO string - never a client-supplied timestamp. */
     now(): string;
 }
