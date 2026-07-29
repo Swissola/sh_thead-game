@@ -133,7 +133,12 @@ describe('checkTurnTimeout (D-05)', () => {
         expect(store.writeCount).toBe(0);
     });
 
-    it('forwards the engine PILE_EMPTY error unchanged and writes nothing when the discard pile is empty', async () => {
+    it('D-05 gap closure: auto-plays the lowest card instead of forwarding PILE_EMPTY when the discard pile is empty and the player holds cards', async () => {
+        // Superseded expectation: this used to assert the pre-fix stall
+        // (PILE_EMPTY forwarded, zero writes). The empty-pile fallback in
+        // 'checkTurnTimeout empty-pile fallback (D-05 gap closure)' below now
+        // resolves this case instead - see that describe block for the full
+        // selection-matrix and write-behaviour coverage.
         const store = new FakeRoomStore(
             makeRoomRow({ state: playingState({ discardPile: [] }) }),
             afterMs(TURN_GRACE_MS + 1)
@@ -141,8 +146,8 @@ describe('checkTurnTimeout (D-05)', () => {
 
         const result = await checkTurnTimeout(store, { roomCode: 'ABC123' });
 
-        expect(result.error?.code).toBe(ERROR_CODES.PILE_EMPTY);
-        expect(store.writeCount).toBe(0);
+        expect(result.error).toBeUndefined();
+        expect(store.writeCount).toBe(1);
     });
 
     it('D-04: the timed-out player keeps their seat, hand, faceUp and faceDown cards intact (plus the picked-up pile)', async () => {
