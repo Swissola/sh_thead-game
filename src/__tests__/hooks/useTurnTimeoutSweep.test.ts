@@ -296,6 +296,7 @@ describe('useTurnTimeoutSweep', () => {
   });
 
   it('a thrown invocation is swallowed without a toast and retried on the next tick', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const invoke = vi
       .fn()
       .mockRejectedValueOnce(new Error('network'))
@@ -325,9 +326,15 @@ describe('useTurnTimeoutSweep', () => {
       await Promise.resolve();
     });
     expect(invoke).toHaveBeenCalledTimes(2);
+    // A thrown rejection stays in the .catch swallow path - never warned on,
+    // and does not leave inFlightRef stuck (proven by the second call firing).
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
   });
 
-  it('a TIMEOUT_NOT_ELAPSED result is swallowed without a toast and retried on the next tick', async () => {
+  it('a TIMEOUT_NOT_ELAPSED result is swallowed without a toast, logs nothing, and is retried on the next tick', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const invoke = vi
       .fn()
       .mockResolvedValue({
@@ -360,6 +367,116 @@ describe('useTurnTimeoutSweep', () => {
       await Promise.resolve();
     });
     expect(invoke).toHaveBeenCalledTimes(2);
+    // TIMEOUT_NOT_ELAPSED is the every-5-seconds normal case on every client
+    // and must stay completely quiet.
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('a CONFLICT result is swallowed without a toast, logs nothing, and is retried on the next tick', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        error: { code: 'CONFLICT', message: 'Could not update room after 3 attempts' },
+      },
+      error: null,
+    });
+    vi.mocked(getSupabaseClient).mockReturnValue({ functions: { invoke } } as never);
+
+    renderHook(() =>
+      useTurnTimeoutSweep({
+        roomCode: 'ABC123',
+        testMode: false,
+        phase: 'playing',
+        turnStartedAt: nearExpiryStart(),
+        currentTurnPlayerId: 'other',
+        playerId: 'me',
+      })
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(TURN_SWEEP_INTERVAL_MS);
+      await Promise.resolve();
+    });
+    expect(invoke).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(TURN_SWEEP_INTERVAL_MS);
+      await Promise.resolve();
+    });
+    expect(invoke).toHaveBeenCalledTimes(2);
+    // CONFLICT is withVersionRetry losing a race it will retry on the next
+    // tick - expected and self-correcting, so it must stay quiet too.
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('an EdgeResult error whose code is neither TIMEOUT_NOT_ELAPSED nor CONFLICT logs exactly one console.warn naming that code', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        error: { code: 'ROOM_NOT_FOUND', message: 'Room ABC123 not found' },
+      },
+      error: null,
+    });
+    vi.mocked(getSupabaseClient).mockReturnValue({ functions: { invoke } } as never);
+
+    renderHook(() =>
+      useTurnTimeoutSweep({
+        roomCode: 'ABC123',
+        testMode: false,
+        phase: 'playing',
+        turnStartedAt: nearExpiryStart(),
+        currentTurnPlayerId: 'other',
+        playerId: 'me',
+      })
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(TURN_SWEEP_INTERVAL_MS);
+      await Promise.resolve();
+    });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0].some((arg) => String(arg).includes('ROOM_NOT_FOUND'))).toBe(true);
+
+    warnSpy.mockRestore();
+  });
+
+  it('a resolved top-level transport error ({ data: null, error }, the uncaught-5xx shape) logs exactly one console.warn', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const invoke = vi.fn().mockResolvedValue({ data: null, error: { message: 'internal error' } });
+    vi.mocked(getSupabaseClient).mockReturnValue({ functions: { invoke } } as never);
+
+    renderHook(() =>
+      useTurnTimeoutSweep({
+        roomCode: 'ABC123',
+        testMode: false,
+        phase: 'playing',
+        turnStartedAt: nearExpiryStart(),
+        currentTurnPlayerId: 'other',
+        playerId: 'me',
+      })
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(TURN_SWEEP_INTERVAL_MS);
+      await Promise.resolve();
+    });
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    // inFlightRef must not be left stuck true - the next tick invokes again.
+    await act(async () => {
+      vi.advanceTimersByTime(TURN_SWEEP_INTERVAL_MS);
+      await Promise.resolve();
+    });
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+
+    warnSpy.mockRestore();
   });
 
   it('unmounting clears the interval', async () => {
