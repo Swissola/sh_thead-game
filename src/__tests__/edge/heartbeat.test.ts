@@ -105,6 +105,17 @@ describe('heartbeat', () => {
 
         expect(result.error?.code).toBe(EDGE_ERROR_CODES.NOT_IN_ROOM);
         expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(0);
+    });
+
+    it('returns ROOM_NOT_FOUND and writes nothing when the room does not exist', async () => {
+        const store = new FakeRoomStore();
+
+        const result = await heartbeat(store, { playerId: 'p0', roomCode: 'MISSING' });
+
+        expect(result.error?.code).toBe(EDGE_ERROR_CODES.ROOM_NOT_FOUND);
+        expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(0);
     });
 
     it('does not touch the per-turn timer field on a successful heartbeat', async () => {
@@ -112,6 +123,50 @@ describe('heartbeat', () => {
         const store = new FakeRoomStore(row);
 
         const result = await heartbeat(store, { playerId: 'p0', roomCode: 'ABC123' });
+
+        expect(result.error).toBeUndefined();
+        expect(result.room?.turnStartedAt).toBe('2000-01-01T00:00:00.000Z');
+    });
+
+    it('leaves version unchanged and performs zero updateRoom calls, exactly one touchPlayerSeen call, on an ordinary heartbeat', async () => {
+        const row = makeRoomRow({ state: lobbyState(), version: 4, player_seen: { p0: LIVE_SEEN, p1: LIVE_SEEN } });
+        const store = new FakeRoomStore(row);
+
+        const result = await heartbeat(store, { playerId: 'p1', roomCode: 'ABC123' });
+
+        expect(result.error).toBeUndefined();
+        expect(result.room?.version).toBe(4);
+        expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(1);
+    });
+
+    it('takes the withVersionRetry path on a genuine lobby host transfer: version increments, host changes, lastAction names the new host', async () => {
+        const row = makeRoomRow({
+            state: lobbyState({ host: 'p0' }),
+            version: 4,
+            player_seen: { p0: STALE_SEEN },
+        });
+        const store = new FakeRoomStore(row);
+
+        const result = await heartbeat(store, { playerId: 'p1', roomCode: 'ABC123' });
+
+        expect(result.error).toBeUndefined();
+        expect(result.room?.version).toBe(5);
+        expect(result.room?.state.host).toBe('p1');
+        expect(result.room?.state.lastAction).toContain('Bob');
+        expect(store.writeCount).toBe(1);
+        expect(store.touchCount).toBe(0);
+    });
+
+    it('does not touch the per-turn timer field on a host-transferring heartbeat', async () => {
+        const row = makeRoomRow({
+            state: lobbyState({ host: 'p0' }),
+            player_seen: { p0: STALE_SEEN },
+            turn_started_at: '2000-01-01T00:00:00.000Z',
+        });
+        const store = new FakeRoomStore(row);
+
+        const result = await heartbeat(store, { playerId: 'p1', roomCode: 'ABC123' });
 
         expect(result.error).toBeUndefined();
         expect(result.room?.turnStartedAt).toBe('2000-01-01T00:00:00.000Z');
