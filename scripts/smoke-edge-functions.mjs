@@ -361,8 +361,13 @@ async function main() {
       !removeC.json?.room?.state?.players?.some((p) => p.id === c.userId)
   );
 
-  // 4. B heartbeat -> 200, and playerSeen[B] is newer than it was before the call.
+  // 4. B heartbeat -> 200, and playerSeen[B] is newer than it was before the
+  // call, while the room's version holds exactly still. This is the
+  // assertion that would have caught the plan 02-15 gap: it can only be
+  // verified against a real Postgres row, because the Vitest fakes cannot
+  // prove the SQL function leaves the column alone.
   const seenBefore = removeC.json?.room?.playerSeen?.[b.userId];
+  const versionBeforeHeartbeat = removeC.json?.room?.version;
   const heartbeat = await call('heartbeat', b.token, { roomCode });
   const seenAfter = heartbeat.json?.room?.playerSeen?.[b.userId];
   check(
@@ -370,6 +375,10 @@ async function main() {
     heartbeat.status === 200 &&
       !!seenAfter &&
       (!seenBefore || Date.parse(seenAfter) > Date.parse(seenBefore))
+  );
+  check(
+    '[heartbeat] version is unchanged - a routine heartbeat must not bump the room version',
+    heartbeat.status === 200 && heartbeat.json?.room?.version === versionBeforeHeartbeat
   );
 
   // 5. A start-game -> 200, phase 'setup', every player holding 3/3/3 cards.
