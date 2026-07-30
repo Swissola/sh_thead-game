@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-last_updated: "2026-07-29T18:28:20.802Z"
+last_updated: "2026-07-30T07:46:51.929Z"
 last_activity: 2026-07-28 -- Plan 02-13's executor hit the account's weekly usage limit mid-task
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 22
-  completed_plans: 20
+  completed_plans: 21
   percent: 14
 ---
 
@@ -43,7 +43,7 @@ wrappers reading the wrong JWT-claims field (`.sub` instead of `.id`) so `player
 `undefined`, and missing local Postgres table-level grants beneath otherwise-correct RLS
 policies. All four fixed and merged (migration `0002_local_dev_grants.sql`).
 
-Progress: [█████████░] 91%
+Progress: [██████████] 95%
 
 **Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
 present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
@@ -76,6 +76,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 
 *Updated after each plan completion*
 | Phase 02 P14 | 12min | 2 tasks | 4 files |
+| Phase 02 P15 | 55min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Recent decisions affecting current work:
 - [Phase 02-13]: `npm:@supabase/server`'s `verifyAuth` short-circuits an unauthenticated request with its own `INVALID_CREDENTIALS` shape before `ctx.userClaims`'s missing-token branch is ever reached - that branch is dead code under single `auth: 'user'` mode; the smoke suite asserts the real observable contract (401, request never reaches game logic) instead of the plan's literal `UNAUTHENTICATED` code
 - [Phase 02]: [Phase 02-14] Auto-play the lowest-RANK_VALUES card via getAvailableCardSource when PICK_UP_PILE returns PILE_EMPTY; faceDown source selects index 0 without reading rank
 - [Phase 02]: [Phase 02-14] useTurnTimeoutSweep warns (console.warn) on any sweep EdgeResult error code outside TIMEOUT_NOT_ELAPSED/CONFLICT and on a resolved top-level transport error, never toasts
+- [Phase 02-15]: touch_player_seen is a plain invoker-rights SQL function, not definer-rights - service_role already bypasses RLS, so elevated execution rights would buy nothing and would punch a hole through 0001's deny-all-writes-for-authenticated posture
+- [Phase 02-15]: heartbeat and joinRoom's D-01 auto-rejoin branch to a state-unchanged condition (nextState.host !== row.state.host; resolution.type === 'existing'), not object identity, before routing through the version-exempt touchPlayerSeen path
 
 ### Pending Todos
 
@@ -145,8 +148,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T18:28:20.795Z
-Stopped at: Completed 02-14-PLAN.md (D-05 empty-pile fallback + sweep warn narrowing); 02-13 Task 3 checkpoint still awaits the human operator
+Last session: 2026-07-30T07:46:51.922Z
+Stopped at: Completed 02-15-PLAN.md (version-exempt player_seen write path for heartbeat and joinRoom D-01 auto-rejoin); 02-13 Task 3 checkpoint still awaits the human operator
 work left in the entire phase — needs the human operator to run it against the hosted Supabase
 project and report back per the resume-signal ("approved" or a description of what didn't
 behave as written). Once signed off, a session needs to: tick the two Manual-Only Verifications

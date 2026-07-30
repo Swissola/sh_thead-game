@@ -52,6 +52,7 @@ interface TableClient<Row> {
 export interface SupabaseAdminClient {
     from(table: 'rooms'): TableClient<RoomRow>;
     from(table: 'moves'): TableClient<MoveLogEntry>;
+    rpc(fn: 'touch_player_seen', args: { p_room_code: string; p_player_id: string; p_seen_at: string }): Promise<ArrayResult<RoomRow>>;
 }
 
 /** Postgres SQLSTATE for a unique-constraint violation (the `room_code` primary key collision). */
@@ -94,6 +95,16 @@ export function createSupabaseRoomStore(admin: SupabaseAdminClient): RoomStore {
         async appendMove(entry: MoveLogEntry): Promise<void> {
             const { error } = await admin.from('moves').insert(entry);
             if (error) throw new Error(`appendMove failed: ${error.message}`);
+        },
+
+        async touchPlayerSeen(roomCode: string, playerId: string, seenAt: string): Promise<RoomRow | null> {
+            const { data, error } = await admin.rpc('touch_player_seen', {
+                p_room_code: roomCode,
+                p_player_id: playerId,
+                p_seen_at: seenAt,
+            });
+            if (error) throw new Error(`touchPlayerSeen failed: ${error.message}`);
+            return data?.[0] ?? null;
         },
 
         now(): string {

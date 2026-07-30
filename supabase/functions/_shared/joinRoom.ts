@@ -8,7 +8,7 @@
  */
 import type { GameState } from '../../../src/types.ts';
 import type { EdgeError, EdgeResult, RoomRow } from '../../../src/supabase/roomTypes.ts';
-import { DISCONNECT_THRESHOLD_MS, EDGE_ERROR_CODES } from '../../../src/supabase/roomTypes.ts';
+import { DISCONNECT_THRESHOLD_MS, EDGE_ERROR_CODES, rowToServerRoom } from '../../../src/supabase/roomTypes.ts';
 import { withVersionRetry, type ComputeResult } from './db.ts';
 import type { RoomStore } from './db.ts';
 
@@ -94,6 +94,44 @@ export async function joinRoom(store: RoomStore, input: JoinRoomInput): Promise<
     const roomCode = input.roomCode.trim().toUpperCase();
     if (!roomCode) {
         return { error: { code: EDGE_ERROR_CODES.BAD_REQUEST, message: 'Room code is required' } };
+    }
+
+    // Pre-read, D-01 fast path: an already-seated caller's rejoin does not
+    // change `state` at all, so - and only so - it goes through
+    // `touchPlayerSeen`'s version-exempt write instead of `withVersionRetry`.
+    // Every other resolution (`takeover`, `new`, and all three `EdgeError`
+    // outcomes) genuinely mutates `state.players`/`state.host`/`state.lastAction`
+    // and must still fall through below to keep bumping the version.
+    //
+    // Between this read and the `touchPlayerSeen` call below, a concurrent
+    // remove-player or D-06 takeover could unseat this caller, leaving an
+    // orphan `player_seen` key for an id no longer in `state.players`. That is
+    // harmless and deliberately not guarded against: `resolveSeat` and
+    // `transferHostIfStale` both iterate `state.players` and look entries up
+    // by seated id, so a key nobody is seated under is never read. Do not add
+    // a defensive re-check here - it would reintroduce the version bump this
+    // task removes.
+    const preReadRow = await store.readRoom(roomCode);
+    if (preReadRow) {
+        const preReadNowIso = store.now();
+        const preReadNowMs = Date.parse(preReadNowIso);
+        const preReadResolution = resolveSeat(
+            preReadRow.state,
+            preReadRow.player_seen,
+            input.playerId,
+            trimmedName,
+            preReadNowMs
+        );
+        if (!isEdgeError(preReadResolution) && preReadResolution.type === 'existing') {
+            const updated = await store.touchPlayerSeen(roomCode, input.playerId, preReadNowIso);
+            if (updated) {
+                return { room: rowToServerRoom(updated) };
+            }
+            // The room was deleted between the pre-read and this write - fall
+            // through to withVersionRetry below, which already produces the
+            // correct ROOM_NOT_FOUND for that case without a duplicated
+            // error-construction path here.
+        }
     }
 
     return withVersionRetry(store, roomCode, (row: RoomRow): ComputeResult => {
