@@ -186,3 +186,46 @@ boundary rules.
   that predates this plan and does not match the codebase's actual (and unmodified)
   Prettier output. Not "fixed" by hand-collapsing the JSX against the formatter's own
   output, since that would just be undone by the next `npm run format`.
+
+## Plan 02-15 (Task 3)
+
+- **`npm run test:edge:smoke` completes all checks but does not exit on its own** -
+  `main()` in `scripts/smoke-edge-functions.mjs` (pre-existing, not touched by this
+  plan's `check()`-call edits) never calls `process.exit()`; it relies on Node's
+  natural exit once the event loop drains. The spawned `npx supabase functions serve
+  --no-verify-jwt` child process (also pre-existing `spawnFunctionsServe()` logic) is
+  opened with piped stdio (`stdio: ['ignore', 'pipe', 'pipe']`), and a live child with
+  open piped streams keeps the parent's event loop - and therefore the whole process -
+  alive indefinitely, even after every `check()` and the final "All checks passed."
+  line have already printed. Confirmed via Kong/GoTrue container logs
+  (`docker logs supabase_kong_...`, `docker logs supabase_auth_...`): the full HTTP
+  call sequence (all 18 checks, all 7 covered functions) completed in well under a
+  minute; the process was still running 8+ minutes later with zero further activity in
+  any container log, and only exited once manually killed. This did not affect the
+  correctness of the run - the captured stdout, once flushed, showed every check as
+  `PASS` including the two new heartbeat assertions this task adds - but it means
+  every future invocation of `npm run test:edge:smoke` needs manual process
+  termination (or a `--timeout`-bounded runner) rather than completing on its own.
+  Out of scope to fix here per scope boundary (the hang is in the spawn/exit
+  lifecycle code near the top of the file, not the `check()` calls or heartbeat
+  assertions this task's `<files>` list covers); a follow-up fix would add either an
+  explicit `process.exit(process.exitCode ?? 0)` at the end of `main()` or
+  `child.unref()`/`child.stdout.unref()` after `spawnFunctionsServe()`.
+- **This worktree's branch was three-plus waves stale** (`d606485`, an ancestor of
+  `stage-1-refactor` missing all of plan 02-14 and the phase's `.planning/` scaffolding)
+  rather than branched from the tip this plan's frontmatter (`depends_on: ["02-14"]`)
+  assumes. Fixed at the start of this plan's execution via `git merge --ff-only
+  stage-1-refactor` (confirmed a strict fast-forward: `git log --oneline
+  stage-1-refactor..HEAD` was empty before merging, i.e. the worktree branch had zero
+  commits of its own to lose). Same stale-base pattern previously logged under plans
+  02-05 and 02-07 above; flagging again in case it recurs for later waves.
+- **The local Supabase stack's `edge_runtime` and `studio` containers were `Exited`**
+  at the start of this plan's execution, with bind mounts pointing at a *different*,
+  no-longer-matching worktree path (`agent-aea2c752cd368982d` instead of this plan's
+  `agent-ab626206d94067ea1`) - visible only when attempting `docker start` directly,
+  which failed with an OCI mount error naming the stale path. `npx supabase stop`
+  followed by `npx supabase start` recreated both containers correctly bound to the
+  current worktree (confirmed via `supabase status -o json` gaining a `FUNCTIONS_URL`
+  key it previously lacked). Not a code change; noted here since a sibling worktree
+  hitting the same symptom will need the same stop/start cycle rather than assuming
+  a hosted-project fallback is required.
