@@ -90,7 +90,7 @@ Plans:
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
 
-**Plans:** 13/15 plans executed
+**Plans:** 14/15 plans executed
 Plans:
 **Wave 1**
 
@@ -129,7 +129,7 @@ Plans:
 
 **Wave 8** *(gap closure — blocked on Wave 7)*
 
-- [ ] 02-15-PLAN.md — Gap closure (major): version-exempt player_seen write path so heartbeats and D-01 auto-rejoins stop polluting the reconciliation stream
+- [x] 02-15-PLAN.md — Gap closure (major): version-exempt player_seen write path so heartbeats and D-01 auto-rejoins stop polluting the reconciliation stream
 
 ### Phase 3: Responsive UI
 
@@ -215,7 +215,7 @@ rework lands).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
-| 2. Real Cross-Device Multiplayer | 13/15 | In Progress|  |
+| 2. Real Cross-Device Multiplayer | 14/15 | In Progress|  |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
