@@ -120,8 +120,8 @@ state in place (`playCards`, `App.tsx:461-834`), `playerId` is never actually
 set (`App.tsx:62`), and rules logic is duplicated across `App.tsx`/`Hand.tsx`/
 `Table.tsx` — all in scope for Phase 1, not new discoveries to re-investigate.
 
-None currently — full suite (352 tests), build, and `check-edge-wrappers.mjs` all green as of
-the 02-13 Tasks 1-2 merge. `npm run lint` still exits 1 on two pre-existing, unrelated issues
+None currently — full suite (385 tests), build, and `check-edge-wrappers.mjs` all green as of
+the 02-14/02-15 gap-closure merge. `npm run lint` still exits 1 on two pre-existing, unrelated issues
 (`GameContext.tsx:142` react-refresh/only-export-components, `GameScreen.tsx:107`
 react-hooks/set-state-in-effect in the pre-existing celebration-modal effect) — confirmed
 present before 02-12 touched either file; logged in `deferred-items.md`, not yet cleaned up.
@@ -132,11 +132,15 @@ present before 02-12 touched either file; logged in `deferred-items.md`, not yet
   acceptance criteria, resume-signal) are in `.planning/phases/02-real-cross-device-multiplayer/
   02-13-PLAN.md`'s Task 3. No SUMMARY.md for 02-13 yet — write it only after sign-off.
 
-- **`.claude/worktrees/agent-aea2c752cd368982d` is an orphaned directory** — `git worktree
-  remove --force` unregistered it from git but the OS refused to delete the directory itself
-  ("device or resource busy" / "permission denied", likely a Docker bind-mount or antivirus
-  lock). Confirmed harmless (not double-counted by vitest, doesn't affect builds); safe to
-  delete by hand once whatever holds the lock releases it.
+- **Three orphaned worktree directories** under `.claude/worktrees/` —
+  `agent-aea2c752cd368982d`, `agent-a24186bc781420a82` (02-14), and
+  `agent-ab626206d94067ea1` (02-15). `git worktree remove --force` unregistered all three from
+  git but the OS refused to delete the directories themselves ("permission denied", likely a
+  lingering node process or antivirus lock). The 02-14/02-15 pair briefly double-counted vitest's
+  test totals (754 instead of 385) until excluded with `--exclude "**/.claude/**"` — confirmed
+  harmless once excluded, doesn't affect builds. Safe to delete by hand once whatever holds the
+  lock releases it; `npm test`/`npm run build` should keep excluding `.claude/` if any of these
+  are still present.
 
 ## Deferred Items
 
