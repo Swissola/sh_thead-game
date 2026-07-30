@@ -173,10 +173,31 @@ describe('joinRoom', () => {
         expect(result.error?.code).toBe(EDGE_ERROR_CODES.ROOM_NOT_FOUND);
     });
 
+    it('returns BAD_REQUEST before any read when the player name is empty', async () => {
+        const store = new FakeRoomStore(makeRoomRow());
+
+        const result = await joinRoom(store, { playerId: 'p2', playerName: '   ', roomCode: 'ABC123' });
+
+        expect(result.error?.code).toBe(EDGE_ERROR_CODES.BAD_REQUEST);
+        expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(0);
+    });
+
+    it('returns BAD_REQUEST before any read when the room code is empty', async () => {
+        const store = new FakeRoomStore(makeRoomRow());
+
+        const result = await joinRoom(store, { playerId: 'p2', playerName: 'Bob', roomCode: '   ' });
+
+        expect(result.error?.code).toBe(EDGE_ERROR_CODES.BAD_REQUEST);
+        expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(0);
+    });
+
     it('D-01: an already-seated caller is returned to their seat unchanged, even mid-game, with player_seen refreshed', async () => {
         const existingPlayer = makePlayer({ id: 'p1', name: 'Alice', hand: [null], isReady: true });
         const row = makeRoomRow({
             state: makeGameState({ players: [existingPlayer], phase: 'playing' }),
+            version: 5,
             player_seen: { p1: STALE_SEEN },
         });
         const store = new FakeRoomStore(row);
@@ -187,10 +208,16 @@ describe('joinRoom', () => {
         expect(result.room?.state.players).toEqual([existingPlayer]);
         expect(result.room?.state.phase).toBe('playing');
         expect(result.room?.playerSeen.p1).toBe(NOW_ISO);
+        expect(result.room?.version).toBe(5);
+        expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(1);
     });
 
-    it('appends a new player and sets lastAction when not seated and phase is lobby', async () => {
-        const row = makeRoomRow({ state: makeGameState({ players: [makePlayer({ id: 'p1', name: 'Alice' })] }) });
+    it('appends a new player, sets lastAction and bumps version when not seated and phase is lobby', async () => {
+        const row = makeRoomRow({
+            state: makeGameState({ players: [makePlayer({ id: 'p1', name: 'Alice' })] }),
+            version: 5,
+        });
         const store = new FakeRoomStore(row);
 
         const result = await joinRoom(store, { playerId: 'p2', playerName: 'Bob', roomCode: 'ABC123' });
@@ -206,9 +233,12 @@ describe('joinRoom', () => {
             isReady: false,
         });
         expect(result.room?.state.lastAction).toBe('Bob joined the room');
+        expect(result.room?.version).toBe(6);
+        expect(store.writeCount).toBe(1);
+        expect(store.touchCount).toBe(0);
     });
 
-    it('returns GAME_ALREADY_STARTED for an unseated caller with no name match once the game has started', async () => {
+    it('returns GAME_ALREADY_STARTED for an unseated caller with no name match once the game has started, writing nothing', async () => {
         const row = makeRoomRow({
             state: makeGameState({ players: [makePlayer({ id: 'p1', name: 'Alice' })], phase: 'playing' }),
         });
@@ -217,9 +247,11 @@ describe('joinRoom', () => {
         const result = await joinRoom(store, { playerId: 'p2', playerName: 'Charlie', roomCode: 'ABC123' });
 
         expect(result.error?.code).toBe(EDGE_ERROR_CODES.GAME_ALREADY_STARTED);
+        expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(0);
     });
 
-    it('returns NAME_IN_USE when the name matches a currently-connected seat', async () => {
+    it('returns NAME_IN_USE when the name matches a currently-connected seat, writing nothing', async () => {
         const row = makeRoomRow({
             state: makeGameState({ players: [makePlayer({ id: 'p1', name: 'Alice' })], phase: 'playing' }),
             player_seen: { p1: LIVE_SEEN },
@@ -229,9 +261,11 @@ describe('joinRoom', () => {
         const result = await joinRoom(store, { playerId: 'p2', playerName: 'Alice', roomCode: 'ABC123' });
 
         expect(result.error?.code).toBe(EDGE_ERROR_CODES.NAME_IN_USE);
+        expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(0);
     });
 
-    it('returns NAME_AMBIGUOUS when the name matches two or more disconnected seats', async () => {
+    it('returns NAME_AMBIGUOUS when the name matches two or more disconnected seats, writing nothing', async () => {
         const row = makeRoomRow({
             state: makeGameState({
                 players: [makePlayer({ id: 'p1', name: 'Alice' }), makePlayer({ id: 'p3', name: 'alice' })],
@@ -244,9 +278,11 @@ describe('joinRoom', () => {
         const result = await joinRoom(store, { playerId: 'p2', playerName: 'ALICE', roomCode: 'ABC123' });
 
         expect(result.error?.code).toBe(EDGE_ERROR_CODES.NAME_AMBIGUOUS);
+        expect(store.writeCount).toBe(0);
+        expect(store.touchCount).toBe(0);
     });
 
-    it('D-02/D-06: a successful takeover rewrites the seat id, preserves hand/faceUp/faceDown/isReady, and rewrites host', async () => {
+    it('D-02/D-06: a successful takeover rewrites the seat id, bumps version, preserves hand/faceUp/faceDown/isReady, and rewrites host', async () => {
         const staleHost = makePlayer({
             id: 'p1',
             name: 'Alice',
@@ -257,6 +293,7 @@ describe('joinRoom', () => {
         });
         const row = makeRoomRow({
             state: makeGameState({ players: [staleHost], phase: 'playing', host: 'p1' }),
+            version: 5,
             player_seen: { p1: STALE_SEEN },
         });
         const store = new FakeRoomStore(row);
@@ -274,8 +311,12 @@ describe('joinRoom', () => {
             isReady: true,
         });
         expect(result.room?.state.host).toBe('p2');
+        expect(result.room?.state.lastAction).toBe('Alice reconnected');
         expect(result.room?.playerSeen.p2).toBe(NOW_ISO);
         expect(result.room?.playerSeen.p1).toBeUndefined();
+        expect(result.room?.version).toBe(6);
+        expect(store.writeCount).toBe(1);
+        expect(store.touchCount).toBe(0);
     });
 
     it('D-04: player count never shrinks across any join path', async () => {
