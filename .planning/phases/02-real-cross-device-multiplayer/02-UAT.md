@@ -1,19 +1,19 @@
 ---
 status: partial
 phase: 02-real-cross-device-multiplayer
-source: [02-05-SUMMARY.md, 02-07-SUMMARY.md, 02-08-SUMMARY.md, 02-09-SUMMARY.md, 02-10-SUMMARY.md, 02-11-SUMMARY.md, 02-12-SUMMARY.md]
+source: [02-05-SUMMARY.md, 02-07-SUMMARY.md, 02-08-SUMMARY.md, 02-09-SUMMARY.md, 02-10-SUMMARY.md, 02-11-SUMMARY.md, 02-12-SUMMARY.md, 02-14-SUMMARY.md, 02-15-SUMMARY.md]
 started: 2026-07-28T18:00:00Z
-updated: 2026-07-28T20:30:00Z
+updated: 2026-07-30T00:00:00Z
 ---
 
 ## Current Test
 
-number: 6
-name: Leave Game + rejoin (D-14, D-04)
+number: 7
+name: Reconciliation toast fires for an idle player, not just the mover
 expected: |
-  Pressing Leave Game, confirming, lands on the menu. Rejoining with the same
-  room code and name puts the player back in their same seat with hand intact.
-awaiting: user response
+  A player who has not submitted a move should never see "Your move didn't
+  stick" purely because another player's legitimate move just broadcast.
+awaiting: gap logged - routing through the gap-closure planning cycle
 
 ## Tests
 
@@ -70,6 +70,15 @@ artifacts:
     issue: reconciliation compares against optimistic local state with no way to distinguish a stale/no-op broadcast from a genuine authoritative correction
 missing:
   - A version-exempt write path for player_seen-only updates (heartbeat, and join-room's 'existing' branch) so routine connectivity traffic stops bumping the game-state version
+status_note: |
+  FIXED and deployed (plan 02-15, migration 0003 + all 7 Edge Functions
+  redeployed to the hosted project): heartbeat and join-room's D-01 branch
+  both route through a version-exempt touchPlayerSeen write on their common
+  no-op path. Confirmed live against real Postgres via the smoke suite, not
+  just Vitest fakes. Not carried forward as an open gap - but retesting this
+  surfaced a second, distinct reconciliation bug (see the new Gap below,
+  test 7): the toast was never actually scoped to "did *I* have a move that
+  might not have stuck" in the first place.
 debug_session: ""
 
 ### 4. Disconnect badge + auto-pickup targeting (D-05, D-10)
@@ -122,11 +131,26 @@ expected: Pressing Leave Game and confirming lands on the menu; rejoining
   with their hand intact
 result: [pending]
 
+### 7. Retest after 02-14/02-15 deploy: reconciliation toast on the idle player
+expected: With both fixes deployed, playing several turns across two devices
+  produces no unexpected "didn't stick" toasts on either screen, including
+  during setup phase and including on the screen that did not just move
+result: issue
+reported: |
+  "Still 'Your move didn't stick sync with the latest game state' popups on
+  PC during setup phase." / "Getting that warning on PC even after Phone
+  client turn made in real game."
+severity: major
+note: |
+  The empty-pile stall and heartbeat/D-01 pollution gaps are confirmed fixed
+  (see status_notes on tests 3 and 4b above) - this is a third, distinct
+  gap, logged below. See root_cause in the new Gaps entry.
+
 ## Summary
 
-total: 6
+total: 7
 passed: 2
-issues: 3
+issues: 4
 pending: 2
 skipped: 0
 blocked: 0
@@ -134,25 +158,11 @@ blocked: 0
 ## Gaps
 
 <!-- YAML format for plan-phase --gaps consumption. Only currently-open items
-     are listed here - the D-05 mistargeting gap (test 4) was fixed and
-     deployed during this session and is not carried forward. -->
-
-- truth: "A player's own optimistic move, once submitted, is not overridden by unrelated server traffic that doesn't reflect a real state change"
-  status: failed
-  reason: "Routine heartbeat/auto-rejoin writes bump the room's version and broadcast an unchanged state, which the client's reconciliation check compares against its own in-flight optimistic prediction - producing false 'your move didn't stick' toasts unrelated to any actual conflict. See 02-VERIFICATION.md Gap B for the full root-cause trace."
-  severity: major
-  test: 3
-  root_cause: "heartbeat() and joinRoom()'s 'existing' branch write via the same version-incrementing path as real state-changing moves, even when state itself is unchanged"
-  artifacts:
-    - path: "supabase/functions/_shared/heartbeat.ts"
-      issue: "Unconditional version-bumping write on every 15s heartbeat, regardless of whether state changed"
-    - path: "supabase/functions/_shared/joinRoom.ts"
-      issue: "'existing' seat resolution branch has the same pattern"
-    - path: "supabase/functions/_shared/db.ts"
-      issue: "withVersionRetry has no version-exempt write path for metadata-only updates"
-  missing:
-    - "A player_seen-only write path that does not bump version, so connectivity bookkeeping stops polluting the game-state reconciliation stream"
-  debug_session: ""
+     are listed here - the D-05 mistargeting gap (test 4), the heartbeat/D-01
+     version-pollution gap (test 3, closed by plan 02-15), and the empty-pile
+     stall gap (test 4b, closed by plan 02-14) were all fixed and deployed
+     during this phase and are not carried forward; their fix record lives in
+     the corresponding Tests section entries' status_note above. -->
 
 - truth: "Leaving mid-turn resolves within the same ~60s grace period as an ordinary disconnect"
   status: failed
@@ -171,17 +181,34 @@ blocked: 0
     - "Decide whether this bounded, self-resolving delay is acceptable as-is, or whether Leave Game should send a lightweight signal to fast-track the staleness clock"
   debug_session: ""
 
-- truth: "A turn that times out always resolves, regardless of table state"
+- truth: "A player who has not submitted a move never sees a toast implying their own move failed"
   status: failed
-  reason: "PICK_UP_PILE requires a non-empty discard pile (PILE_EMPTY otherwise). checkTurnTimeout forwards that error unwritten, and useTurnTimeoutSweep silently swallows every sweep error (.catch(() => {})) with no fallback. Since nothing about the room changes between sweeps, every retry produces the identical failure forever - the game stalls permanently and silently, with zero user-visible indication anything is wrong."
-  severity: blocker
-  test: 4b
-  root_cause: "D-05's auto-pickup assumed PICK_UP_PILE is always legal when a turn can't otherwise be resolved; an empty discard pile breaks that assumption and D-05 has no fallback for it"
+  reason: |
+    Live retest after the 02-15 deploy: the PC (idle, made no move) showed
+    "Your move didn't stick" immediately after the phone made a legitimate,
+    successful move - during both setup phase and normal play. Traced via
+    code, not just observed: useRoomSubscription's handlePayload fires
+    onReconciled() whenever the incoming broadcast's state differs from this
+    client's current local state, with no check for whether this client has
+    a move of its own actually in flight. For any client that did not just
+    submit a move, the local state is - by definition - the pre-move
+    snapshot right up until the broadcast delivers the post-move state, so
+    the comparison is structurally guaranteed to mismatch on essentially
+    every real move any other player makes, not only on genuine
+    races/rejections. Distinct from the two 02-14/02-15 gaps: those were
+    about *ambient, no-op* writes bumping the version; this fires on
+    completely legitimate, content-changing writes too, and specifically for
+    the client who did *not* make the move.
+  severity: major
+  test: 7
+  root_cause: "onReconciled fires on any local/server state diff, with no gate on whether the comparing client itself has an unconfirmed move outstanding"
   artifacts:
-    - path: "supabase/functions/_shared/turnTimeout.ts"
-      issue: "No fallback when applyMove's PICK_UP_PILE attempt returns PILE_EMPTY"
-    - path: "src/hooks/useTurnTimeoutSweep.ts"
-      issue: "Every sweep error is silently swallowed with no distinction or surfacing"
+    - path: "src/hooks/useRoomSubscription.ts"
+      issue: "handlePayload's stableStringify comparison and onReconciled() call have no awareness of whether this client submitted the move that produced the incoming broadcast"
+    - path: "src/context/GameContext.tsx"
+      issue: "dispatchMove/submitMove do not record any 'I have a move outstanding' flag that useRoomSubscription could gate on"
+    - path: "src/hooks/useGameState.ts"
+      issue: "submitMove's own result?.error branch already raises the correct, correctly-scoped toast for a genuine server-side rejection of this client's own move - the useRoomSubscription path is the one that over-fires"
   missing:
-    - "Design decision made 2026-07-28: auto-play the player's lowest-ranked card (via gameLogic.ts's existing RANK_VALUES ordering) from their current getAvailableCardSource() when PICK_UP_PILE returns PILE_EMPTY. For a faceDown source, cards are blind by design, so there is no rank to compare - deterministically use index 0 instead."
+    - "A per-client 'pending move' flag/ref, set when dispatchMove submits and cleared once the matching broadcast (or a timeout) resolves it, so onReconciled only fires for the client that actually has something outstanding to reconcile"
   debug_session: ""
