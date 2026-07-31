@@ -15,7 +15,7 @@ expected: |
   stick" toasts on the idle screen; and a backgrounded/throttled tab's
   Realtime connection recovers on its own (screen resumes reflecting the
   opponent's moves) without requiring a manual rejoin.
-awaiting: live two-device retest, plus outstanding items from tests 4b and 6
+awaiting: live two-device retest, plus outstanding item from test 6 (test 4b confirmed pass)
 
 ## Tests
 
@@ -115,7 +115,10 @@ status_note: |
 ### 4b. Retest: auto-pickup targeting after the D-05 fix
 expected: With the fix deployed, the auto-pickup should only ever target the
   player who is genuinely stale on player_seen, never a fully connected one
-result: [pending]
+result: pass
+note: |
+  Live retest confirms auto-pickup on the disconnected player worked
+  correctly - targets the genuinely-stale player, not the connected one.
 
 ### 5. Reconnect (D-01, D-10)
 expected: Reopening the app at the same URL drops the player straight back
@@ -216,9 +219,9 @@ result: [pending]
 ## Summary
 
 total: 9
-passed: 2
+passed: 3
 issues: 5
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 
