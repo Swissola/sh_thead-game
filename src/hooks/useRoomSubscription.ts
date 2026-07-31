@@ -1,6 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { getSupabaseClient } from '../supabase/client';
-import { rowToServerRoom, type RoomRow, type ServerRoom } from '../supabase/roomTypes';
+import {
+    rowToServerRoom,
+    type RoomRow,
+    type ServerRoom,
+    SUBSCRIPTION_RECONNECT_BASE_MS,
+    SUBSCRIPTION_RECONNECT_MAX_MS,
+    SUBSCRIPTION_RECONNECT_RESET_DWELL_MS,
+} from '../supabase/roomTypes';
 import type { GameState } from '../types';
 
 export interface UseRoomSubscriptionArgs {
@@ -80,7 +87,18 @@ export function useRoomSubscription({
         lastAppliedVersionRef.current = -1;
 
         const supabase = getSupabaseClient();
-        const channel = supabase.channel(`room-${roomCode}`);
+
+        // Effect-scoped reconnect/backoff state (Plan 02-17, MPLAY-02,
+        // 02-UAT.md test 8) - reset per [roomCode, testMode] effect run,
+        // exactly like lastAppliedVersionRef above. Not useRef: nothing here
+        // needs to survive across effect runs, only across the callbacks
+        // this single effect run schedules.
+        let cancelled = false;
+        let reconnectAttempt = 0;
+        let reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
+        let resetDwellTimeoutId: ReturnType<typeof setTimeout> | null = null;
+        let hadDisconnected = false;
+        let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 
         const handlePayload = (payload: { new: RoomRow }) => {
             const row = payload.new;
@@ -105,21 +123,104 @@ export function useRoomSubscription({
             onServerRoomRef.current(serverRoom); // always snap to server truth (D-11)
         };
 
-        channel
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `room_code=eq.${roomCode}` },
-                handlePayload
-            )
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'rooms', filter: `room_code=eq.${roomCode}` },
-                handlePayload
-            )
-            .subscribe();
+        // No-op if a reconnect is already scheduled (overlapping-timer
+        // guard) or the effect has been cancelled. Delay is capped
+        // exponential backoff: SUBSCRIPTION_RECONNECT_BASE_MS doubling on
+        // each consecutive failure, never exceeding
+        // SUBSCRIPTION_RECONNECT_MAX_MS - retries are only capped in delay,
+        // never in count, so a dropped connection keeps trying to self-heal
+        // indefinitely rather than freezing the screen forever (02-UAT.md
+        // test 8).
+        const scheduleReconnect = () => {
+            if (cancelled || reconnectTimeoutId !== null) return;
+            const delay = Math.min(
+                SUBSCRIPTION_RECONNECT_BASE_MS * 2 ** reconnectAttempt,
+                SUBSCRIPTION_RECONNECT_MAX_MS
+            );
+            reconnectAttempt += 1;
+            reconnectTimeoutId = setTimeout(() => {
+                reconnectTimeoutId = null;
+                if (!cancelled) subscribeChannel();
+            }, delay);
+        };
+
+        // Creates and subscribes a fresh channel for this room, called once
+        // synchronously at mount and again on every reconnect. Restructured
+        // out of a single inline channel construction so a dropped
+        // connection can be replaced mid-effect (Plan 02-17).
+        const subscribeChannel = () => {
+            const channel = supabase.channel(`room-${roomCode}`);
+            currentChannel = channel;
+
+            channel
+                .on(
+                    'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `room_code=eq.${roomCode}` },
+                    handlePayload
+                )
+                .on(
+                    'postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'rooms', filter: `room_code=eq.${roomCode}` },
+                    handlePayload
+                )
+                .subscribe((status: string) => {
+                    if (cancelled) return; // a status arriving after unmount/room-change must do nothing
+
+                    if (status === 'SUBSCRIBED') {
+                        // Defensive: 'SUBSCRIBED' only fires once per
+                        // successful (re)subscribe, so there is never one
+                        // already pending here under this plan's own control
+                        // flow - cheap safety margin against a future edit
+                        // changing that assumption.
+                        if (resetDwellTimeoutId !== null) {
+                            clearTimeout(resetDwellTimeoutId);
+                        }
+                        // Schedule, don't immediately apply, the backoff
+                        // reset: a flapping connection (brief reconnect
+                        // immediately followed by another drop) must not
+                        // have its retry cadence reset to base on every
+                        // blip - only a connection that stays up for a
+                        // genuine dwell period counts as recovered.
+                        resetDwellTimeoutId = setTimeout(() => {
+                            resetDwellTimeoutId = null;
+                            reconnectAttempt = 0;
+                        }, SUBSCRIPTION_RECONNECT_RESET_DWELL_MS);
+                        // hadDisconnected is only ever true here on a
+                        // post-drop resubscribe - reset it now so a
+                        // subsequent, genuinely routine SUBSCRIBED does not
+                        // look like a recovery. Task 2 (Plan 02-17) extends
+                        // this branch to capture the pre-reset value before
+                        // clearing it and trigger the one-off recovery
+                        // refetch from it.
+                        if (hadDisconnected) {
+                            hadDisconnected = false;
+                        }
+                        return;
+                    }
+
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        // A SUBSCRIBED blip that did not actually last must
+                        // not be allowed to reset the backoff counter - stop
+                        // that pending dwell timer before it fires.
+                        if (resetDwellTimeoutId !== null) {
+                            clearTimeout(resetDwellTimeoutId);
+                            resetDwellTimeoutId = null;
+                        }
+                        hadDisconnected = true;
+                        supabase.removeChannel(channel);
+                        currentChannel = null; // the effect's cleanup must not try to remove this again
+                        scheduleReconnect();
+                    }
+                });
+        };
+
+        subscribeChannel();
 
         return () => {
-            supabase.removeChannel(channel);
+            cancelled = true;
+            if (reconnectTimeoutId !== null) clearTimeout(reconnectTimeoutId);
+            if (resetDwellTimeoutId !== null) clearTimeout(resetDwellTimeoutId);
+            if (currentChannel !== null) supabase.removeChannel(currentChannel);
         };
     }, [roomCode, testMode]);
 }

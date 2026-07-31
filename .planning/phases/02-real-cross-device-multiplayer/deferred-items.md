@@ -260,3 +260,18 @@ boundary rules.
   src/__tests__/App.test.tsx` (this task's four touched files) is clean with zero
   output. Not re-fixed here per scope boundary; still carried forward for the same
   future lint-cleanup pass first logged under Plan 02-01.
+
+## Plan 02-17 (Task 1 and Task 2)
+
+- **`npm run lint` still exits 1** (Task 2's `<acceptance_criteria>` and this plan's own
+  `<verification>` both expect exit 0) - the same two pre-existing issues logged under
+  Plan 02-16 above, in the same two files (`GameContext.tsx:221`,
+  `GameScreen.tsx:107`), neither of which this plan touches (`GameContext.tsx` is not
+  imported or modified anywhere in this plan; `GameScreen.tsx` is untouched). Confirmed
+  via `git status --short` after both tasks: only `src/supabase/roomTypes.ts`,
+  `src/hooks/useRoomSubscription.ts` and
+  `src/__tests__/hooks/useRoomSubscription.test.ts` are modified. `npx eslint
+  src/supabase/roomTypes.ts src/hooks/useRoomSubscription.ts
+  src/__tests__/hooks/useRoomSubscription.test.ts` (this plan's three touched files) is
+  clean with zero output. Not re-fixed here per scope boundary; still carried forward
+  for the same future lint-cleanup pass first logged under Plan 02-01.

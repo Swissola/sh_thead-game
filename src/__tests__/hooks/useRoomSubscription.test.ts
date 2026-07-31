@@ -46,15 +46,17 @@ function makeFakeChannel() {
 
 function makeFakeSupabase() {
     const channels: ReturnType<typeof makeFakeChannel>[] = [];
+    const channelNames: string[] = [];
     const supabase = {
-        channel: vi.fn(() => {
+        channel: vi.fn((name: string) => {
+            channelNames.push(name);
             const ch = makeFakeChannel();
             channels.push(ch);
             return ch;
         }),
         removeChannel: vi.fn(),
     };
-    return { supabase, channels };
+    return { supabase, channels, channelNames };
 }
 
 function buildState(overrides: Partial<GameState> = {}): GameState {
@@ -706,7 +708,7 @@ describe('useRoomSubscription', () => {
 
         it('changing the room code while a reconnect for the old room is pending cancels that pending reconnect', () => {
             vi.useFakeTimers();
-            const { supabase, channels } = makeFakeSupabase();
+            const { supabase, channels, channelNames } = makeFakeSupabase();
             vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
 
             const { rerender } = renderHook(
@@ -726,19 +728,15 @@ describe('useRoomSubscription', () => {
 
             rerender({ roomCode: 'XYZ789' });
 
-            const roomCodeCallsAfterChange = supabase.channel.mock.calls.filter(
-                (args) => args[0] === 'room-ABC123'
-            );
+            const roomCodeCallsAfterChange = channelNames.filter((name) => name === 'room-ABC123').length;
 
             vi.advanceTimersByTime(SUBSCRIPTION_RECONNECT_MAX_MS);
 
             // No extra channel is ever created for the old room's cancelled
             // reconnect - only the original mount call used 'room-ABC123'.
-            const roomCodeCallsAfterAdvance = supabase.channel.mock.calls.filter(
-                (args) => args[0] === 'room-ABC123'
-            );
-            expect(roomCodeCallsAfterAdvance).toHaveLength(roomCodeCallsAfterChange.length);
-            expect(roomCodeCallsAfterAdvance).toHaveLength(1);
+            const roomCodeCallsAfterAdvance = channelNames.filter((name) => name === 'room-ABC123').length;
+            expect(roomCodeCallsAfterAdvance).toBe(roomCodeCallsAfterChange);
+            expect(roomCodeCallsAfterAdvance).toBe(1);
         });
     });
 });
