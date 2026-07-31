@@ -1,19 +1,21 @@
 ---
 status: partial
 phase: 02-real-cross-device-multiplayer
-source: [02-05-SUMMARY.md, 02-07-SUMMARY.md, 02-08-SUMMARY.md, 02-09-SUMMARY.md, 02-10-SUMMARY.md, 02-11-SUMMARY.md, 02-12-SUMMARY.md, 02-14-SUMMARY.md, 02-15-SUMMARY.md]
+source: [02-05-SUMMARY.md, 02-07-SUMMARY.md, 02-08-SUMMARY.md, 02-09-SUMMARY.md, 02-10-SUMMARY.md, 02-11-SUMMARY.md, 02-12-SUMMARY.md, 02-14-SUMMARY.md, 02-15-SUMMARY.md, 02-16-SUMMARY.md, 02-17-SUMMARY.md]
 started: 2026-07-28T18:00:00Z
-updated: 2026-07-30T00:00:00Z
+updated: 2026-07-31T00:00:00Z
 ---
 
 ## Current Test
 
-number: 7
-name: Reconciliation toast fires for an idle player, not just the mover
+number: 9
+name: Retest after 02-16/02-17 deploy - reconciliation toast scoping and Realtime self-heal
 expected: |
-  A player who has not submitted a move should never see "Your move didn't
-  stick" purely because another player's legitimate move just broadcast.
-awaiting: gap logged - routing through the gap-closure planning cycle
+  Playing several turns across two devices produces no unexpected "didn't
+  stick" toasts on the idle screen; and a backgrounded/throttled tab's
+  Realtime connection recovers on its own (screen resumes reflecting the
+  opponent's moves) without requiring a manual rejoin.
+awaiting: live two-device retest, plus outstanding items from tests 4b and 6
 
 ## Tests
 
@@ -145,6 +147,17 @@ note: |
   The empty-pile stall and heartbeat/D-01 pollution gaps are confirmed fixed
   (see status_notes on tests 3 and 4b above) - this is a third, distinct
   gap, logged below. See root_cause in the new Gaps entry.
+status_note: |
+  FIXED (plan 02-16, commits a5a372b/8ba51bc/3575c35, merged to
+  stage-1-refactor): a per-client pending-move tracker
+  (beginPendingMove/resolveOldestPendingMove/hasPendingMove) now gates the
+  reconciliation toast on whether this specific client actually has a move
+  outstanding, not just on whether the broadcast differs from local state.
+  432/432 tests passing, build clean. Two narrow accepted residuals
+  documented and tested rather than left silent (T-02-58 same-client
+  overlapping submissions, T-02-59 cross-player non-turn-gated setup-phase
+  races - see 02-16-PLAN.md's threat model). Not carried forward as an open
+  gap; live two-device retest still pending (see test 9).
 
 ### 8. Realtime room-data channel goes silently stale, no reconnect
 expected: If the browser's WebSocket connection drops or is throttled (tab
@@ -181,13 +194,31 @@ artifacts:
 missing:
   - "A subscribe-status callback on useRoomSubscription's channel that detects CHANNEL_ERROR/TIMED_OUT/CLOSED and resubscribes (or forces a full state refetch), so a dropped WebSocket self-heals instead of requiring a manual rejoin"
 debug_session: ""
+status_note: |
+  FIXED (plan 02-17, commits 21ded97/bc14e50/d6a64d2, merged to
+  stage-1-refactor): useRoomSubscription's channel now has a subscribe-status
+  callback detecting CHANNEL_ERROR/TIMED_OUT/CLOSED and resubscribes with
+  dwell-gated capped exponential backoff; a one-off recovery refetch on
+  reconnect closes the missed-broadcast gap, with its reconciliation check
+  gated on hadPendingMoveAtDrop (a snapshot taken at the instant of the
+  drop) so it doesn't reopen the 02-16 bystander-false-toast bug. 432/432
+  tests passing (37/37 in useRoomSubscription.test.ts), build clean. Not
+  carried forward as an open gap; live two-device retest still pending
+  (see test 9).
+
+### 9. Retest after 02-16/02-17 deploy: reconciliation toast scoping and Realtime self-heal
+expected: |
+  Playing several turns across two devices produces no unexpected "didn't
+  stick" toasts on the idle screen (setup and normal play); backgrounding or
+  throttling a tab's connection self-heals without a manual rejoin.
+result: [pending]
 
 ## Summary
 
-total: 8
+total: 9
 passed: 2
 issues: 5
-pending: 2
+pending: 3
 skipped: 0
 blocked: 0
 
@@ -195,8 +226,10 @@ blocked: 0
 
 <!-- YAML format for plan-phase --gaps consumption. Only currently-open items
      are listed here - the D-05 mistargeting gap (test 4), the heartbeat/D-01
-     version-pollution gap (test 3, closed by plan 02-15), and the empty-pile
-     stall gap (test 4b, closed by plan 02-14) were all fixed and deployed
+     version-pollution gap (test 3, closed by plan 02-15), the empty-pile
+     stall gap (test 4b, closed by plan 02-14), the reconciliation-toast
+     scoping gap (test 7, closed by plan 02-16), and the silently-stale
+     Realtime channel gap (test 8, closed by plan 02-17) were all fixed
      during this phase and are not carried forward; their fix record lives in
      the corresponding Tests section entries' status_note above. -->
 
@@ -215,61 +248,4 @@ blocked: 0
       issue: "transferHostIfStale has the identical staleness-clock-starts-late interaction for a host who leaves the lobby"
   missing:
     - "Decide whether this bounded, self-resolving delay is acceptable as-is, or whether Leave Game should send a lightweight signal to fast-track the staleness clock"
-  debug_session: ""
-
-- truth: "A player who has not submitted a move never sees a toast implying their own move failed"
-  status: failed
-  reason: |
-    Live retest after the 02-15 deploy: the PC (idle, made no move) showed
-    "Your move didn't stick" immediately after the phone made a legitimate,
-    successful move - during both setup phase and normal play. Traced via
-    code, not just observed: useRoomSubscription's handlePayload fires
-    onReconciled() whenever the incoming broadcast's state differs from this
-    client's current local state, with no check for whether this client has
-    a move of its own actually in flight. For any client that did not just
-    submit a move, the local state is - by definition - the pre-move
-    snapshot right up until the broadcast delivers the post-move state, so
-    the comparison is structurally guaranteed to mismatch on essentially
-    every real move any other player makes, not only on genuine
-    races/rejections. Distinct from the two 02-14/02-15 gaps: those were
-    about *ambient, no-op* writes bumping the version; this fires on
-    completely legitimate, content-changing writes too, and specifically for
-    the client who did *not* make the move.
-  severity: major
-  test: 7
-  root_cause: "onReconciled fires on any local/server state diff, with no gate on whether the comparing client itself has an unconfirmed move outstanding"
-  artifacts:
-    - path: "src/hooks/useRoomSubscription.ts"
-      issue: "handlePayload's stableStringify comparison and onReconciled() call have no awareness of whether this client submitted the move that produced the incoming broadcast"
-    - path: "src/context/GameContext.tsx"
-      issue: "dispatchMove/submitMove do not record any 'I have a move outstanding' flag that useRoomSubscription could gate on"
-    - path: "src/hooks/useGameState.ts"
-      issue: "submitMove's own result?.error branch already raises the correct, correctly-scoped toast for a genuine server-side rejection of this client's own move - the useRoomSubscription path is the one that over-fires"
-  missing:
-    - "A per-client 'pending move' flag/ref, set when dispatchMove submits and cleared once the matching broadcast (or a timeout) resolves it, so onReconciled only fires for the client that actually has something outstanding to reconcile"
-  debug_session: ""
-
-- truth: "A dropped or throttled Realtime connection self-heals instead of permanently freezing the game-state view"
-  status: failed
-  reason: |
-    Confirmed by direct inspection of the hosted room's moves audit table
-    (room ZABYDB, versions 58-72): every play alternates PC/Phone correctly
-    with zero gaps or duplicates, so nothing was lost or corrupted
-    server-side. The PC's screen stopped reflecting new broadcasts entirely
-    - the user's own move appeared not to register, and the opponent's move
-    right before it was never seen either - until a full manual rejoin
-    ("signing in to the room again") forced a resync. A subsequent replay
-    from the stale screen was most likely rejected server-side (a
-    stale-precondition CAS loss against the true current state) rather than
-    the original move having failed to land.
-  severity: blocker
-  test: 8
-  root_cause: "useRoomSubscription's postgres_changes channel has no subscribe-status callback and no CHANNEL_ERROR/TIMED_OUT/CLOSED handling, so a silently dropped WebSocket (tab backgrounding, network blip, an idle period) is never detected or recovered from"
-  artifacts:
-    - path: "src/hooks/useRoomSubscription.ts"
-      issue: "channel.subscribe() has no status callback and no error/reconnect handling of any kind"
-    - path: "src/hooks/usePresence.ts"
-      issue: "the only precedent in the codebase for reacting to a channel's subscribe status (checks status === 'SUBSCRIBED') - reference for how the fix should hook in"
-  missing:
-    - "A subscribe-status callback on useRoomSubscription's channel that detects CHANNEL_ERROR/TIMED_OUT/CLOSED and resubscribes (or forces a full state refetch via a fresh join-room-style read), so a dropped connection self-heals instead of requiring a manual rejoin"
   debug_session: ""
