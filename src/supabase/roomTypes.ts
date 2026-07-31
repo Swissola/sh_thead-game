@@ -91,6 +91,39 @@ export const HEARTBEAT_INTERVAL_MS = 15000;
 export const DISCONNECT_THRESHOLD_MS = 45000;
 
 /**
+ * First retry delay after a dropped room-data Realtime channel
+ * (CHANNEL_ERROR/TIMED_OUT/CLOSED, MPLAY-02, 02-UAT.md test 8). Fast enough
+ * that a brief blip (a few seconds of backgrounding, a momentary network
+ * hiccup) recovers close to instantly.
+ */
+export const SUBSCRIPTION_RECONNECT_BASE_MS = 1000;
+
+/**
+ * Backoff ceiling for the room-data channel's reconnect delay. Retries are
+ * deliberately never capped in *count*, only in *delay*: MPLAY-02's whole
+ * point is that a dropped connection self-heals without a manual rejoin, so
+ * giving up after N attempts would silently reintroduce the exact
+ * permanent-freeze failure this plan closes, just delayed. A 30s ceiling
+ * keeps a genuinely-down network from being hammered while still trying
+ * indefinitely until the network returns.
+ */
+export const SUBSCRIPTION_RECONNECT_MAX_MS = 30000;
+
+/**
+ * Minimum time a resubscribed room-data channel must stay connected before
+ * its reconnect backoff counter resets to base. Without this, a flapping
+ * connection (a brief reconnect immediately followed by another drop -
+ * plausible for a Wi-Fi/cell handoff, one of the causes behind
+ * `02-UAT.md` test 8's "tab backgrounding, brief network blip") would have
+ * every SUBSCRIBED status reset the counter to 0, pinning retry cadence near
+ * the 1s base indefinitely even though the connection never actually
+ * stabilises. 5s is comfortably shorter than the 30s cap but long enough
+ * that a channel merely bouncing through SUBSCRIBED for a moment before
+ * re-erroring is not mistaken for a genuine recovery.
+ */
+export const SUBSCRIPTION_RECONNECT_RESET_DWELL_MS = 5000;
+
+/**
  * Safety-net upper bound for `GameContext`'s pending-move tracker (MPLAY-05):
  * comfortably above a normal Realtime broadcast round-trip, and safely below
  * `HEARTBEAT_INTERVAL_MS` (15000) so a stuck flag self-heals well before the
