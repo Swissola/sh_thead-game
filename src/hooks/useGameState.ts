@@ -21,12 +21,24 @@ import type { EdgeResult } from '../supabase/roomTypes';
  * correction and arrives regardless of this invocation's outcome, so this
  * hook never rolls the optimistic state back itself - it only distinguishes
  * which toast copy/variant to show.
+ *
+ * Plan 02-16 (MPLAY-05, UAT test 7): `beginPendingMove` is called once per
+ * real (non-test-mode) submission, immediately before the network call
+ * fires, so GameContext's pending-move tracker knows this client has a move
+ * genuinely outstanding for the whole window a reconciliation broadcast
+ * could legitimately arrive. Its returned resolver is called on exactly the
+ * three branches below that mean "no write happened, no broadcast is coming
+ * for this attempt" - never on the bare-success path, since a successful
+ * write still has a broadcast in flight and only GameContext's
+ * applyServerRoom (via resolveOldestPendingMove) is responsible for
+ * resolving that.
  */
 export function useGameStateUpdater(
     testMode: boolean,
     roomCode: string,
     setGameState: (s: GameState) => void,
-    showToast: (message: string, code?: string, variant?: ToastVariant) => void
+    showToast: (message: string, code?: string, variant?: ToastVariant) => void,
+    beginPendingMove: () => () => void
 ) {
     const submitMove = useCallback(
         (move: Move, optimisticState: GameState) => {
@@ -34,6 +46,7 @@ export function useGameStateUpdater(
             if (testMode) {
                 return;
             }
+            const resolvePendingMove = beginPendingMove();
             void (async () => {
                 try {
                     const { data, error } = await getSupabaseClient().functions.invoke('apply-move', {
@@ -42,6 +55,7 @@ export function useGameStateUpdater(
                     if (error) {
                         // Transport failure - the move may still land, so keep the
                         // generic retry copy rather than the reconciliation copy.
+                        resolvePendingMove();
                         showToast('Failed to save your move - please retry.');
                         return;
                     }
@@ -50,6 +64,7 @@ export function useGameStateUpdater(
                         // Server-side rejection - the server has definitively
                         // disagreed with the optimistic prediction. Do not roll
                         // back here; the Realtime broadcast will correct the state.
+                        resolvePendingMove();
                         showToast(
                             "Your move didn't stick - synced with the latest game state.",
                             'RECONCILED',
@@ -57,11 +72,12 @@ export function useGameStateUpdater(
                         );
                     }
                 } catch {
+                    resolvePendingMove();
                     showToast('Failed to save your move - please retry.');
                 }
             })();
         },
-        [testMode, roomCode, setGameState, showToast]
+        [testMode, roomCode, setGameState, showToast, beginPendingMove]
     );
 
     return submitMove;

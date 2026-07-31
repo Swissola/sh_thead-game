@@ -229,3 +229,22 @@ boundary rules.
   key it previously lacked). Not a code change; noted here since a sibling worktree
   hitting the same symptom will need the same stop/start cycle rather than assuming
   a hosted-project fallback is required.
+
+## Plan 02-16 (Task 1)
+
+- **`npm run lint` still exits 1** (Task 1 acceptance criterion expects exit 0) - the
+  same two pre-existing issues logged under Plan 02-12 above:
+  - `src/context/GameContext.tsx:221` - `react-refresh/only-export-components`
+    (`useGameContext` exported alongside `GameProvider`, unchanged by this task; the
+    line number shifted only because this task added lines earlier in the file)
+  - `src/screens/GameScreen.tsx:107` - `react-hooks/set-state-in-effect`, in the
+    same pre-existing celebration-modal effect, unrelated to this plan
+  - Confirmed pre-existing by temporarily stashing this task's own edits (reverting to
+    the worktree's base commit) and re-running `npm run lint`: both errors reproduce
+    identically, at the same relative locations, with this task's changes absent.
+    `npx eslint src/context/GameContext.tsx src/hooks/useGameState.ts
+    src/supabase/roomTypes.ts` (this task's three source files) reports only the one
+    pre-existing `react-refresh` error already logged above - no new lint errors from
+    the `beginPendingMove`/`resolveOldestPendingMove`/`hasPendingMove` additions. Not
+    re-fixed here per scope boundary; still carried forward for the same future
+    lint-cleanup pass first logged under Plan 02-01.

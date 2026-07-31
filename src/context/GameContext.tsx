@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useRef, type ReactNod
 import { applyMove } from '../engine/applyMove';
 import type { Move } from '../engine/moves';
 import type { GameState } from '../types';
-import type { ServerRoom } from '../supabase/roomTypes';
+import { PENDING_MOVE_TIMEOUT_MS, type ServerRoom } from '../supabase/roomTypes';
 import { useGameStateUpdater } from '../hooks/useGameState';
 import { useToast, type ToastState, type ToastVariant } from '../hooks/useToast';
 
@@ -26,6 +26,7 @@ export interface GameContextValue {
     notifyReconciled: () => void;
     roomVersion: number;
     turnStartedAt: string;
+    hasPendingMove: () => boolean;
     toast: ToastState | null;
     showToast: (message: string, code?: string, variant?: ToastVariant) => void;
     dismissToast: () => void;
@@ -57,12 +58,85 @@ export function GameProvider({ playerId, children }: { playerId: string; childre
     // for the same reason.
     const roomVersionRef = useRef(-1);
 
+    // Plan 02-16 (MPLAY-05, UAT test 7): a per-client "pending move" tracker,
+    // private to this file - only `hasPendingMove` is exposed on
+    // GameContextValue, since that is the only piece useRoomSubscription
+    // needs. pendingMoveCountRef counts how many of THIS client's own
+    // submissions are currently unresolved; pendingMoveTimeoutsRef holds each
+    // one's individual safety-net timeout so one submission's resolution can
+    // never accidentally cancel another's. A Set's iteration order is
+    // insertion order, which resolveOldestPendingMove relies on to find "the
+    // oldest still-outstanding submission" without a separate ordered
+    // structure.
+    const pendingMoveCountRef = useRef(0);
+    const pendingMoveTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+    // Called once per real (non-test-mode) submission, immediately before the
+    // network call fires (from useGameState.ts's submitMove). Returns a
+    // settle() closure that is idempotent: it only clears the timeout and
+    // decrements the count if this specific timeout is still present in the
+    // set - i.e. it hasn't already fired or already been settled once.
+    // pendingMoveTimeoutsRef.current.delete(timeoutId) returning true is the
+    // guard. This per-call independence is what makes overlapping
+    // submissions resolve correctly: settling submission A can only ever
+    // cancel/decrement submission A's own entry, never submission B's.
+    //
+    // Call sites for the returned settle() live in useGameState.ts, never
+    // here - beginPendingMove only *creates* the tracking; it never assumes
+    // when or whether it resolves.
+    const beginPendingMove = useCallback((): (() => void) => {
+        pendingMoveCountRef.current += 1;
+        const timeoutId: ReturnType<typeof setTimeout> = setTimeout(() => {
+            if (pendingMoveTimeoutsRef.current.delete(timeoutId)) {
+                pendingMoveCountRef.current = Math.max(0, pendingMoveCountRef.current - 1);
+            }
+        }, PENDING_MOVE_TIMEOUT_MS);
+        pendingMoveTimeoutsRef.current.add(timeoutId);
+
+        return () => {
+            if (pendingMoveTimeoutsRef.current.delete(timeoutId)) {
+                clearTimeout(timeoutId);
+                pendingMoveCountRef.current = Math.max(0, pendingMoveCountRef.current - 1);
+            }
+        };
+    }, []);
+
+    // Called from applyServerRoom, inside the existing stale-version guard's
+    // *pass* branch - i.e. only when a broadcast is actually accepted.
+    // Removes and clears ONLY the single oldest entry still tracked in
+    // pendingMoveTimeoutsRef (a Set's iteration order is insertion order, so
+    // .values().next().value is the oldest still-outstanding submission),
+    // decrementing pendingMoveCountRef by exactly one (clamped at a floor of
+    // 0 - a no-op when nothing is pending, e.g. a heartbeat or lobby
+    // broadcast with no move in flight).
+    //
+    // FIFO, one-at-a-time removal - never a bulk clear - is what stops an
+    // *earlier* submission's own broadcast from silently zeroing out a
+    // *later*, still-genuinely-outstanding submission's pending credit. A
+    // plan-checker review caught bulk-clearing the whole Set in one go as
+    // this plan's first-draft bug: it let a real divergence on a later,
+    // still-outstanding submission go unreported - the opposite of MPLAY-05's
+    // contract. Do not "simplify" this back into a bulk clear (calling
+    // .clear() on the whole tracked-timeouts Set); see the plan's "Scope
+    // note on overlapping submissions" for exactly what this does and does
+    // not additionally guarantee.
+    const resolveOldestPendingMove = useCallback(() => {
+        const oldest = pendingMoveTimeoutsRef.current.values().next().value;
+        if (oldest === undefined) return;
+        pendingMoveTimeoutsRef.current.delete(oldest);
+        clearTimeout(oldest);
+        pendingMoveCountRef.current = Math.max(0, pendingMoveCountRef.current - 1);
+    }, []);
+
+    // The query useRoomSubscription consults before calling onReconciled.
+    const hasPendingMove = useCallback(() => pendingMoveCountRef.current > 0, []);
+
     // D-10 cleanup: roomCode is derived from gameState each render, not a separate
     // state field - removes the dual-purpose roomCode state bug present in App.tsx.
     const roomCode = gameState?.roomCode ?? '';
     // Plan 02-09: the storage write is gone - submitMove applies the optimistic
     // state locally then submits to the apply-move Edge Function (MPLAY-05).
-    const submitMove = useGameStateUpdater(testMode, roomCode, setGameStateInternal, showToast);
+    const submitMove = useGameStateUpdater(testMode, roomCode, setGameStateInternal, showToast, beginPendingMove);
 
     // D-10 cleanup: computed once here, replacing the four duplicate
     // `const currentPlayerId = testMode ? ... : playerId` lines in App.tsx.
@@ -101,13 +175,17 @@ export function GameProvider({ playerId, children }: { playerId: string; childre
     // last-applied version (T-02-32 - the optimistic value is never treated
     // as authoritative), otherwise replaces gameState with the server's copy
     // and records its version/turnStartedAt for GameScreen's timeout check.
-    const applyServerRoom = useCallback((room: ServerRoom) => {
-        if (room.version <= roomVersionRef.current) return;
-        roomVersionRef.current = room.version;
-        setGameStateInternal(room.state);
-        setRoomVersion(room.version);
-        setTurnStartedAt(room.turnStartedAt);
-    }, []);
+    const applyServerRoom = useCallback(
+        (room: ServerRoom) => {
+            if (room.version <= roomVersionRef.current) return;
+            resolveOldestPendingMove();
+            roomVersionRef.current = room.version;
+            setGameStateInternal(room.state);
+            setRoomVersion(room.version);
+            setTurnStartedAt(room.turnStartedAt);
+        },
+        [resolveOldestPendingMove]
+    );
 
     // D-12's deliberate departure from Phase 1's one-style-for-all-errors
     // rule: 'RECONCILED' is a client-side networking sentinel, not a member
@@ -125,6 +203,7 @@ export function GameProvider({ playerId, children }: { playerId: string; childre
         notifyReconciled,
         roomVersion,
         turnStartedAt,
+        hasPendingMove,
         toast,
         showToast,
         dismissToast,

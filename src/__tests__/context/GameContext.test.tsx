@@ -9,7 +9,7 @@ vi.mock('../../supabase/client', () => ({
 import { getSupabaseClient } from '../../supabase/client';
 import { GameProvider, useGameContext } from '../../context/GameContext';
 import { buildGameState, buildPlayer } from '../testUtils/buildGameState';
-import type { ServerRoom } from '../../supabase/roomTypes';
+import { PENDING_MOVE_TIMEOUT_MS, type ServerRoom } from '../../supabase/roomTypes';
 
 function makeFakeSupabase(invokeImpl?: (...args: unknown[]) => unknown) {
     const invoke = vi.fn(invokeImpl ?? (() => Promise.resolve({ data: {}, error: null })));
@@ -38,6 +38,8 @@ describe('GameContext', () => {
             await result.current.setGameState(state);
         });
 
+        expect(result.current.hasPendingMove()).toBe(false);
+
         act(() => {
             result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
         });
@@ -46,6 +48,7 @@ describe('GameContext', () => {
         expect(result.current.toast?.code).toBe('WRONG_PHASE');
         expect(result.current.toast?.variant).toBe('error');
         expect(invoke).not.toHaveBeenCalled();
+        expect(result.current.hasPendingMove()).toBe(false);
     });
 
     it('dispatchMove with a legal move sets local state to the predicted state synchronously, then submits the move', async () => {
@@ -184,5 +187,400 @@ describe('GameContext', () => {
 
         expect(typeof result.current.roomVersion).toBe('number');
         expect(typeof result.current.turnStartedAt).toBe('string');
+    });
+
+    // Plan 02-16 (MPLAY-05, UAT test 7): the per-client pending-move tracker
+    // that gates the reconciliation toast (src/hooks/useRoomSubscription.ts).
+    describe('pending-move tracker', () => {
+        it('hasPendingMove() is false immediately after GameProvider mounts, before anything is dispatched', () => {
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            expect(result.current.hasPendingMove()).toBe(false);
+        });
+
+        it('dispatchMove with a legal, non-test-mode move makes hasPendingMove() become true synchronously, before the invoke promise settles', async () => {
+            const { supabase } = makeFakeSupabase(() => new Promise(() => {})); // never resolves
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const state = buildGameState({
+                phase: 'setup',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                ],
+            });
+            await act(async () => {
+                await result.current.setGameState(state);
+            });
+
+            expect(result.current.hasPendingMove()).toBe(false);
+
+            act(() => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+            });
+
+            expect(result.current.hasPendingMove()).toBe(true);
+        });
+
+        it('when the invoke throws, hasPendingMove() becomes false once the rejection is handled, and the existing generic-failure toast still fires unduplicated', async () => {
+            const { supabase } = makeFakeSupabase(() => Promise.reject(new Error('network down')));
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const state = buildGameState({
+                phase: 'setup',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                ],
+            });
+            await act(async () => {
+                await result.current.setGameState(state);
+            });
+
+            await act(async () => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.hasPendingMove()).toBe(false);
+            expect(result.current.toast?.message).toBe('Failed to save your move - please retry.');
+        });
+
+        it('when the invoke resolves with a top-level transport error, hasPendingMove() becomes false, and the existing generic-failure toast still fires unduplicated', async () => {
+            const { supabase } = makeFakeSupabase(() =>
+                Promise.resolve({ data: null, error: new Error('transport') })
+            );
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const state = buildGameState({
+                phase: 'setup',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                ],
+            });
+            await act(async () => {
+                await result.current.setGameState(state);
+            });
+
+            await act(async () => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.hasPendingMove()).toBe(false);
+            expect(result.current.toast?.message).toBe('Failed to save your move - please retry.');
+        });
+
+        it("when the invoke resolves with an EdgeResult.error, hasPendingMove() becomes false, and the existing reconciliation-styled toast fires exactly once unduplicated", async () => {
+            const { supabase } = makeFakeSupabase(() =>
+                Promise.resolve({ data: { error: { code: 'CONFLICT', message: 'stale version' } }, error: null })
+            );
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const state = buildGameState({
+                phase: 'setup',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                ],
+            });
+            await act(async () => {
+                await result.current.setGameState(state);
+            });
+
+            await act(async () => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.hasPendingMove()).toBe(false);
+            expect(result.current.toast?.message).toBe(
+                "Your move didn't stick - synced with the latest game state."
+            );
+            expect(result.current.toast?.variant).toBe('reconcile');
+        });
+
+        it('when the invoke resolves successfully (no error at all), hasPendingMove() stays true - only a subsequent applyServerRoom call clears it', async () => {
+            const { supabase } = makeFakeSupabase(() => Promise.resolve({ data: {}, error: null }));
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const state = buildGameState({
+                phase: 'setup',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                ],
+            });
+            await act(async () => {
+                await result.current.setGameState(state);
+            });
+
+            await act(async () => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.hasPendingMove()).toBe(true);
+        });
+
+        it('applyServerRoom with a greater version resolves exactly one outstanding entry via resolveOldestPendingMove(), regardless of whether the state matches', async () => {
+            const { supabase } = makeFakeSupabase(() => new Promise(() => {})); // never resolves - stays pending
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const state = buildGameState({
+                phase: 'setup',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                ],
+            });
+            await act(async () => {
+                await result.current.setGameState(state);
+            });
+
+            act(() => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+            });
+
+            expect(result.current.hasPendingMove()).toBe(true);
+
+            act(() => {
+                result.current.applyServerRoom({
+                    roomCode: 'TEST',
+                    state: buildGameState({ phase: 'setup', lastAction: 'server accepted' }),
+                    version: 5,
+                    turnStartedAt: '2026-01-01T00:00:00.000Z',
+                    playerSeen: {},
+                });
+            });
+
+            expect(result.current.hasPendingMove()).toBe(false);
+        });
+
+        it('applyServerRoom with a version at or below the current one (the stale/duplicate guard) leaves a genuinely pending move untouched', async () => {
+            const { supabase } = makeFakeSupabase(() => new Promise(() => {}));
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const baselineState = buildGameState({
+                phase: 'setup',
+                lastAction: 'baseline',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                ],
+            });
+
+            act(() => {
+                result.current.applyServerRoom({
+                    roomCode: 'TEST',
+                    state: baselineState,
+                    version: 5,
+                    turnStartedAt: '2026-01-01T00:00:00.000Z',
+                    playerSeen: {},
+                });
+            });
+
+            act(() => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+            });
+
+            expect(result.current.hasPendingMove()).toBe(true);
+
+            act(() => {
+                result.current.applyServerRoom({
+                    roomCode: 'TEST',
+                    state: buildGameState({ phase: 'setup', lastAction: 'stale, should be ignored' }),
+                    version: 5,
+                    turnStartedAt: '2026-02-02T00:00:00.000Z',
+                    playerSeen: {},
+                });
+            });
+
+            expect(result.current.hasPendingMove()).toBe(true);
+        });
+
+        it('with neither a definite failure nor a broadcast arriving, hasPendingMove() becomes false on its own once PENDING_MOVE_TIMEOUT_MS has elapsed', async () => {
+            vi.useFakeTimers();
+            try {
+                const { supabase } = makeFakeSupabase(() => new Promise(() => {}));
+                vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+                const { result } = renderHook(() => useGameContext(), { wrapper });
+
+                const state = buildGameState({
+                    phase: 'setup',
+                    players: [
+                        buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                        buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                    ],
+                });
+                act(() => {
+                    void result.current.setGameState(state);
+                });
+
+                act(() => {
+                    result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+                });
+
+                expect(result.current.hasPendingMove()).toBe(true);
+
+                act(() => {
+                    vi.advanceTimersByTime(PENDING_MOVE_TIMEOUT_MS);
+                });
+
+                expect(result.current.hasPendingMove()).toBe(false);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('two overlapping submissions: if only the first settles via a definite failure, hasPendingMove() stays true (the still-outstanding second submission survives)', async () => {
+            let callCount = 0;
+            const { supabase } = makeFakeSupabase(() => {
+                callCount += 1;
+                return callCount === 1 ? Promise.reject(new Error('first fails')) : new Promise(() => {});
+            });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const state = buildGameState({
+                phase: 'setup',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                ],
+            });
+            await act(async () => {
+                await result.current.setGameState(state);
+            });
+
+            await act(async () => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p1' });
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.hasPendingMove()).toBe(true);
+        });
+
+        it("two overlapping submissions: if only the first settles via a successful applyServerRoom broadcast, hasPendingMove() stays true (the second submission's credit survives)", async () => {
+            const { supabase } = makeFakeSupabase(() => Promise.resolve({ data: {}, error: null }));
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const state = buildGameState({
+                phase: 'setup',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                ],
+            });
+            await act(async () => {
+                await result.current.setGameState(state);
+            });
+
+            await act(async () => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p1' });
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.hasPendingMove()).toBe(true); // two outstanding
+
+            act(() => {
+                result.current.applyServerRoom({
+                    roomCode: 'TEST',
+                    state: buildGameState({ phase: 'setup', lastAction: 'server accepted p0' }),
+                    version: 5,
+                    turnStartedAt: '2026-01-01T00:00:00.000Z',
+                    playerSeen: {},
+                });
+            });
+
+            expect(result.current.hasPendingMove()).toBe(true); // second submission's credit survives
+        });
+
+        it('resolveOldestPendingMove() (exercised indirectly via applyServerRoom) removes exactly one of three outstanding entries per call, not all three', async () => {
+            const { supabase } = makeFakeSupabase(() => new Promise(() => {})); // never resolves - stays pending
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() => useGameContext(), { wrapper });
+
+            const state = buildGameState({
+                phase: 'setup',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+                    buildPlayer({ id: 'p2', name: 'Carol', isReady: false }),
+                ],
+            });
+            await act(async () => {
+                await result.current.setGameState(state);
+            });
+
+            act(() => {
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p0' });
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p1' });
+                result.current.dispatchMove({ type: 'READY_UP', playerId: 'p2' });
+            });
+
+            expect(result.current.hasPendingMove()).toBe(true); // three outstanding
+
+            act(() => {
+                result.current.applyServerRoom({
+                    roomCode: 'TEST',
+                    state: buildGameState({ phase: 'setup', lastAction: 'broadcast 1' }),
+                    version: 5,
+                    turnStartedAt: '2026-01-01T00:00:00.000Z',
+                    playerSeen: {},
+                });
+            });
+            expect(result.current.hasPendingMove()).toBe(true); // two remain
+
+            act(() => {
+                result.current.applyServerRoom({
+                    roomCode: 'TEST',
+                    state: buildGameState({ phase: 'setup', lastAction: 'broadcast 2' }),
+                    version: 6,
+                    turnStartedAt: '2026-01-01T00:00:00.000Z',
+                    playerSeen: {},
+                });
+            });
+            expect(result.current.hasPendingMove()).toBe(true); // one remains
+
+            act(() => {
+                result.current.applyServerRoom({
+                    roomCode: 'TEST',
+                    state: buildGameState({ phase: 'setup', lastAction: 'broadcast 3' }),
+                    version: 7,
+                    turnStartedAt: '2026-01-01T00:00:00.000Z',
+                    playerSeen: {},
+                });
+            });
+            expect(result.current.hasPendingMove()).toBe(false); // none remain
+        });
     });
 });

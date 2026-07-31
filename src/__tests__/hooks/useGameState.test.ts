@@ -29,8 +29,11 @@ describe('useGameStateUpdater', () => {
         vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
         const setGameState = vi.fn();
         const showToast = vi.fn();
+        const beginPendingMove = vi.fn(() => vi.fn());
 
-        const { result } = renderHook(() => useGameStateUpdater(true, 'ABC123', setGameState, showToast));
+        const { result } = renderHook(() =>
+            useGameStateUpdater(true, 'ABC123', setGameState, showToast, beginPendingMove)
+        );
 
         act(() => {
             result.current(move, optimisticState);
@@ -46,8 +49,11 @@ describe('useGameStateUpdater', () => {
         vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
         const setGameState = vi.fn();
         const showToast = vi.fn();
+        const beginPendingMove = vi.fn(() => vi.fn());
 
-        const { result } = renderHook(() => useGameStateUpdater(false, 'ABC123', setGameState, showToast));
+        const { result } = renderHook(() =>
+            useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+        );
 
         act(() => {
             result.current(move, optimisticState);
@@ -62,8 +68,11 @@ describe('useGameStateUpdater', () => {
         vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
         const setGameState = vi.fn();
         const showToast = vi.fn();
+        const beginPendingMove = vi.fn(() => vi.fn());
 
-        const { result } = renderHook(() => useGameStateUpdater(false, 'ABC123', setGameState, showToast));
+        const { result } = renderHook(() =>
+            useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+        );
 
         act(() => {
             result.current(move, optimisticState);
@@ -79,8 +88,11 @@ describe('useGameStateUpdater', () => {
         vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
         const setGameState = vi.fn();
         const showToast = vi.fn();
+        const beginPendingMove = vi.fn(() => vi.fn());
 
-        const { result } = renderHook(() => useGameStateUpdater(false, 'ABC123', setGameState, showToast));
+        const { result } = renderHook(() =>
+            useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+        );
 
         await act(async () => {
             result.current(move, optimisticState);
@@ -96,8 +108,11 @@ describe('useGameStateUpdater', () => {
         vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
         const setGameState = vi.fn();
         const showToast = vi.fn();
+        const beginPendingMove = vi.fn(() => vi.fn());
 
-        const { result } = renderHook(() => useGameStateUpdater(false, 'ABC123', setGameState, showToast));
+        const { result } = renderHook(() =>
+            useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+        );
 
         await act(async () => {
             result.current(move, optimisticState);
@@ -115,8 +130,11 @@ describe('useGameStateUpdater', () => {
         vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
         const setGameState = vi.fn();
         const showToast = vi.fn();
+        const beginPendingMove = vi.fn(() => vi.fn());
 
-        const { result } = renderHook(() => useGameStateUpdater(false, 'ABC123', setGameState, showToast));
+        const { result } = renderHook(() =>
+            useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+        );
 
         await act(async () => {
             result.current(move, optimisticState);
@@ -129,5 +147,142 @@ describe('useGameStateUpdater', () => {
             'RECONCILED',
             'reconcile'
         );
+    });
+
+    // Plan 02-16 (MPLAY-05, UAT test 7): unit-level assertions on the
+    // beginPendingMove wiring itself, distinct from GameContext.test.tsx's
+    // integration-level ones.
+    describe('beginPendingMove wiring', () => {
+        it('is never called in testMode', () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const setGameState = vi.fn();
+            const showToast = vi.fn();
+            const beginPendingMove = vi.fn(() => vi.fn());
+
+            const { result } = renderHook(() =>
+                useGameStateUpdater(true, 'ABC123', setGameState, showToast, beginPendingMove)
+            );
+
+            act(() => {
+                result.current(move, optimisticState);
+            });
+
+            expect(beginPendingMove).not.toHaveBeenCalled();
+        });
+
+        it('is called exactly once per non-test-mode submitMove invocation, before the invoke call', () => {
+            const invokeOrder: string[] = [];
+            const { supabase } = makeFakeSupabase(() => {
+                invokeOrder.push('invoke');
+                return new Promise(() => {}); // never resolves - only ordering matters here
+            });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const setGameState = vi.fn();
+            const showToast = vi.fn();
+            const beginPendingMove = vi.fn(() => {
+                invokeOrder.push('beginPendingMove');
+                return vi.fn();
+            });
+
+            const { result } = renderHook(() =>
+                useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+            );
+
+            act(() => {
+                result.current(move, optimisticState);
+            });
+
+            expect(beginPendingMove).toHaveBeenCalledTimes(1);
+            expect(invokeOrder).toEqual(['beginPendingMove', 'invoke']);
+        });
+
+        it('calls the returned resolver exactly once on the thrown catch branch', async () => {
+            const { supabase } = makeFakeSupabase(() => Promise.reject(new Error('network down')));
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const setGameState = vi.fn();
+            const showToast = vi.fn();
+            const resolvePendingMove = vi.fn();
+            const beginPendingMove = vi.fn(() => resolvePendingMove);
+
+            const { result } = renderHook(() =>
+                useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+            );
+
+            await act(async () => {
+                result.current(move, optimisticState);
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(resolvePendingMove).toHaveBeenCalledTimes(1);
+        });
+
+        it('calls the returned resolver exactly once on the top-level transport-error branch', async () => {
+            const { supabase } = makeFakeSupabase(() =>
+                Promise.resolve({ data: null, error: new Error('transport') })
+            );
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const setGameState = vi.fn();
+            const showToast = vi.fn();
+            const resolvePendingMove = vi.fn();
+            const beginPendingMove = vi.fn(() => resolvePendingMove);
+
+            const { result } = renderHook(() =>
+                useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+            );
+
+            await act(async () => {
+                result.current(move, optimisticState);
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(resolvePendingMove).toHaveBeenCalledTimes(1);
+        });
+
+        it('calls the returned resolver exactly once on the EdgeResult.error branch', async () => {
+            const { supabase } = makeFakeSupabase(() =>
+                Promise.resolve({ data: { error: { code: 'CONFLICT', message: 'stale version' } }, error: null })
+            );
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const setGameState = vi.fn();
+            const showToast = vi.fn();
+            const resolvePendingMove = vi.fn();
+            const beginPendingMove = vi.fn(() => resolvePendingMove);
+
+            const { result } = renderHook(() =>
+                useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+            );
+
+            await act(async () => {
+                result.current(move, optimisticState);
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(resolvePendingMove).toHaveBeenCalledTimes(1);
+        });
+
+        it('is never called at all on a fully successful resolution (no error)', async () => {
+            const { supabase } = makeFakeSupabase(() => Promise.resolve({ data: {}, error: null }));
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const setGameState = vi.fn();
+            const showToast = vi.fn();
+            const resolvePendingMove = vi.fn();
+            const beginPendingMove = vi.fn(() => resolvePendingMove);
+
+            const { result } = renderHook(() =>
+                useGameStateUpdater(false, 'ABC123', setGameState, showToast, beginPendingMove)
+            );
+
+            await act(async () => {
+                result.current(move, optimisticState);
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(resolvePendingMove).not.toHaveBeenCalled();
+        });
     });
 });

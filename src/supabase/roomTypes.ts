@@ -89,3 +89,19 @@ export const HEARTBEAT_INTERVAL_MS = 15000;
 
 /** Threshold after which a missed heartbeat is treated as disconnected (MPLAY-06). */
 export const DISCONNECT_THRESHOLD_MS = 45000;
+
+/**
+ * Safety-net upper bound for `GameContext`'s pending-move tracker (MPLAY-05):
+ * comfortably above a normal Realtime broadcast round-trip, and safely below
+ * `HEARTBEAT_INTERVAL_MS` (15000) so a stuck flag self-heals well before the
+ * next heartbeat cycle could otherwise make the symptom harder to diagnose.
+ *
+ * Accepted trade-off: on a slow-but-not-dead connection, a broadcast that is
+ * merely delayed past this bound - not lost - has its resolution silently
+ * missed once the timeout fires and clears the flag first, exactly as if the
+ * broadcast had never arrived at all. This is a deliberate choice, not an
+ * oversight: a bounded, self-healing flag beats one that can leak open
+ * forever. A future reader tuning this value up or down is trading responsiveness
+ * of the self-heal against the width of that missed-if-merely-slow window.
+ */
+export const PENDING_MOVE_TIMEOUT_MS = 8000;
