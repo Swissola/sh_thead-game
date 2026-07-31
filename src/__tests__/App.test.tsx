@@ -20,6 +20,8 @@ import ShitheadGame, { Router } from '../App';
 import { getSupabaseClient } from '../supabase/client';
 import { ensurePlayerIdentity } from '../supabase/session';
 import { buildGameState, buildPlayer } from './testUtils/buildGameState';
+import type { RoomRow } from '../supabase/roomTypes';
+import type { Move } from '../engine/moves';
 
 /**
  * Seeds gameState via the context's setGameState in an effect on mount, so
@@ -33,6 +35,21 @@ function SeedGameState({ state }: { state: ReturnType<typeof buildGameState> }) 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     return null;
+}
+
+/**
+ * Plan 02-16 (MPLAY-05, UAT test 7 / T-02-59): a test-only button that calls
+ * the real dispatchMove -> submitMove -> beginPendingMove cycle, so a test
+ * can drive a genuine outstanding-move scenario without depending on
+ * GameScreen's actual button markup.
+ */
+function DispatchMove({ move }: { move: Move }) {
+    const { dispatchMove } = useGameContext();
+    return (
+        <button type="button" onClick={() => dispatchMove(move)}>
+            Dispatch Move
+        </button>
+    );
 }
 
 /**
@@ -108,6 +125,51 @@ function makeControllableFakeSupabase() {
         functions: { invoke },
     };
     return { supabase, channels };
+}
+
+type RoomPostgresHandler = (payload: { new: RoomRow }) => void;
+
+/**
+ * Plan 02-16 (MPLAY-05, UAT test 7 / T-02-59): like makeFakeSupabase, but the
+ * room's own postgres_changes channel keeps its registered UPDATE handler
+ * and exposes _fire(payload), mirroring useRoomSubscription.test.ts's
+ * makeFakeChannel - neither of the two helpers above supports firing a
+ * room-table broadcast. The presence channel (a differently-named channel -
+ * `room-<code>-presence`) is left inert, matching makeFakeSupabase's own
+ * presence shape, since this fake is only used to drive a Realtime room
+ * broadcast, not presence.
+ */
+function makeFakeSupabaseWithRoomChannel() {
+    const roomHandlers: Record<string, RoomPostgresHandler> = {};
+    const roomChannel = {
+        on: vi.fn(function (this: unknown, _type: string, config: { event: string }, handler: RoomPostgresHandler) {
+            roomHandlers[config.event] = handler;
+            return this;
+        }),
+        subscribe: vi.fn(function (this: unknown) {
+            return this;
+        }),
+        _fire(payload: { new: RoomRow }) {
+            roomHandlers['UPDATE']?.(payload);
+        },
+    };
+    const presenceChannel = {
+        on: vi.fn(function (this: unknown) {
+            return this;
+        }),
+        subscribe: vi.fn(function (this: unknown) {
+            return this;
+        }),
+        track: vi.fn().mockResolvedValue(undefined),
+        presenceState: vi.fn(() => ({})),
+    };
+    const invoke = vi.fn().mockResolvedValue({ data: {}, error: null });
+    const supabase = {
+        channel: vi.fn((name: string) => (name.endsWith('-presence') ? presenceChannel : roomChannel)),
+        removeChannel: vi.fn(),
+        functions: { invoke },
+    };
+    return { supabase, roomChannel, invoke };
 }
 
 describe('Router', () => {
@@ -246,6 +308,86 @@ describe('Router', () => {
         await waitFor(() => {
             expect(supabase.channel).toHaveBeenCalledWith('room-ROOM99');
         });
+    });
+
+    // Plan 02-16 (MPLAY-05, UAT test 7 / T-02-59): this test documents - it
+    // does NOT fix - the second accepted residual from the plan's objective
+    // scope note. hasPendingMove() cannot distinguish "my own setup-phase
+    // move's resolution" from "an unrelated concurrent player's own
+    // setup-phase move", because READY_UP/SWAP_CARDS (applyMove.ts's
+    // applyReadyUp/applySwapCards) are gated only on phase, not turn - unlike
+    // PLAY_CARDS/PICK_UP_PILE in the playing phase. A future attempt to "fix"
+    // this by weakening the gate further should read this comment and the
+    // plan's objective first: a fuller fix needs a server-side
+    // broadcast-to-submission correlation mechanism, outside this plan's
+    // client-only-fix boundary.
+    it('documents the cross-player setup-phase residual (T-02-59): an unrelated player\'s READY_UP broadcast still fires the reconciliation toast while this client\'s own READY_UP is genuinely outstanding', async () => {
+        const { supabase, roomChannel } = makeFakeSupabaseWithRoomChannel();
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+        const setupState = buildGameState({
+            roomCode: 'ROOM99',
+            phase: 'setup',
+            host: 'test-player',
+            players: [
+                buildPlayer({ id: 'test-player', name: 'Alice', isReady: false }),
+                buildPlayer({ id: 'p1', name: 'Bob', isReady: false }),
+            ],
+        });
+
+        render(
+            <GameProvider playerId="test-player">
+                <SeedGameState state={setupState} />
+                <DispatchMove move={{ type: 'READY_UP', playerId: 'test-player' }} />
+                <Router />
+            </GameProvider>
+        );
+
+        // Render is complete once GameScreen's setup-phase "Ready to Play"
+        // button for this not-yet-ready player appears.
+        await screen.findByText('Ready to Play');
+
+        // Dispatch this client's OWN READY_UP. The fake invoke resolves
+        // successfully by default, so hasPendingMove() becomes and stays
+        // true - nothing clears it yet (only a subsequent applyServerRoom
+        // broadcast, via resolveOldestPendingMove, would).
+        await act(async () => {
+            screen.getByText('Dispatch Move').click();
+            await Promise.resolve();
+        });
+
+        // A broadcast reflecting a DIFFERENT, unrelated player's (p1's) own
+        // independent READY_UP - content this client's own pending move had
+        // nothing to do with.
+        const unrelatedPlayerReadyRow: RoomRow = {
+            room_code: 'ROOM99',
+            state: buildGameState({
+                roomCode: 'ROOM99',
+                phase: 'setup',
+                host: 'test-player',
+                players: [
+                    buildPlayer({ id: 'test-player', name: 'Alice', isReady: false }),
+                    buildPlayer({ id: 'p1', name: 'Bob', isReady: true }),
+                ],
+            }),
+            version: 2,
+            turn_started_at: '2026-01-01T00:00:00.000Z',
+            player_seen: {},
+            created_at: '2026-01-01T00:00:00.000Z',
+            updated_at: '2026-01-01T00:00:00.000Z',
+        };
+
+        act(() => {
+            roomChannel._fire({ new: unrelatedPlayerReadyRow });
+        });
+
+        // The accepted residual: this client's own move hasn't failed - it
+        // simply hasn't resolved yet - but the toast still appears, because
+        // hasPendingMove() cannot tell "my move resolving" apart from
+        // "someone else's unrelated concurrent setup-phase move".
+        expect(
+            await screen.findByText("Your move didn't stick - synced with the latest game state.")
+        ).toBeInTheDocument();
     });
 });
 

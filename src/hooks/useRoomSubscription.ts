@@ -9,6 +9,7 @@ export interface UseRoomSubscriptionArgs {
     localState: GameState | null;
     onServerRoom: (room: ServerRoom) => void;
     onReconciled: () => void;
+    hasPendingMove: () => boolean;
 }
 
 /**
@@ -49,6 +50,7 @@ export function useRoomSubscription({
     localState,
     onServerRoom,
     onReconciled,
+    hasPendingMove,
 }: UseRoomSubscriptionArgs): void {
     // Refs so the effect's dependency array can stay keyed on just
     // `roomCode`/`testMode` (mirroring the replaced poll effect's shape)
@@ -56,6 +58,11 @@ export function useRoomSubscription({
     const localStateRef = useRef(localState);
     const onServerRoomRef = useRef(onServerRoom);
     const onReconciledRef = useRef(onReconciled);
+    // Plan 02-16 (MPLAY-05, UAT test 7): read fresh on every payload, never a
+    // stale closure captured at subscribe time - hasPendingMove's return
+    // value can (and does) change between separate deliveries on the same
+    // mounted hook.
+    const hasPendingMoveRef = useRef(hasPendingMove);
     const lastAppliedVersionRef = useRef(-1);
 
     // Refs must not be written during render (react-hooks/refs) - sync them
@@ -64,6 +71,7 @@ export function useRoomSubscription({
         localStateRef.current = localState;
         onServerRoomRef.current = onServerRoom;
         onReconciledRef.current = onReconciled;
+        hasPendingMoveRef.current = hasPendingMove;
     });
 
     useEffect(() => {
@@ -81,7 +89,17 @@ export function useRoomSubscription({
             lastAppliedVersionRef.current = version;
 
             const serverRoom = rowToServerRoom(row);
-            if (stableStringify(serverRoom.state) !== stableStringify(localStateRef.current)) {
+            // Plan 02-16 (MPLAY-05, UAT test 7): a mismatch alone used to be
+            // enough to fire onReconciled, which meant any *other* player's
+            // legitimate move mismatched this client's pre-move local state
+            // and wrongly told this client "your move didn't stick". Gate on
+            // hasPendingMoveRef.current() first - the cheaper check, and
+            // false for the overwhelming majority of deliveries - before the
+            // two stableStringify calls.
+            if (
+                hasPendingMoveRef.current() &&
+                stableStringify(serverRoom.state) !== stableStringify(localStateRef.current)
+            ) {
                 onReconciledRef.current();
             }
             onServerRoomRef.current(serverRoom); // always snap to server truth (D-11)

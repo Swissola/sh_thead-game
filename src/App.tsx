@@ -33,7 +33,7 @@ function parseJoinCode(pathname: string): string {
  * inside a screen) so only one Presence channel/heartbeat exists per room.
  */
 export function Router({ initialRoomCode = '' }: { initialRoomCode?: string } = {}) {
-    const { gameState, testMode, toast, dismissToast, applyServerRoom, notifyReconciled, playerId } =
+    const { gameState, testMode, toast, dismissToast, applyServerRoom, notifyReconciled, playerId, hasPendingMove } =
         useGameContext();
 
     const roomCode = gameState?.roomCode ?? '';
@@ -44,6 +44,7 @@ export function Router({ initialRoomCode = '' }: { initialRoomCode?: string } = 
         localState: gameState,
         onServerRoom: applyServerRoom,
         onReconciled: notifyReconciled,
+        hasPendingMove,
     });
 
     // D-10: drives the offline badge on both LobbyScreen's and GameScreen's

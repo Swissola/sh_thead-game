@@ -248,3 +248,15 @@ boundary rules.
     the `beginPendingMove`/`resolveOldestPendingMove`/`hasPendingMove` additions. Not
     re-fixed here per scope boundary; still carried forward for the same future
     lint-cleanup pass first logged under Plan 02-01.
+
+## Plan 02-16 (Task 2)
+
+- **`npm run lint` still exits 1** (this plan's own `<verification>` also expects exit
+  0) - the same two pre-existing issues logged under Plan 02-16 (Task 1) above, in the
+  same two files (`GameContext.tsx:221`, `GameScreen.tsx:107`), neither of which Task 2
+  modifies (`GameContext.tsx` is read-only here - only its already-exposed
+  `hasPendingMove` is consumed). `npx eslint src/hooks/useRoomSubscription.ts
+  src/App.tsx src/__tests__/hooks/useRoomSubscription.test.ts
+  src/__tests__/App.test.tsx` (this task's four touched files) is clean with zero
+  output. Not re-fixed here per scope boundary; still carried forward for the same
+  future lint-cleanup pass first logged under Plan 02-01.

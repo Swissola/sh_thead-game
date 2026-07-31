@@ -87,6 +87,7 @@ describe('useRoomSubscription', () => {
                 localState: null,
                 onServerRoom: vi.fn(),
                 onReconciled: vi.fn(),
+                hasPendingMove: () => true,
             })
         );
 
@@ -104,6 +105,7 @@ describe('useRoomSubscription', () => {
                 localState: null,
                 onServerRoom: vi.fn(),
                 onReconciled: vi.fn(),
+                hasPendingMove: () => true,
             })
         );
 
@@ -121,6 +123,7 @@ describe('useRoomSubscription', () => {
                 localState: buildState(),
                 onServerRoom: vi.fn(),
                 onReconciled: vi.fn(),
+                hasPendingMove: () => true,
             })
         );
 
@@ -153,6 +156,7 @@ describe('useRoomSubscription', () => {
                 localState: buildState(),
                 onServerRoom,
                 onReconciled: vi.fn(),
+                hasPendingMove: () => true,
             })
         );
 
@@ -181,6 +185,7 @@ describe('useRoomSubscription', () => {
                 localState: buildState(),
                 onServerRoom,
                 onReconciled: vi.fn(),
+                hasPendingMove: () => true,
             })
         );
 
@@ -196,7 +201,11 @@ describe('useRoomSubscription', () => {
         expect(onServerRoom).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onReconciled exactly once when the incoming server state differs from the local state', () => {
+    // Plan 02-16 (MPLAY-05, UAT test 7): calls onReconciled exactly once for
+    // the identical mismatched payload when this client has a move genuinely
+    // outstanding ("pending" case), retargeted from the pre-02-16 version of
+    // this test which had no notion of a pending gate.
+    it('calls onReconciled exactly once when the incoming server state differs from the local state AND hasPendingMove() is true (pending case)', () => {
         const { supabase, channels } = makeFakeSupabase();
         vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
         const onReconciled = vi.fn();
@@ -209,6 +218,7 @@ describe('useRoomSubscription', () => {
                 localState,
                 onServerRoom: vi.fn(),
                 onReconciled,
+                hasPendingMove: () => true,
             })
         );
 
@@ -218,7 +228,75 @@ describe('useRoomSubscription', () => {
         expect(onReconciled).toHaveBeenCalledTimes(1);
     });
 
-    it('does not call onReconciled when the incoming server state matches the local state', () => {
+    // The direct fix for the live PC/phone reproduction in 02-UAT.md test 7:
+    // the identical mismatched payload as the test above, but with nothing
+    // of this client's own outstanding - onReconciled must not fire, while
+    // onServerRoom (D-11's "always snap to server truth") still does.
+    it('does not call onReconciled on the identical mismatched payload when hasPendingMove() is false, while onServerRoom still fires (UAT test 7 fix)', () => {
+        const { supabase, channels } = makeFakeSupabase();
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+        const onReconciled = vi.fn();
+        const onServerRoom = vi.fn();
+        const localState = buildState({ lastAction: 'local move' });
+
+        renderHook(() =>
+            useRoomSubscription({
+                roomCode: 'ABC123',
+                testMode: false,
+                localState,
+                onServerRoom,
+                onReconciled,
+                hasPendingMove: () => false,
+            })
+        );
+
+        const serverState = buildState({ lastAction: 'server move' });
+        channels[0]._fire('UPDATE', { new: buildRow({ version: 2, state: serverState }) });
+
+        expect(onReconciled).not.toHaveBeenCalled();
+        expect(onServerRoom).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads hasPendingMove fresh on every payload via the render-sync ref, not a stale closure captured at subscribe time', () => {
+        const { supabase, channels } = makeFakeSupabase();
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+        const onReconciled = vi.fn();
+        let pending = false;
+        const localState = buildState({ lastAction: 'local move' });
+
+        const { rerender } = renderHook(
+            (props: { hasPendingMove: () => boolean }) =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState,
+                    onServerRoom: vi.fn(),
+                    onReconciled,
+                    hasPendingMove: props.hasPendingMove,
+                }),
+            { initialProps: { hasPendingMove: () => pending } }
+        );
+
+        // First delivery: hasPendingMove() is false - no reconciliation.
+        channels[0]._fire('UPDATE', {
+            new: buildRow({ version: 2, state: buildState({ lastAction: 'server move 1' }) }),
+        });
+        expect(onReconciled).not.toHaveBeenCalled();
+
+        // Toggle the mock and force the ref-sync effect to re-run.
+        pending = true;
+        rerender({ hasPendingMove: () => pending });
+
+        // Second delivery on the SAME mounted hook: hasPendingMove() is now
+        // true - reconciliation fires, proving the read was fresh, not a
+        // stale closure from the initial subscribe.
+        channels[0]._fire('UPDATE', {
+            new: buildRow({ version: 3, state: buildState({ lastAction: 'server move 2' }) }),
+        });
+        expect(onReconciled).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call onReconciled when the incoming server state matches the local state, regardless of hasPendingMove()', () => {
         const { supabase, channels } = makeFakeSupabase();
         vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
         const onReconciled = vi.fn();
@@ -231,6 +309,31 @@ describe('useRoomSubscription', () => {
                 localState: sharedState,
                 onServerRoom: vi.fn(),
                 onReconciled,
+                hasPendingMove: () => true,
+            })
+        );
+
+        channels[0]._fire('UPDATE', {
+            new: buildRow({ version: 2, state: buildState({ lastAction: 'same move' }) }),
+        });
+
+        expect(onReconciled).not.toHaveBeenCalled();
+    });
+
+    it('does not call onReconciled when the incoming server state matches the local state and hasPendingMove() is false', () => {
+        const { supabase, channels } = makeFakeSupabase();
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+        const onReconciled = vi.fn();
+        const sharedState = buildState({ lastAction: 'same move' });
+
+        renderHook(() =>
+            useRoomSubscription({
+                roomCode: 'ABC123',
+                testMode: false,
+                localState: sharedState,
+                onServerRoom: vi.fn(),
+                onReconciled,
+                hasPendingMove: () => false,
             })
         );
 
@@ -252,6 +355,7 @@ describe('useRoomSubscription', () => {
                 localState: buildState(),
                 onServerRoom: vi.fn(),
                 onReconciled: vi.fn(),
+                hasPendingMove: () => true,
             })
         );
 
@@ -272,6 +376,7 @@ describe('useRoomSubscription', () => {
                     localState: buildState(),
                     onServerRoom: vi.fn(),
                     onReconciled: vi.fn(),
+                    hasPendingMove: () => true,
                 }),
             { initialProps: { roomCode: 'ABC123' } }
         );
