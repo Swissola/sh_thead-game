@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-last_updated: "2026-07-31T18:45:05.892Z"
+last_updated: "2026-07-31T19:06:59.568Z"
 last_activity: 2026-07-28 -- Plan 02-13's executor hit the account's weekly usage limit mid-task
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 24
-  completed_plans: 22
+  completed_plans: 23
   percent: 14
 ---
 
@@ -25,14 +25,24 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-13 — Tasks 1-2 COMPLETE and merged (wave 6). `scripts/smoke-edge-functions.mjs` now
-proves all seven Edge Functions against a live served stack (auth/identity invariants, and a
-full create→join→heartbeat→remove→start→ready-up→timeout-check lifecycle). Task 3 is a
-BLOCKING human-verify checkpoint (two-device play test against the hosted project) — not
-started, awaiting the operator.
-Status: 12/13 plans fully complete and merged (02-01..02-12); 02-13 is 2/3 tasks merged, its
-final task pending human sign-off. This is the last plan in the phase.
-Last activity: 2026-07-28 -- Plan 02-13's executor hit the account's weekly usage limit mid-task
+Plan: 02-17 — COMPLETE (both tasks, TDD RED/GREEN commits). Closed 02-UAT.md test 8: the
+room-data channel now detects a dropped CHANNEL_ERROR/TIMED_OUT/CLOSED subscription and
+self-heals with dwell-gated capped exponential backoff, plus a one-off recovery refetch on
+genuine reconnect whose reconciliation check is gated on a drop-time `hadPendingMoveAtDrop`
+snapshot rather than the live pending flag. 02-16 (gate the reconciliation toast on a
+per-client pending-move tracker) and 02-17 are both gap-closure plans layered on top of the
+12/13 base plans below.
+Status: 16/17 plans fully complete and merged (02-01..02-12, 02-14..02-17); 02-13 is 2/3
+tasks merged, its final Task 3 (blocking human-verify checkpoint) still pending human
+sign-off. 02-13 is the only plan remaining before Phase 02 can close.
+Last activity: 2026-07-31 -- Plan 02-17 executed (worktree was 197 commits stale off an old
+ancestor of `stage-1-refactor`; fast-forwarded via `git merge --ff-only` before starting).
+Both tasks' RED tests written and confirmed failing before their GREEN implementation;
+`npm run build`/`npm test -- --run` (432 tests)/scoped `npx eslint` all green. Full-suite
+`npm run lint` still exits 1 on the same two pre-existing, unrelated issues carried since
+02-01 (neither touched by this plan).
+
+Previously (2026-07-28): Plan 02-13's executor hit the account's weekly usage limit mid-task
 (twice — once on first dispatch before any commits, once again mid-debug of Task 2's audit-trail
 read-back after being resumed). Both times resumed the same agent from its transcript once the
 limit reset rather than losing progress. Running the smoke suite for real against `supabase
@@ -43,7 +53,7 @@ wrappers reading the wrong JWT-claims field (`.sub` instead of `.id`) so `player
 `undefined`, and missing local Postgres table-level grants beneath otherwise-correct RLS
 policies. All four fixed and merged (migration `0002_local_dev_grants.sql`).
 
-Progress: [█████████░] 92%
+Progress: [██████████] 96%
 
 **Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
 present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
@@ -77,6 +87,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 *Updated after each plan completion*
 | Phase 02 P14 | 12min | 2 tasks | 4 files |
 | Phase 02 P15 | 55min | 3 tasks | 13 files |
+| Phase 02 P17 | 35min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -104,6 +115,8 @@ Recent decisions affecting current work:
 - [Phase 02]: [Phase 02-14] useTurnTimeoutSweep warns (console.warn) on any sweep EdgeResult error code outside TIMEOUT_NOT_ELAPSED/CONFLICT and on a resolved top-level transport error, never toasts
 - [Phase 02-15]: touch_player_seen is a plain invoker-rights SQL function, not definer-rights - service_role already bypasses RLS, so elevated execution rights would buy nothing and would punch a hole through 0001's deny-all-writes-for-authenticated posture
 - [Phase 02-15]: heartbeat and joinRoom's D-01 auto-rejoin branch to a state-unchanged condition (nextState.host !== row.state.host; resolution.type === 'existing'), not object identity, before routing through the version-exempt touchPlayerSeen path
+- [Phase 02]: [Phase 02-17]: hadPendingMoveAtDrop is a snapshot taken at the instant of the first connection drop, never the live hasPendingMove() value at refetch time - the only way to tell apart a genuinely-pending move whose flag 02-16's safety net cleared mid-outage from a bystander who never had anything pending, once both look identical by refetch time
+- [Phase 02]: [Phase 02-17]: room-data channel reconnect backoff resets only after a SUBSCRIPTION_RECONNECT_RESET_DWELL_MS (5s) dwell period of uninterrupted connectivity, scheduled not applied immediately on SUBSCRIBED, so a flapping connection keeps escalating instead of resetting on every brief reconnect; retries are capped only in delay (30s ceiling), never in count
 
 ### Pending Todos
 
@@ -152,8 +165,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-31T18:45:05.885Z
-Stopped at: Completed 02-15-PLAN.md (version-exempt player_seen write path for heartbeat and joinRoom D-01 auto-rejoin); 02-13 Task 3 checkpoint still awaits the human operator
+Last session: 2026-07-31T19:06:59.561Z
+Stopped at: Completed 02-17-PLAN.md (self-healing room-data channel reconnect + recovery refetch, closing 02-UAT.md test 8); 02-13 Task 3 checkpoint still awaits the human operator
 work left in the entire phase — needs the human operator to run it against the hosted Supabase
 project and report back per the resume-signal ("approved" or a description of what didn't
 behave as written). Once signed off, a session needs to: tick the two Manual-Only Verifications
