@@ -146,11 +146,47 @@ note: |
   (see status_notes on tests 3 and 4b above) - this is a third, distinct
   gap, logged below. See root_cause in the new Gaps entry.
 
+### 8. Realtime room-data channel goes silently stale, no reconnect
+expected: If the browser's WebSocket connection drops or is throttled (tab
+  backgrounded, brief network blip, machine idle for a few minutes), the
+  room-data subscription should detect it and resubscribe, so the screen
+  never permanently stops reflecting the opponent's moves
+result: issue
+reported: |
+  "Phone hand just played last card from main hand. Move not seen on PC
+  client screen." / "There now after signing in to the room again and
+  playing the card again, but looked like the original move did not take."
+severity: blocker
+root_cause: |
+  Confirmed by direct inspection of the hosted room's `moves` audit table
+  (versions 58-72 for room ZABYDB): every play alternates PC/Phone correctly
+  with zero gaps or duplicates - nothing was lost or corrupted server-side.
+  The PC's screen simply stopped reflecting new broadcasts. `usePresence.ts`
+  checks its own channel's subscribe status (`status === 'SUBSCRIBED'`) and
+  reacts to it, but `useRoomSubscription.ts`'s room-data `postgres_changes`
+  channel (the one that carries every game-state update) has no subscribe-
+  status callback and no CHANNEL_ERROR/TIMED_OUT/CLOSED handling anywhere -
+  confirmed via a codebase-wide grep for those terms plus 'reconnect'. If
+  that channel silently drops (tab backgrounding, network blip, an idle
+  period), nothing detects it or resubscribes; the only recovery path found
+  was a full manual rejoin, which is exactly what "signing in to the room
+  again" did. The user's own subsequent replay was then most likely
+  rejected server-side (a stale-precondition CAS loss, invisible on a
+  frozen screen) rather than the original move failing to land.
+artifacts:
+  - path: "src/hooks/useRoomSubscription.ts"
+    issue: "channel.subscribe() has no status callback and no error/reconnect handling of any kind, unlike usePresence.ts's channel"
+  - path: "src/hooks/usePresence.ts"
+    issue: "the only precedent in the codebase for reacting to a channel's subscribe status - reference for how the fix should hook in"
+missing:
+  - "A subscribe-status callback on useRoomSubscription's channel that detects CHANNEL_ERROR/TIMED_OUT/CLOSED and resubscribes (or forces a full state refetch), so a dropped WebSocket self-heals instead of requiring a manual rejoin"
+debug_session: ""
+
 ## Summary
 
-total: 7
+total: 8
 passed: 2
-issues: 4
+issues: 5
 pending: 2
 skipped: 0
 blocked: 0
@@ -211,4 +247,29 @@ blocked: 0
       issue: "submitMove's own result?.error branch already raises the correct, correctly-scoped toast for a genuine server-side rejection of this client's own move - the useRoomSubscription path is the one that over-fires"
   missing:
     - "A per-client 'pending move' flag/ref, set when dispatchMove submits and cleared once the matching broadcast (or a timeout) resolves it, so onReconciled only fires for the client that actually has something outstanding to reconcile"
+  debug_session: ""
+
+- truth: "A dropped or throttled Realtime connection self-heals instead of permanently freezing the game-state view"
+  status: failed
+  reason: |
+    Confirmed by direct inspection of the hosted room's moves audit table
+    (room ZABYDB, versions 58-72): every play alternates PC/Phone correctly
+    with zero gaps or duplicates, so nothing was lost or corrupted
+    server-side. The PC's screen stopped reflecting new broadcasts entirely
+    - the user's own move appeared not to register, and the opponent's move
+    right before it was never seen either - until a full manual rejoin
+    ("signing in to the room again") forced a resync. A subsequent replay
+    from the stale screen was most likely rejected server-side (a
+    stale-precondition CAS loss against the true current state) rather than
+    the original move having failed to land.
+  severity: blocker
+  test: 8
+  root_cause: "useRoomSubscription's postgres_changes channel has no subscribe-status callback and no CHANNEL_ERROR/TIMED_OUT/CLOSED handling, so a silently dropped WebSocket (tab backgrounding, network blip, an idle period) is never detected or recovered from"
+  artifacts:
+    - path: "src/hooks/useRoomSubscription.ts"
+      issue: "channel.subscribe() has no status callback and no error/reconnect handling of any kind"
+    - path: "src/hooks/usePresence.ts"
+      issue: "the only precedent in the codebase for reacting to a channel's subscribe status (checks status === 'SUBSCRIBED') - reference for how the fix should hook in"
+  missing:
+    - "A subscribe-status callback on useRoomSubscription's channel that detects CHANNEL_ERROR/TIMED_OUT/CLOSED and resubscribes (or forces a full state refetch via a fresh join-room-style read), so a dropped connection self-heals instead of requiring a manual rejoin"
   debug_session: ""
