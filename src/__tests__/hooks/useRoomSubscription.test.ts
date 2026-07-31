@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 
 vi.mock('../../supabase/client', () => ({
     getSupabaseClient: vi.fn(),
@@ -47,6 +47,15 @@ function makeFakeChannel() {
 function makeFakeSupabase() {
     const channels: ReturnType<typeof makeFakeChannel>[] = [];
     const channelNames: string[] = [];
+    // supabase.from('rooms').select('*').eq('room_code', roomCode).single()
+    // (Plan 02-17's recovery refetch) - matches supabaseStore.ts's existing
+    // server-side PostgREST chain shape, from the browser client instead.
+    // `single` is left a bare vi.fn() so each test configures its own
+    // resolved/rejected value.
+    const single = vi.fn();
+    const eq = vi.fn(() => ({ single }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
     const supabase = {
         channel: vi.fn((name: string) => {
             channelNames.push(name);
@@ -55,8 +64,9 @@ function makeFakeSupabase() {
             return ch;
         }),
         removeChannel: vi.fn(),
+        from,
     };
-    return { supabase, channels, channelNames };
+    return { supabase, channels, channelNames, from, select, eq, single };
 }
 
 function buildState(overrides: Partial<GameState> = {}): GameState {
@@ -737,6 +747,445 @@ describe('useRoomSubscription', () => {
             const roomCodeCallsAfterAdvance = channelNames.filter((name) => name === 'room-ABC123').length;
             expect(roomCodeCallsAfterAdvance).toBe(roomCodeCallsAfterChange);
             expect(roomCodeCallsAfterAdvance).toBe(1);
+        });
+    });
+
+    // Plan 02-17 Task 2 (MPLAY-02/MPLAY-05, 02-UAT.md test 8): a genuine
+    // recovery performs a one-off direct read of the room's current state,
+    // gated on whether this client genuinely had a move outstanding at the
+    // moment the connection dropped - not the live hasPendingMove() value at
+    // refetch time, which 02-16's 8s safety net may have already cleared.
+    describe('recovery refetch closing the missed-broadcast gap (02-UAT.md test 8)', () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        /** Drives channels[0] through a genuine CHANNEL_ERROR drop and the
+         * scheduled reconnect, leaving the newly-created channel at index 1
+         * not yet SUBSCRIBED - the caller fires that status itself so tests
+         * can control exactly when the recovery refetch kicks off. */
+        function dropAndReconnect(channels: ReturnType<typeof makeFakeChannel>[]) {
+            channels[0]._fireStatus('CHANNEL_ERROR');
+            vi.advanceTimersByTime(SUBSCRIPTION_RECONNECT_BASE_MS);
+        }
+
+        it('performs exactly one supabase.from(rooms).select().eq().single() refetch on SUBSCRIBED following a genuine prior drop', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, from, select, eq, single } = makeFakeSupabase();
+            single.mockResolvedValue({ data: null, error: { message: 'not found' } });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState(),
+                    onServerRoom: vi.fn(),
+                    onReconciled: vi.fn(),
+                    hasPendingMove: () => false,
+                })
+            );
+
+            dropAndReconnect(channels);
+            expect(channels).toHaveLength(2);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(from).toHaveBeenCalledTimes(1);
+            expect(from).toHaveBeenCalledWith('rooms');
+            expect(select).toHaveBeenCalledWith('*');
+            expect(eq).toHaveBeenCalledWith('room_code', 'ABC123');
+            expect(single).toHaveBeenCalledTimes(1);
+        });
+
+        it("the initial mount's first SUBSCRIBED performs no refetch at all", async () => {
+            const { supabase, channels, from } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState(),
+                    onServerRoom: vi.fn(),
+                    onReconciled: vi.fn(),
+                    hasPendingMove: () => false,
+                })
+            );
+
+            await act(async () => {
+                channels[0]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+            });
+
+            expect(from).not.toHaveBeenCalled();
+        });
+
+        it('a subsequent healthy SUBSCRIBED (no new drop in between) does not re-trigger the refetch', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, from, single } = makeFakeSupabase();
+            single.mockResolvedValue({ data: buildRow({ version: 2 }), error: null });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState(),
+                    onServerRoom: vi.fn(),
+                    onReconciled: vi.fn(),
+                    hasPendingMove: () => false,
+                })
+            );
+
+            dropAndReconnect(channels);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED'); // recovery -> refetch #1
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+            expect(from).toHaveBeenCalledTimes(1);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED'); // no new drop - must not refetch again
+                await Promise.resolve();
+            });
+            expect(from).toHaveBeenCalledTimes(1);
+        });
+
+        it('snapshots hasPendingMove at the instant of the first drop, and a later error while already disconnected does not overwrite that snapshot', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            const differingRow = buildRow({ version: 2, state: buildState({ lastAction: 'server move' }) });
+            single.mockResolvedValue({ data: differingRow, error: null });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onReconciled = vi.fn();
+            let pending = true; // pending at the moment of the first drop
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState({ lastAction: 'local move' }),
+                    onServerRoom: vi.fn(),
+                    onReconciled,
+                    hasPendingMove: () => pending,
+                })
+            );
+
+            channels[0]._fireStatus('CHANNEL_ERROR'); // first drop - snapshot: true
+            vi.advanceTimersByTime(SUBSCRIPTION_RECONNECT_BASE_MS); // reconnect -> channels[1]
+
+            // 02-16's safety net has since cleared the live flag mid-outage,
+            // then a failed retry itself immediately re-errors - this must
+            // NOT overwrite the snapshot captured at the original drop.
+            pending = false;
+            channels[1]._fireStatus('CHANNEL_ERROR');
+            vi.advanceTimersByTime(SUBSCRIPTION_RECONNECT_BASE_MS * 2); // reconnect -> channels[2]
+
+            await act(async () => {
+                channels[2]._fireStatus('SUBSCRIBED'); // genuine recovery
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            // The snapshot survived as true despite pending being false by
+            // the time recovery actually happened.
+            expect(onReconciled).toHaveBeenCalledTimes(1);
+        });
+
+        it("applies a successful refetch's row through the shared version-gate, calling onServerRoom for a version higher than last-applied", async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            single.mockResolvedValue({ data: buildRow({ version: 5 }), error: null });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onServerRoom = vi.fn();
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState(),
+                    onServerRoom,
+                    onReconciled: vi.fn(),
+                    hasPendingMove: () => false,
+                })
+            );
+
+            dropAndReconnect(channels);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(onServerRoom).toHaveBeenCalledTimes(1);
+            expect(onServerRoom).toHaveBeenCalledWith(expect.objectContaining({ version: 5 }));
+        });
+
+        it('a client with a move genuinely outstanding at drop time still gets the reconciliation toast on recovery, even after the pending flag has since cleared (survives 02-16 safety net)', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            const differingRow = buildRow({ version: 2, state: buildState({ lastAction: 'server move' }) });
+            single.mockResolvedValue({ data: differingRow, error: null });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onReconciled = vi.fn();
+            const onServerRoom = vi.fn();
+            let pending = true;
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState({ lastAction: 'local move' }),
+                    onServerRoom,
+                    onReconciled,
+                    hasPendingMove: () => pending,
+                })
+            );
+
+            channels[0]._fireStatus('CHANNEL_ERROR'); // snapshot: pending was true
+            pending = false; // 02-16's 8s safety net has since cleared it
+            vi.advanceTimersByTime(SUBSCRIPTION_RECONNECT_BASE_MS);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(onReconciled).toHaveBeenCalledTimes(1);
+            expect(onServerRoom).toHaveBeenCalledTimes(1);
+        });
+
+        it("a client that never had a move outstanding never gets the reconciliation toast on recovery, even when the refetch reveals another player's legitimate move (02-UAT.md test 8 regression lock)", async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            const differingRow = buildRow({ version: 2, state: buildState({ lastAction: "opponent's move" }) });
+            single.mockResolvedValue({ data: differingRow, error: null });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onReconciled = vi.fn();
+            const onServerRoom = vi.fn();
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState({ lastAction: 'nothing outstanding' }),
+                    onServerRoom,
+                    onReconciled,
+                    hasPendingMove: () => false,
+                })
+            );
+
+            dropAndReconnect(channels);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(onReconciled).not.toHaveBeenCalled();
+            expect(onServerRoom).toHaveBeenCalledTimes(1);
+        });
+
+        it('a refetched row whose state matches local state never calls onReconciled, regardless of the pending-at-drop snapshot', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            const sharedState = buildState({ lastAction: 'same move' });
+            single.mockResolvedValue({ data: buildRow({ version: 2, state: sharedState }), error: null });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onReconciled = vi.fn();
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: sharedState,
+                    onServerRoom: vi.fn(),
+                    onReconciled,
+                    hasPendingMove: () => true, // even genuinely pending throughout
+                })
+            );
+
+            dropAndReconnect(channels);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(onReconciled).not.toHaveBeenCalled();
+        });
+
+        it('a live broadcast landing before the refetch resolves makes the refetch a no-op for that now-stale version', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            let resolveSingle: ((value: { data: RoomRow; error: null }) => void) | null = null;
+            single.mockReturnValue(
+                new Promise((resolve) => {
+                    resolveSingle = resolve;
+                })
+            );
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onServerRoom = vi.fn();
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState(),
+                    onServerRoom,
+                    onReconciled: vi.fn(),
+                    hasPendingMove: () => false,
+                })
+            );
+
+            dropAndReconnect(channels);
+            channels[1]._fireStatus('SUBSCRIBED'); // kicks off the refetch - promise not yet resolved
+
+            // A live postgres_changes delivery for version 5 arrives first.
+            channels[1]._fire('UPDATE', { new: buildRow({ version: 5 }) });
+            expect(onServerRoom).toHaveBeenCalledTimes(1);
+
+            // The refetch's own promise now resolves with the SAME
+            // (now-stale) version - must be a no-op.
+            await act(async () => {
+                resolveSingle?.({ data: buildRow({ version: 5 }), error: null });
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(onServerRoom).toHaveBeenCalledTimes(1);
+        });
+
+        it('a refetch resolving before a live broadcast for that same version makes the broadcast a no-op afterwards', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            single.mockResolvedValue({ data: buildRow({ version: 5 }), error: null });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onServerRoom = vi.fn();
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState(),
+                    onServerRoom,
+                    onReconciled: vi.fn(),
+                    hasPendingMove: () => false,
+                })
+            );
+
+            dropAndReconnect(channels);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+            expect(onServerRoom).toHaveBeenCalledTimes(1);
+
+            // A live broadcast for the SAME version arrives afterward - no-op.
+            channels[1]._fire('UPDATE', { new: buildRow({ version: 5 }) });
+            expect(onServerRoom).toHaveBeenCalledTimes(1);
+        });
+
+        it('a refetch that resolves with a PostgREST error does not throw and does not call onServerRoom or onReconciled', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            single.mockResolvedValue({ data: null, error: { message: 'boom' } });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onServerRoom = vi.fn();
+            const onReconciled = vi.fn();
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState(),
+                    onServerRoom,
+                    onReconciled,
+                    hasPendingMove: () => true,
+                })
+            );
+
+            dropAndReconnect(channels);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(onServerRoom).not.toHaveBeenCalled();
+            expect(onReconciled).not.toHaveBeenCalled();
+        });
+
+        it('a refetch that resolves with empty data does not throw and does not call onServerRoom or onReconciled', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            single.mockResolvedValue({ data: null, error: null });
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onServerRoom = vi.fn();
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState(),
+                    onServerRoom,
+                    onReconciled: vi.fn(),
+                    hasPendingMove: () => false,
+                })
+            );
+
+            dropAndReconnect(channels);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(onServerRoom).not.toHaveBeenCalled();
+        });
+
+        it('a refetch that rejects (network failure) is caught and does not propagate an unhandled rejection', async () => {
+            vi.useFakeTimers();
+            const { supabase, channels, single } = makeFakeSupabase();
+            single.mockRejectedValue(new Error('network down'));
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const onServerRoom = vi.fn();
+
+            renderHook(() =>
+                useRoomSubscription({
+                    roomCode: 'ABC123',
+                    testMode: false,
+                    localState: buildState(),
+                    onServerRoom,
+                    onReconciled: vi.fn(),
+                    hasPendingMove: () => false,
+                })
+            );
+
+            dropAndReconnect(channels);
+
+            await act(async () => {
+                channels[1]._fireStatus('SUBSCRIBED');
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(onServerRoom).not.toHaveBeenCalled();
         });
     });
 });
