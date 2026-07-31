@@ -98,10 +98,23 @@ export function useRoomSubscription({
         let reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
         let resetDwellTimeoutId: ReturnType<typeof setTimeout> | null = null;
         let hadDisconnected = false;
+        // Plan 02-17 Task 2: snapshotted the instant the connection first
+        // drops (hadPendingMoveAtDrop's own paragraph below has the full
+        // two-case reasoning for why this must be a snapshot, not the live
+        // hasPendingMove() value at refetch time).
+        let hadPendingMoveAtDrop = false;
         let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 
-        const handlePayload = (payload: { new: RoomRow }) => {
-            const row = payload.new;
+        // Shared core for both delivery paths (the live postgres_changes
+        // handler below and Task 2's recovery refetch): exactly one
+        // version-gate and exactly one stableStringify comparison in this
+        // file, never two diverging copies. `forceReconciliationCheck`
+        // widens the reconciliation gate beyond hasPendingMoveRef.current()
+        // alone - see hadPendingMoveAtDrop's declaration above and the
+        // refetch's SUBSCRIBED-branch call site below for why a client can
+        // need the check to run even though the live pending flag has
+        // already gone false by the time this runs.
+        const applyRoomRow = (row: RoomRow, forceReconciliationCheck: boolean) => {
             const version = Number(row.version);
             if (version <= lastAppliedVersionRef.current) return; // stale/duplicate delivery - T-02-29
             lastAppliedVersionRef.current = version;
@@ -111,16 +124,43 @@ export function useRoomSubscription({
             // enough to fire onReconciled, which meant any *other* player's
             // legitimate move mismatched this client's pre-move local state
             // and wrongly told this client "your move didn't stick". Gate on
-            // hasPendingMoveRef.current() first - the cheaper check, and
-            // false for the overwhelming majority of deliveries - before the
-            // two stableStringify calls.
+            // the cheaper check first - false for the overwhelming majority
+            // of deliveries - before the two stableStringify calls.
             if (
-                hasPendingMoveRef.current() &&
+                (forceReconciliationCheck || hasPendingMoveRef.current()) &&
                 stableStringify(serverRoom.state) !== stableStringify(localStateRef.current)
             ) {
                 onReconciledRef.current();
             }
             onServerRoomRef.current(serverRoom); // always snap to server truth (D-11)
+        };
+
+        // The live-broadcast path always passes false - its behaviour is
+        // unchanged from 02-16's landing, still gated purely by
+        // hasPendingMove().
+        const handlePayload = (payload: { new: RoomRow }) => applyRoomRow(payload.new, false);
+
+        // Plan 02-17 Task 2: a one-off direct read of the room's current
+        // state, fired only on recovery from a genuine drop - postgres_changes
+        // does not replay/backfill, so a move that happened server-side
+        // during the outage window would otherwise be silently missed
+        // forever (02-UAT.md test 8). `forceReconciliationCheck` is always
+        // the caller's hadPendingMoveAtDrop snapshot, never a literal `true`
+        // - see the SUBSCRIBED branch below for why.
+        const refetchRoomState = async (forceReconciliationCheck: boolean) => {
+            try {
+                const { data, error } = await supabase
+                    .from('rooms')
+                    .select('*')
+                    .eq('room_code', roomCode)
+                    .single();
+                if (cancelled) return; // a resolution arriving after unmount/room-change must do nothing
+                if (error || !data) return; // best-effort catch-up - the next broadcast or reconnect cycle is the fallback
+                applyRoomRow(data as RoomRow, forceReconciliationCheck);
+            } catch {
+                // A rejected `.single()` promise (transport failure) is exactly as
+                // recoverable as a resolved `error` above - swallow it the same way.
+            }
         };
 
         // No-op if a reconnect is already scheduled (overlapping-timer
@@ -186,14 +226,20 @@ export function useRoomSubscription({
                             reconnectAttempt = 0;
                         }, SUBSCRIPTION_RECONNECT_RESET_DWELL_MS);
                         // hadDisconnected is only ever true here on a
-                        // post-drop resubscribe - reset it now so a
-                        // subsequent, genuinely routine SUBSCRIBED does not
-                        // look like a recovery. Task 2 (Plan 02-17) extends
-                        // this branch to capture the pre-reset value before
-                        // clearing it and trigger the one-off recovery
-                        // refetch from it.
-                        if (hadDisconnected) {
-                            hadDisconnected = false;
+                        // post-drop resubscribe - an initial mount's first
+                        // SUBSCRIBED (which runs before any error could have
+                        // occurred) never sets it, so never triggers a
+                        // refetch. Capture both flags before resetting them
+                        // (both reset immediately and unconditionally,
+                        // independent of the dwell-gated backoff-counter
+                        // reset above) so a *subsequent*, genuinely routine
+                        // SUBSCRIBED does not look like a fresh recovery.
+                        const wasDisconnected = hadDisconnected;
+                        const forceReconciliationCheck = hadPendingMoveAtDrop;
+                        hadDisconnected = false;
+                        hadPendingMoveAtDrop = false;
+                        if (wasDisconnected) {
+                            void refetchRoomState(forceReconciliationCheck);
                         }
                         return;
                     }
@@ -205,6 +251,41 @@ export function useRoomSubscription({
                         if (resetDwellTimeoutId !== null) {
                             clearTimeout(resetDwellTimeoutId);
                             resetDwellTimeoutId = null;
+                        }
+                        // Only the original transition into the outage
+                        // snapshots hadPendingMoveAtDrop - `!hadDisconnected`
+                        // here means "this is the first drop, not a failed
+                        // reconnect attempt partway through an outage that is
+                        // already under way". Without this guard, a failed
+                        // retry's own re-error (which can land after 02-16's
+                        // safety net has already cleared hasPendingMove())
+                        // would overwrite what was genuinely true when the
+                        // outage began, silently erasing case (a) below.
+                        //
+                        // Two cases hasPendingMove() === false cannot tell
+                        // apart by refetch time, which is exactly why this
+                        // snapshot exists rather than a hardcoded `true`:
+                        // (a) this client genuinely had a move outstanding
+                        // when the connection dropped, and 02-16's
+                        // PENDING_MOVE_TIMEOUT_MS safety net cleared it
+                        // during the outage before the matching broadcast
+                        // could arrive - the reconciliation check must still
+                        // catch this; (b) this client never submitted
+                        // anything at all - an idle bystander whose channel
+                        // happened to drop while the *opponent* moved during
+                        // the outage (02-UAT.md test 8's own reproduction).
+                        // Snapshotting here, at the one moment before either
+                        // case has had a chance to make hasPendingMove()
+                        // misleading, is what tells them apart: case (a)
+                        // snapshots `true` and still forces the check even
+                        // after the flag goes stale; case (b) snapshots
+                        // `false` and leaves the refetch's reconciliation
+                        // check exactly as gated as the live-broadcast path
+                        // already is - never the toast, only the silent
+                        // onServerRoom catch-up. Do not "simplify" the
+                        // refetch call below back to a literal `true`.
+                        if (!hadDisconnected) {
+                            hadPendingMoveAtDrop = hasPendingMoveRef.current();
                         }
                         hadDisconnected = true;
                         supabase.removeChannel(channel);
