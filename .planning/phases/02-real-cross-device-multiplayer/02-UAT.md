@@ -219,11 +219,45 @@ expected: |
   throttling a tab's connection self-heals without a manual rejoin.
 result: [pending]
 
+### 10. Reconnect toast (D-10) misattributes a player's own connection recovery to the other player
+expected: The reconnect toast ("X reconnected") should only fire on a
+  screen when the player named in it genuinely just came back online -
+  never as a side effect of the viewing client's own connection recovering
+result: issue
+reported: |
+  "Logout and reconnection worked on phone first then pc. Pc toast was
+  incorrect saying the phone players name when reconnected."
+severity: minor
+root_cause: |
+  Traced by code inspection (no DB access available this session - not yet
+  independently confirmed against a live audit trail). GameScreen.tsx's
+  reconnect-toast effect (lines 157-159) fires `${player.name} reconnected`
+  on any true->false transition of usePresence's onlinePlayerIds for another
+  player. usePresence's Presence channel (room-{code}-presence) is entirely
+  separate from the room-data postgres_changes channel that plan 02-17 gave
+  subscribe-status/reconnect handling to - it has none of its own. When a
+  client's own connection drops and later recovers, its Presence channel
+  view of every OTHER player was frozen for the outage and then catches up
+  in one batch on resubscribe. The toast effect has no way to distinguish
+  "the other player genuinely just reconnected" from "my own view of them
+  just caught up because my own connection recovered" - so a client whose
+  own network blipped can see a reconnect toast misattributed to whichever
+  other player looked stale during the outage, even though that player's
+  connection never changed.
+artifacts:
+  - path: "src/screens/GameScreen.tsx"
+    issue: "the true->false transition check (lines 157-159) has no signal for whether this client's own connection just recovered vs the other player's did"
+  - path: "src/hooks/usePresence.ts"
+    issue: "the Presence channel's .subscribe() callback only acts on SUBSCRIBED (re-tracking); it has no CHANNEL_ERROR/TIMED_OUT/CLOSED handling at all, unlike useRoomSubscription.ts's channel after plan 02-17"
+missing:
+  - "A way for the reconnect-toast effect to know whether this client's own connection just dropped and recovered, so a self-recovery-induced batch catch-up in onlinePlayerIds doesn't get attributed to another player"
+debug_session: ""
+
 ## Summary
 
-total: 9
+total: 10
 passed: 3
-issues: 5
+issues: 6
 pending: 2
 skipped: 0
 blocked: 0
@@ -254,4 +288,24 @@ blocked: 0
       issue: "transferHostIfStale has the identical staleness-clock-starts-late interaction for a host who leaves the lobby"
   missing:
     - "Decide whether this bounded, self-resolving delay is acceptable as-is, or whether Leave Game should send a lightweight signal to fast-track the staleness clock"
+  debug_session: ""
+
+- truth: "The reconnect toast (\"X reconnected\") only fires when the named player genuinely just came back online, never as a side effect of the viewing client's own connection recovering"
+  status: failed
+  reason: |
+    Live retest: after phone and then PC each disconnected and reconnected,
+    PC's screen showed a reconnect toast naming the phone player at the
+    point PC itself reconnected - not confirmed via DB audit this session,
+    but grounded in a clear structural gap found by code inspection (see
+    root_cause).
+  severity: minor
+  test: 10
+  root_cause: "usePresence's Presence channel (separate from the room-data channel plan 02-17 fixed) has no subscribe-status/reconnect handling of its own; a client's own connection dropping and recovering can batch-update its onlinePlayerIds view of OTHER players in one jump, and GameScreen.tsx's reconnect-toast effect (lines 157-159) cannot distinguish that from a genuine reconnect by the named player"
+  artifacts:
+    - path: "src/screens/GameScreen.tsx"
+      issue: "the true->false transition check has no signal for whether this client's own connection just recovered vs the other player's did"
+    - path: "src/hooks/usePresence.ts"
+      issue: "the Presence channel's .subscribe() callback only acts on SUBSCRIBED; no CHANNEL_ERROR/TIMED_OUT/CLOSED handling, unlike useRoomSubscription.ts after plan 02-17"
+  missing:
+    - "A way to detect that this client's own Presence channel just recovered from a drop, so a resulting batch catch-up in onlinePlayerIds doesn't get misattributed as another player's reconnect"
   debug_session: ""
