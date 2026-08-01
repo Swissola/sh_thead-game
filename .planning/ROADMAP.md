@@ -24,7 +24,7 @@ CI, monitoring, store assets — needed for an actual app store release.
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Rules Engine Refactor** - Extract a single pure `applyMove` reducer and split the 1,500-line `App.tsx`, so client and future server can run identical rules (completed 2026-07-25)
-- [ ] **Phase 2: Real Cross-Device Multiplayer** - Supabase-backed rooms with Realtime sync, anonymous identity, and server-validated moves — a friend can actually join and play from another device
+- [x] **Phase 2: Real Cross-Device Multiplayer** - Supabase-backed rooms with Realtime sync, anonymous identity, and server-validated moves — a friend can actually join and play from another device (completed 2026-08-01)
 - [ ] **Phase 3: Responsive UI** - The game is fully usable on a phone-sized screen and via keyboard, not just desktop mouse
 - [ ] **Phase 4: Mobile Packaging (Capacitor)** - The app installs and runs as a native app on Android and iOS
 - [ ] **Phase 5: Desktop Polish** - A polished, PWA-installable desktop experience with no native wrapper
@@ -91,7 +91,7 @@ Plans:
   5. Players can see when an opponent has disconnected mid-game
   6. The room host can set the turn auto-pickup timeout (30s-300s) in the lobby, visible to all players (MPLAY-07)
 
-**Plans:** 18/19 plans executed
+**Plans:** 19/19 plans executed
 Plans:
 **Wave 1**
 
@@ -122,7 +122,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5)*
 
-- [ ] 02-13-PLAN.md — Edge Function functional smoke suite over all seven wrappers, plus the two-device cross-device play test
+- [x] 02-13-PLAN.md — Edge Function functional smoke suite over all seven wrappers, plus the two-device cross-device play test (Task 3 signed off against this session's full 02-UAT.md testing record)
 
 **Wave 7** *(gap closure — blocked on Wave 6)*
 
@@ -232,7 +232,7 @@ rework lands).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
-| 2. Real Cross-Device Multiplayer | 18/19 | In Progress|  |
+| 2. Real Cross-Device Multiplayer | 19/19 | Complete    | 2026-08-01 |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |

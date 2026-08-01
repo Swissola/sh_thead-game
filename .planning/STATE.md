@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-last_updated: "2026-08-01T15:29:42.397Z"
-last_activity: 2026-08-01 -- Plan 02-19 executed (MPLAY-07's lobby UI and client-side sweep wiring; MPLAY-07 fully closed)
+last_updated: "2026-08-01T16:45:00.000Z"
+last_activity: 2026-08-01 -- Phase 02 closed out: 02-13 Task 3's manual two-device checkpoint signed off against this session's full 02-UAT.md testing record (10 tests, all pass or fixed-and-verified)
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 26
-  completed_plans: 25
-  percent: 14
+  completed_plans: 26
+  percent: 29
 ---
 
 # Project State
@@ -20,28 +20,37 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-25)
 
 **Core value:** A friend can join a room from any device (phone, desktop, either OS) and play a full game with you in real time.
-**Current focus:** Phase 02 — real-cross-device-multiplayer
+**Current focus:** Phase 03 — responsive-ui (not yet started)
 
 ## Current Position
 
-Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-19 — COMPLETE (both tasks). MPLAY-07's UI/wiring half, closing both gaps 02-18
-deliberately left open: a host-editable, all-players-visible auto-pickup timeout `<select>`
-in `LobbyScreen.tsx`, dispatching `SET_TURN_TIMEOUT` through the standard `dispatchMove`
-pipeline and bounded by 02-18's own `MIN_TURN_TIMEOUT_MS`/`MAX_TURN_TIMEOUT_MS`; and
-`useTurnTimeoutSweep` now comparing elapsed time against the room's actual configured
-`turnTimeoutMs` (threaded from `GameScreen.tsx`) instead of the previously hardcoded
-`TURN_GRACE_MS`. MPLAY-07 is now fully closed end-to-end (server-validated by 02-18,
-reachable by 02-19) - `REQUIREMENTS.md`'s MPLAY-07 checkbox ticked.
-Status: 18/19 plans fully complete and merged (02-01..02-12, 02-14..02-19); 02-13 is 2/3
-tasks merged, its final Task 3 (blocking human-verify checkpoint) still pending human
-sign-off. 02-13 remains the only plan blocking Phase 02's close.
-Last activity: 2026-08-01 -- Plan 02-19 executed (worktree was 168 files/~31.8k lines stale
-off an old ancestor of `stage-1-refactor` that predated `.planning/` itself; fast-forwarded
-via `git merge --ff-only` before starting, to pick up its own 02-18 dependency and the
-02-19 plan file). `npm run build`/`npm test -- --run` (478 tests, up from 466)/scoped
-`npx eslint` all green. Full-suite `npm run lint` still exits 1 on the same two
-pre-existing, unrelated issues carried since 02-01 (neither touched by this plan).
+Phase: 02 (real-cross-device-multiplayer) — COMPLETE
+Plan: 02-13 Task 3 — SIGNED OFF. The phase's blocking manual two-device checkpoint was satisfied
+across this session's full gap-closure arc rather than as one isolated pass: `02-UAT.md`'s ten
+logged tests, run live against the hosted Supabase project on real PC + phone hardware, cover
+every scenario the checkpoint's `<how-to-verify>` steps ask for. `02-VALIDATION.md`'s two
+Manual-Only Verification rows (MPLAY-01, MPLAY-06) are ticked with dates and evidence
+references; `02-13-SUMMARY.md` written covering all three of the plan's tasks. One noted
+variance, not a gap: disconnects were exercised via Leave Game, an Ethernet-adapter disable, and
+Airplane Mode rather than literally closing a tab every time - functionally equivalent, since the
+Presence channel can't distinguish cause of disconnect.
+Status: 19/19 plans fully complete and merged. Phase 02 is done - every requirement
+(MPLAY-01 through MPLAY-07) is ticked complete in `REQUIREMENTS.md`.
+Last activity: 2026-08-01 -- Phase 02 closed out administratively (STATE.md/ROADMAP.md/
+02-VALIDATION.md updated, 02-13-SUMMARY.md written) after MPLAY-07 shipped end-to-end via
+02-18/02-19. Next: Phase 03 (Responsive UI) has not been discussed or planned yet.
+
+Previously (2026-08-01): Plan 02-19 executed (MPLAY-07's UI/wiring half, closing both gaps
+02-18 deliberately left open: a host-editable, all-players-visible auto-pickup timeout
+`<select>` in `LobbyScreen.tsx`, dispatching `SET_TURN_TIMEOUT` through the standard
+`dispatchMove` pipeline and bounded by 02-18's own `MIN_TURN_TIMEOUT_MS`/`MAX_TURN_TIMEOUT_MS`;
+`useTurnTimeoutSweep` now compares elapsed time against the room's actual configured
+`turnTimeoutMs` instead of the previously hardcoded `TURN_GRACE_MS`). Worktree was 168
+files/~31.8k lines stale off an old ancestor of `stage-1-refactor` that predated `.planning/`
+itself; fast-forwarded via `git merge --ff-only` before starting. `npm run build`/
+`npm test -- --run` (478 tests, up from 466)/scoped `npx eslint` all green. Full-suite
+`npm run lint` still exits 1 on the same two pre-existing, unrelated issues carried since
+02-01 (neither touched by this plan).
 
 Previously (2026-07-28): Plan 02-13's executor hit the account's weekly usage limit mid-task
 (twice — once on first dispatch before any commits, once again mid-debug of Task 2's audit-trail
@@ -145,12 +154,6 @@ the 02-14/02-15 gap-closure merge. `npm run lint` still exits 1 on two pre-exist
 react-hooks/set-state-in-effect in the pre-existing celebration-modal effect) — confirmed
 present before 02-12 touched either file; logged in `deferred-items.md`, not yet cleaned up.
 
-- **02-13 Task 3 is a blocking checkpoint awaiting the human operator** — a two-device manual
-  play test against the hosted Supabase project. This is the only thing standing between the
-  current state and Phase 02 being fully complete. Full checkpoint details (how-to-verify steps,
-  acceptance criteria, resume-signal) are in `.planning/phases/02-real-cross-device-multiplayer/
-  02-13-PLAN.md`'s Task 3. No SUMMARY.md for 02-13 yet — write it only after sign-off.
-
 - **Three orphaned worktree directories** under `.claude/worktrees/` —
   `agent-aea2c752cd368982d`, `agent-a24186bc781420a82` (02-14), and
   `agent-ab626206d94067ea1` (02-15). `git worktree remove --force` unregistered all three from
@@ -171,12 +174,12 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-01T15:29:42.389Z
-Stopped at: Completed 02-19-PLAN.md (MPLAY-07's lobby UI/client-side sweep wiring: host-editable turn-timeout select in LobbyScreen dispatching SET_TURN_TIMEOUT, useTurnTimeoutSweep reading gameState.turnTimeoutMs instead of hardcoded TURN_GRACE_MS). MPLAY-07 fully closed end-to-end.
-02-13 Task 3 remains the only work left in the entire phase — needs the human operator to run it
-against the hosted Supabase project and report back per the resume-signal ("approved" or a
-description of what didn't behave as written). Once signed off, a session needs to: tick the two
-Manual-Only Verifications rows in 02-VALIDATION.md with the date performed, record any
-grace-period timing feedback, write 02-13-SUMMARY.md, then close out Phase 02 in
-STATE.md/ROADMAP.md.
+Last session: 2026-08-01T16:45:00.000Z
+Stopped at: Phase 02 closed out. 02-13 Task 3's manual two-device checkpoint signed off against
+this session's full 02-UAT.md testing record (tests 1-10, all pass or fixed-and-verified) rather
+than a fresh isolated pass. 02-VALIDATION.md's two Manual-Only Verifications rows ticked with
+dates/evidence, 02-13-SUMMARY.md written covering all three of that plan's tasks, ROADMAP.md's
+Phase 2 checkbox and plan table updated to 19/19. Every requirement MPLAY-01 through MPLAY-07 is
+complete. Phase 03 (Responsive UI) has not been discussed, spec'd, or planned yet - that is the
+next open work whenever a session picks this back up.
 Resume file: None
