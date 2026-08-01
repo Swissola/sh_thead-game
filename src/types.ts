@@ -1,6 +1,7 @@
 /**
  * Shared TypeScript types and interfaces for the Shithead game
  */
+import type { FocusEventHandler } from 'react';
 
 export interface Card {
     suit: string;
@@ -51,4 +52,9 @@ export interface CardProps {
     selected?: boolean;
     small?: boolean;
     title?: string;
+    role?: 'option';
+    ariaSelected?: boolean;
+    ariaLabel?: string;
+    tabIndex?: number;
+    onFocus?: FocusEventHandler<HTMLDivElement>;
 }
