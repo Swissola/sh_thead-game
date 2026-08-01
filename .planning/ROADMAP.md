@@ -161,15 +161,15 @@ Plans:
   4. A player can select and play cards using only the keyboard
   5. Turn changes are announced and modals trap focus properly for screen reader/keyboard users
 
-**Plans:** 0/8 plans complete
+**Plans:** 3/8 plans executed
 **UI hint**: yes
 
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Accessibility primitives: useRovingTabindex + useFocusTrap hooks, sr-only utility
-- [ ] 03-02-PLAN.md — Card leaf a11y: role=option, Enter/Space activation, cyan focus-visible ring, blind-play-safe accessible name
-- [ ] 03-06-PLAN.md — LobbyScreen: 44px control audit and phone-width row wrapping
+- [x] 03-01-PLAN.md — Accessibility primitives: useRovingTabindex + useFocusTrap hooks, sr-only utility
+- [x] 03-02-PLAN.md — Card leaf a11y: role=option, Enter/Space activation, cyan focus-visible ring, blind-play-safe accessible name
+- [x] 03-06-PLAN.md — LobbyScreen: 44px control audit and phone-width row wrapping
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -257,7 +257,7 @@ rework lands).
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
 | 2. Real Cross-Device Multiplayer | 19/19 | Complete    | 2026-08-01 |
-| 3. Responsive UI | 0/8 | Not started | - |
+| 3. Responsive UI | 3/8 | In Progress|  |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
 | 6. Visual/Gameplay Polish | 0/TBD | Not started | - |
