@@ -73,7 +73,29 @@ export const Card: React.FC<CardProps> = ({
                 aria-selected={role === 'option' ? ariaSelected : undefined}
                 aria-label={ariaLabel}
                 tabIndex={tabIndex}
-                onFocus={onFocus}
+                onFocus={(event) => {
+                    if (showTimer.current) {
+                        window.clearTimeout(showTimer.current);
+                        showTimer.current = null;
+                    }
+                    if (hideTimer.current) {
+                        window.clearTimeout(hideTimer.current);
+                        hideTimer.current = null;
+                    }
+                    setHover(true);
+                    onFocus?.(event);
+                }}
+                onBlur={() => {
+                    if (showTimer.current) {
+                        window.clearTimeout(showTimer.current);
+                        showTimer.current = null;
+                    }
+                    if (hideTimer.current) {
+                        window.clearTimeout(hideTimer.current);
+                        hideTimer.current = null;
+                    }
+                    setHover(false);
+                }}
                 onClick={onClick}
                 onKeyDown={(event) => {
                     if (event.key === ' ' || event.key === 'Enter') {
@@ -116,12 +138,13 @@ export const Card: React.FC<CardProps> = ({
           bg-gradient-to-br ${colorScheme.from} ${colorScheme.via} ${colorScheme.to}
           ${selectable ? 'hover:scale-110 hover:-translate-y-2 shadow-lg' : ''}
           ${selected ? 'scale-110 -translate-y-3 ring-4 ring-yellow-400' : ''}
+          focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
           shadow-md border-2 ${colorScheme.border}
         `}
             >
                 {title && (
                     <div
-                        className={`absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full z-20 px-2.5 py-1.5 rounded-md text-sm font-medium text-white bg-black/85 backdrop-blur border border-white/10 shadow-lg transition-opacity duration-150 ${hover ? 'opacity-100' : 'opacity-0'}`}
+                        className={`absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full z-20 px-2.5 py-1.5 rounded-md text-sm font-semibold text-white bg-black/85 backdrop-blur border border-white/10 shadow-lg transition-opacity duration-150 ${hover ? 'opacity-100' : 'opacity-0'}`}
                         style={{ pointerEvents: 'none', maxWidth: small ? '10rem' : '12rem' }}
                         aria-hidden="true"
                     >
@@ -170,7 +193,29 @@ export const Card: React.FC<CardProps> = ({
             aria-selected={role === 'option' ? ariaSelected : undefined}
             aria-label={ariaLabel}
             tabIndex={tabIndex}
-            onFocus={onFocus}
+            onFocus={(event) => {
+                if (showTimer.current) {
+                    window.clearTimeout(showTimer.current);
+                    showTimer.current = null;
+                }
+                if (hideTimer.current) {
+                    window.clearTimeout(hideTimer.current);
+                    hideTimer.current = null;
+                }
+                setHover(true);
+                onFocus?.(event);
+            }}
+            onBlur={() => {
+                if (showTimer.current) {
+                    window.clearTimeout(showTimer.current);
+                    showTimer.current = null;
+                }
+                if (hideTimer.current) {
+                    window.clearTimeout(hideTimer.current);
+                    hideTimer.current = null;
+                }
+                setHover(false);
+            }}
             onClick={selectable ? onClick : undefined}
             onKeyDown={(event) => {
                 if (event.key === ' ' || event.key === 'Enter') {
@@ -215,12 +260,13 @@ export const Card: React.FC<CardProps> = ({
         bg-white
         ${selectable ? 'cursor-pointer hover:scale-110 hover:-translate-y-2 shadow-lg' : 'cursor-default'}
         ${selected ? 'scale-110 -translate-y-3 ring-4 ring-yellow-400' : ''}
+        focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
         shadow-md border-2 border-gray-200
       `}
         >
             {title && (
                 <div
-                    className={`absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full z-20 px-2.5 py-1.5 rounded-md text-sm font-medium text-white bg-slate-900/95 backdrop-blur border border-white/10 shadow-lg transition-opacity duration-150 ${hover ? 'opacity-100' : 'opacity-0'}`}
+                    className={`absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full z-20 px-2.5 py-1.5 rounded-md text-sm font-semibold text-white bg-slate-900/95 backdrop-blur border border-white/10 shadow-lg transition-opacity duration-150 ${hover ? 'opacity-100' : 'opacity-0'}`}
                     style={{ pointerEvents: 'none', maxWidth: small ? '10rem' : '12rem' }}
                     aria-hidden="true"
                 >
