@@ -129,6 +129,9 @@ note: |
   User suggestion (not a defect): the last-used room code should persist in
   the join-form's room-code field so a reconnecting player doesn't have to
   retype it after a timeout. Logged as a UX enhancement, not a gap.
+  DONE (commit c217367): mirrors D-09's last-used-name pattern via
+  readLastUsedRoomCode/writeLastUsedRoomCode in src/supabase/session.ts - a
+  join-link deep link still takes priority over the stored code.
 
 ### 6. Leave Game + rejoin (D-14, D-04)
 expected: Pressing Leave Game and confirming lands on the menu; rejoining
