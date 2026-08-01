@@ -3,7 +3,7 @@ status: partial
 phase: 02-real-cross-device-multiplayer
 source: [02-05-SUMMARY.md, 02-07-SUMMARY.md, 02-08-SUMMARY.md, 02-09-SUMMARY.md, 02-10-SUMMARY.md, 02-11-SUMMARY.md, 02-12-SUMMARY.md, 02-14-SUMMARY.md, 02-15-SUMMARY.md, 02-16-SUMMARY.md, 02-17-SUMMARY.md]
 started: 2026-07-28T18:00:00Z
-updated: 2026-07-31T00:00:00Z
+updated: 2026-08-01T00:00:00Z
 ---
 
 ## Current Test
@@ -275,12 +275,27 @@ artifacts:
 missing:
   - "A way for the reconnect-toast effect to know whether this client's own connection just dropped and recovered, so a self-recovery-induced batch catch-up in onlinePlayerIds doesn't get attributed to another player"
 debug_session: ""
+status_note: |
+  FIXED (commits e7e6b5b/40f2e4c): usePresence's Presence channel now
+  tracks its own subscribe-status (CHANNEL_ERROR/TIMED_OUT/CLOSED) and
+  exposes a read-and-clear consumeJustReconnected() signal, set true for
+  exactly the first presence sync that lands after such a drop recovers
+  (the batched catch-up this gap is about) and cleared on read. Router
+  threads it into GameScreen alongside isPlayerOffline; GameScreen's
+  reconnect-toast effect consumes it and, when true, silently reseeds
+  lastOfflineRef instead of firing toasts for that pass - exactly like the
+  existing initial-mount seed - while every other pass (a genuine reconnect
+  observed by a client whose own connection stayed up) keeps firing the
+  toast unchanged. TDD: failing tests written first for both the usePresence
+  signal and the GameScreen suppression, then implemented. 15/15
+  usePresence tests and 27/27 GameScreen tests passing (448/448 full suite),
+  build clean. Not carried forward as an open gap.
 
 ## Summary
 
 total: 10
 passed: 5
-issues: 6
+issues: 5
 pending: 0
 skipped: 0
 blocked: 0
@@ -291,10 +306,12 @@ blocked: 0
      are listed here - the D-05 mistargeting gap (test 4), the heartbeat/D-01
      version-pollution gap (test 3, closed by plan 02-15), the empty-pile
      stall gap (test 4b, closed by plan 02-14), the reconciliation-toast
-     scoping gap (test 7, closed by plan 02-16), and the silently-stale
-     Realtime channel gap (test 8, closed by plan 02-17) were all fixed
-     during this phase and are not carried forward; their fix record lives in
-     the corresponding Tests section entries' status_note above. -->
+     scoping gap (test 7, closed by plan 02-16), the silently-stale
+     Realtime channel gap (test 8, closed by plan 02-17), and the reconnect-
+     toast self-recovery misattribution gap (test 10, closed by commits
+     e7e6b5b/40f2e4c) were all fixed during this phase and are not carried
+     forward; their fix record lives in the corresponding Tests section
+     entries' status_note above. -->
 
 - truth: "Leaving mid-turn resolves within the same ~60s grace period as an ordinary disconnect"
   status: failed
@@ -311,24 +328,4 @@ blocked: 0
       issue: "transferHostIfStale has the identical staleness-clock-starts-late interaction for a host who leaves the lobby"
   missing:
     - "Decide whether this bounded, self-resolving delay is acceptable as-is, or whether Leave Game should send a lightweight signal to fast-track the staleness clock"
-  debug_session: ""
-
-- truth: "The reconnect toast (\"X reconnected\") only fires when the named player genuinely just came back online, never as a side effect of the viewing client's own connection recovering"
-  status: failed
-  reason: |
-    Live retest: after phone and then PC each disconnected and reconnected,
-    PC's screen showed a reconnect toast naming the phone player at the
-    point PC itself reconnected - not confirmed via DB audit this session,
-    but grounded in a clear structural gap found by code inspection (see
-    root_cause).
-  severity: minor
-  test: 10
-  root_cause: "usePresence's Presence channel (separate from the room-data channel plan 02-17 fixed) has no subscribe-status/reconnect handling of its own; a client's own connection dropping and recovering can batch-update its onlinePlayerIds view of OTHER players in one jump, and GameScreen.tsx's reconnect-toast effect (lines 157-159) cannot distinguish that from a genuine reconnect by the named player"
-  artifacts:
-    - path: "src/screens/GameScreen.tsx"
-      issue: "the true->false transition check has no signal for whether this client's own connection just recovered vs the other player's did"
-    - path: "src/hooks/usePresence.ts"
-      issue: "the Presence channel's .subscribe() callback only acts on SUBSCRIBED; no CHANNEL_ERROR/TIMED_OUT/CLOSED handling, unlike useRoomSubscription.ts after plan 02-17"
-  missing:
-    - "A way to detect that this client's own Presence channel just recovered from a drop, so a resulting batch catch-up in onlinePlayerIds doesn't get misattributed as another player's reconnect"
   debug_session: ""
