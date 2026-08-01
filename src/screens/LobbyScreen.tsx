@@ -139,7 +139,7 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
                         <button
                             onClick={copyRoomCode}
                             aria-label="Copy room code"
-                            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                            className="p-2 min-h-11 min-w-11 hover:bg-slate-700 rounded-lg transition-colors"
                         >
                             {copied ? (
                                 <Check size={20} className="text-green-400" />
@@ -150,7 +150,7 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
                         <button
                             onClick={copyJoinLink}
                             aria-label="Copy join link"
-                            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                            className="p-2 min-h-11 min-w-11 hover:bg-slate-700 rounded-lg transition-colors"
                         >
                             {copiedLink ? (
                                 <Check size={20} className="text-green-400" />
@@ -168,7 +168,7 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
                             aria-label="Auto-pickup timeout"
                             value={gameState?.turnTimeoutMs ?? MIN_TURN_TIMEOUT_MS}
                             onChange={(e) => setTurnTimeout(Number(e.target.value))}
-                            className="bg-slate-600 text-white px-3 py-1 rounded border border-slate-500 font-semibold"
+                            className="bg-slate-600 text-white px-3 py-2 min-h-11 rounded border border-slate-500 font-semibold"
                         >
                             {TURN_TIMEOUT_OPTIONS_MS.map((ms) => (
                                 <option key={ms} value={ms}>
@@ -216,7 +216,7 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
                                             disabled={!offline}
                                             aria-label={`Remove ${player.name}`}
                                             title={offline ? 'Remove player' : 'Player is connected'}
-                                            className="p-1 hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                            className="p-1 min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                         >
                                             <UserX size={16} className="text-red-400" />
                                         </button>

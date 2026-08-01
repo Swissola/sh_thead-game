@@ -545,6 +545,171 @@ describe('LobbyScreen', () => {
         });
     });
 
+    describe('44px touch-target sizing (RESP-03, plan 03-06)', () => {
+        it('the "Copy room code" button carries min-h-11 and min-w-11', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            const roomCodeButton = await screen.findByLabelText('Copy room code');
+            expect(roomCodeButton).toHaveClass('min-h-11');
+            expect(roomCodeButton).toHaveClass('min-w-11');
+        });
+
+        it('the "Copy join link" button carries min-h-11 and min-w-11', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            const joinLinkButton = await screen.findByLabelText('Copy join link');
+            expect(joinLinkButton).toHaveClass('min-h-11');
+            expect(joinLinkButton).toHaveClass('min-w-11');
+        });
+
+        it('the auto-pickup timeout <select> (host view) carries min-h-11', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                turnTimeoutMs: 60000,
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            const select = await screen.findByLabelText('Auto-pickup timeout');
+            expect(select).toHaveClass('min-h-11');
+        });
+
+        it('every "Remove <name>" button carries min-h-11 and min-w-11', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice' }),
+                    buildPlayer({ id: 'p1', name: 'Bob' }),
+                    buildPlayer({ id: 'p2', name: 'Carol' }),
+                ],
+            });
+            renderLobby('p0', state, offlineChecker(['p1', 'p2']));
+
+            const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
+            const bobRemove = within(bobRow).getByLabelText(/remove/i);
+            expect(bobRemove).toHaveClass('min-h-11');
+            expect(bobRemove).toHaveClass('min-w-11');
+
+            const carolRow = screen.getByText('Carol').closest('div.flex') as HTMLElement;
+            const carolRemove = within(carolRow).getByLabelText(/remove/i);
+            expect(carolRemove).toHaveClass('min-h-11');
+            expect(carolRemove).toHaveClass('min-w-11');
+        });
+
+        it('the remove-player button keeps its disabled gating unchanged by the size change', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [
+                    buildPlayer({ id: 'p0', name: 'Alice' }),
+                    buildPlayer({ id: 'p1', name: 'Bob' }),
+                    buildPlayer({ id: 'p2', name: 'Carol' }),
+                ],
+            });
+            renderLobby('p0', state, offlineChecker(['p2'])); // Bob online, Carol offline
+
+            const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
+            expect(within(bobRow).getByLabelText(/remove/i)).toBeDisabled();
+
+            const carolRow = screen.getByText('Carol').closest('div.flex') as HTMLElement;
+            expect(within(carolRow).getByLabelText(/remove/i)).toBeEnabled();
+        });
+
+        it('the remove-player button still exposes aria-label="Remove <name>" and calls removePlayerFromLobby with that player id on click', async () => {
+            const updatedState = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' })],
+            });
+            const { supabase, invoke } = makeFakeSupabase(() =>
+                Promise.resolve({
+                    data: {
+                        room: {
+                            roomCode: 'ABC123',
+                            state: updatedState,
+                            version: 3,
+                            turnStartedAt: '2026-01-01T00:00:00.000Z',
+                            playerSeen: {},
+                        },
+                    },
+                    error: null,
+                })
+            );
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state, offlineChecker(['p1']));
+
+            const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
+            const bobRemove = within(bobRow).getByLabelText('Remove Bob');
+            fireEvent.click(bobRemove);
+
+            expect(invoke).toHaveBeenCalledWith('remove-player', {
+                body: { roomCode: 'ABC123', targetPlayerId: 'p1' },
+            });
+
+            await waitFor(() => {
+                expect(screen.getByTestId('probe')).toHaveTextContent('Alice(hand:1,faceUp:0,faceDown:0)');
+            });
+        });
+
+        it('the Offline and You badges are unchanged - neither gains min-h-11', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state, offlineChecker(['p1'])); // Alice online+You, Bob offline
+
+            const bobRow = screen.getByText('Bob').closest('div.flex') as HTMLElement;
+            const offlineBadge = within(bobRow).getByText('Offline').closest('span') as HTMLElement;
+            expect(offlineBadge).toHaveClass('px-2');
+            expect(offlineBadge).toHaveClass('py-1');
+            expect(offlineBadge).not.toHaveClass('min-h-11');
+
+            const aliceRow = screen.getByText('Alice').closest('div.flex') as HTMLElement;
+            const youBadge = within(aliceRow).getByText('You');
+            expect(youBadge).toHaveClass('px-2');
+            expect(youBadge).toHaveClass('py-1');
+            expect(youBadge).not.toHaveClass('min-h-11');
+        });
+    });
+
     describe('auto-pickup timeout control (MPLAY-07, plan 02-19)', () => {
         it('renders a <select> for the host with the current turnTimeoutMs selected, formatted in seconds', async () => {
             const { supabase } = makeFakeSupabase();
