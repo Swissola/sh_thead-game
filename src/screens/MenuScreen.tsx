@@ -4,7 +4,7 @@ import * as GameLogic from '../gameLogic';
 import type { GameState } from '../types';
 import { useGameContext } from '../context/GameContext';
 import { getSupabaseClient } from '../supabase/client';
-import { EDGE_ERROR_CODES, type EdgeErrorCode, type EdgeResult } from '../supabase/roomTypes';
+import { EDGE_ERROR_CODES, TURN_GRACE_MS, type EdgeErrorCode, type EdgeResult } from '../supabase/roomTypes';
 import {
     readLastUsedName,
     writeLastUsedName,
@@ -94,6 +94,7 @@ export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
             burnPile: [],
             lastAction: 'Test game created! Use the green dropdown to switch players.',
             isFirstTurn: true,
+            turnTimeoutMs: TURN_GRACE_MS,
         };
 
         setGameState(newGameState);
@@ -133,6 +134,7 @@ export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
             burnPile: [],
             lastAction: `Ready to play! ${dealtPlayers[startingPlayerIndex].name} starts.`,
             isFirstTurn: true,
+            turnTimeoutMs: TURN_GRACE_MS,
         };
 
         setGameState(newGameState);

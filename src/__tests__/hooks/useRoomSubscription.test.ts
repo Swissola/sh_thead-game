@@ -11,6 +11,7 @@ import {
     SUBSCRIPTION_RECONNECT_BASE_MS,
     SUBSCRIPTION_RECONNECT_MAX_MS,
     SUBSCRIPTION_RECONNECT_RESET_DWELL_MS,
+    TURN_GRACE_MS,
     type RoomRow,
 } from '../../supabase/roomTypes';
 import type { GameState } from '../../types';
@@ -81,6 +82,7 @@ function buildState(overrides: Partial<GameState> = {}): GameState {
         burnPile: [],
         lastAction: '',
         isFirstTurn: false,
+        turnTimeoutMs: TURN_GRACE_MS,
         ...overrides,
     };
 }

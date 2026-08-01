@@ -81,8 +81,28 @@ export interface EdgeResult {
   error?: EdgeError;
 }
 
-/** D-05's turn grace period: auto-`PICK_UP_PILE` after this many ms of inactivity. */
+/**
+ * D-05's turn grace period: auto-`PICK_UP_PILE` after this many ms of inactivity.
+ * Also MPLAY-07's default `turnTimeoutMs` for newly created rooms and the
+ * fallback value used by any room whose stored state predates this field.
+ */
 export const TURN_GRACE_MS = 60000;
+
+/**
+ * MPLAY-07's locked, user-specified inclusive lower bound for
+ * `GameState.turnTimeoutMs`, enforced inside `applyMove`'s `SET_TURN_TIMEOUT`
+ * handler itself - not merely by whatever range a future client-side control
+ * happens to offer.
+ */
+export const MIN_TURN_TIMEOUT_MS = 30000;
+
+/**
+ * MPLAY-07's locked, user-specified inclusive upper bound for
+ * `GameState.turnTimeoutMs`, enforced inside `applyMove`'s `SET_TURN_TIMEOUT`
+ * handler itself - not merely by whatever range a future client-side control
+ * happens to offer.
+ */
+export const MAX_TURN_TIMEOUT_MS = 300000;
 
 /** Client presence heartbeat interval (MPLAY-06). */
 export const HEARTBEAT_INTERVAL_MS = 15000;

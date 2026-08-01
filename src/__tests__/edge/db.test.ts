@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { withVersionRetry, MAX_WRITE_ATTEMPTS, type RoomStore, type RoomUpdatePatch } from '../../../supabase/functions/_shared/db';
 import { jsonResponse, edgeError } from '../../../supabase/functions/_shared/respond';
-import { EDGE_ERROR_CODES, type RoomRow, type EdgeResult } from '../../supabase/roomTypes';
+import { EDGE_ERROR_CODES, TURN_GRACE_MS, type RoomRow, type EdgeResult } from '../../supabase/roomTypes';
 import type { GameState } from '../../types';
 
 function makeGameState(overrides: Partial<GameState> = {}): GameState {
@@ -16,6 +16,7 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
         burnPile: [],
         lastAction: '',
         isFirstTurn: false,
+        turnTimeoutMs: TURN_GRACE_MS,
         ...overrides,
     };
 }

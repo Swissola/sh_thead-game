@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { joinRoom, resolveSeat } from '../../../supabase/functions/_shared/joinRoom';
 import type { RoomStore, RoomUpdatePatch } from '../../../supabase/functions/_shared/db';
-import { EDGE_ERROR_CODES, DISCONNECT_THRESHOLD_MS, type RoomRow } from '../../supabase/roomTypes';
+import { EDGE_ERROR_CODES, DISCONNECT_THRESHOLD_MS, TURN_GRACE_MS, type RoomRow } from '../../supabase/roomTypes';
 import type { GameState, Player } from '../../types';
 
 const NOW_ISO = '2026-07-26T00:10:00.000Z';
@@ -23,6 +23,7 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
         burnPile: [],
         lastAction: '',
         isFirstTurn: true,
+        turnTimeoutMs: TURN_GRACE_MS,
         ...overrides,
     };
 }

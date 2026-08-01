@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildGameState, buildPlayer } from './buildGameState';
+import { TURN_GRACE_MS } from '../../supabase/roomTypes';
 
 describe('buildGameState', () => {
     it('returns an object with all GameState keys populated', () => {
@@ -14,6 +15,7 @@ describe('buildGameState', () => {
         expect(state.burnPile).toEqual([]);
         expect(state.lastAction).toBe('');
         expect(state.isFirstTurn).toBe(false);
+        expect(state.turnTimeoutMs).toBe(TURN_GRACE_MS);
     });
 
     it('overrides only phase, other defaults intact', () => {

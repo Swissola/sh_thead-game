@@ -29,6 +29,11 @@ export interface GameState {
     burnPile: Card[]; // Cards that have been burned/removed from game
     lastAction: string;
     isFirstTurn: boolean; // True only for the very first card played in the game
+    // MPLAY-07's host-configurable auto-pickup grace period in ms, bounded by
+    // src/supabase/roomTypes.ts's MIN_TURN_TIMEOUT_MS/MAX_TURN_TIMEOUT_MS,
+    // replacing the previously-hardcoded TURN_GRACE_MS as the value
+    // checkTurnTimeout actually reads.
+    turnTimeoutMs: number;
 }
 
 export type CardSource = 'hand' | 'faceUp' | 'faceDown';

@@ -6,6 +6,7 @@
  * array (no deep-merge) so callers can supply a custom roster without the
  * defaults leaking in.
  */
+import { TURN_GRACE_MS } from '../../supabase/roomTypes';
 import type { Card, GameState, Player } from '../../types';
 
 export function buildCard(overrides: Partial<Card> = {}): Card {
@@ -45,6 +46,7 @@ export function buildGameState(overrides: Partial<GameState> = {}): GameState {
         burnPile: [],
         lastAction: '',
         isFirstTurn: false,
+        turnTimeoutMs: TURN_GRACE_MS,
         ...overrides,
     };
 }

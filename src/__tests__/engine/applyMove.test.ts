@@ -3,6 +3,7 @@ import { applyMove } from '../../engine/applyMove';
 import { ERROR_CODES } from '../../engine/errors';
 import { buildGameState, buildPlayer, buildCard } from '../testUtils/buildGameState';
 import * as GameLogic from '../../gameLogic';
+import { MIN_TURN_TIMEOUT_MS, MAX_TURN_TIMEOUT_MS } from '../../supabase/roomTypes';
 
 /** Deep snapshot used to prove the input state object is never mutated (ENGINE-02/D-11). */
 function snapshot<T>(value: T): T {
@@ -69,6 +70,135 @@ describe('applyMove - READY_UP', () => {
         const before = snapshot(state);
 
         const result = applyMove(state, { type: 'READY_UP', playerId: 'p0' });
+
+        expect(result.error?.code).toBe(ERROR_CODES.WRONG_PHASE);
+        expect(result.state).toBe(state);
+        expect(state).toEqual(before);
+    });
+});
+
+describe('applyMove - SET_TURN_TIMEOUT', () => {
+    it('sets turnTimeoutMs, updates lastAction, and returns a new state object leaving the original untouched', () => {
+        const state = buildGameState({ phase: 'lobby' });
+        const before = snapshot(state);
+
+        const result = applyMove(state, { type: 'SET_TURN_TIMEOUT', playerId: state.host, timeoutMs: 90000 });
+
+        expect(result.error).toBeUndefined();
+        expect(result.state).not.toBe(state);
+        expect(result.state.turnTimeoutMs).toBe(90000);
+        expect(result.state.lastAction).toContain('90s');
+        expect(state).toEqual(before);
+    });
+
+    it('accepts the minimum boundary value (inclusive)', () => {
+        const state = buildGameState({ phase: 'lobby' });
+
+        const result = applyMove(state, { type: 'SET_TURN_TIMEOUT', playerId: state.host, timeoutMs: MIN_TURN_TIMEOUT_MS });
+
+        expect(result.error).toBeUndefined();
+        expect(result.state.turnTimeoutMs).toBe(MIN_TURN_TIMEOUT_MS);
+    });
+
+    it('accepts the maximum boundary value (inclusive)', () => {
+        const state = buildGameState({ phase: 'lobby' });
+
+        const result = applyMove(state, { type: 'SET_TURN_TIMEOUT', playerId: state.host, timeoutMs: MAX_TURN_TIMEOUT_MS });
+
+        expect(result.error).toBeUndefined();
+        expect(result.state.turnTimeoutMs).toBe(MAX_TURN_TIMEOUT_MS);
+    });
+
+    it('rejects a value one below the minimum with INVALID_TIMEOUT_RANGE, leaving turnTimeoutMs untouched', () => {
+        const state = buildGameState({ phase: 'lobby' });
+        const before = snapshot(state);
+
+        const result = applyMove(state, {
+            type: 'SET_TURN_TIMEOUT',
+            playerId: state.host,
+            timeoutMs: MIN_TURN_TIMEOUT_MS - 1,
+        });
+
+        expect(result.error?.code).toBe(ERROR_CODES.INVALID_TIMEOUT_RANGE);
+        expect(result.state).toBe(state);
+        expect(state).toEqual(before);
+    });
+
+    it('rejects a value one above the maximum with INVALID_TIMEOUT_RANGE, leaving turnTimeoutMs untouched', () => {
+        const state = buildGameState({ phase: 'lobby' });
+        const before = snapshot(state);
+
+        const result = applyMove(state, {
+            type: 'SET_TURN_TIMEOUT',
+            playerId: state.host,
+            timeoutMs: MAX_TURN_TIMEOUT_MS + 1,
+        });
+
+        expect(result.error?.code).toBe(ERROR_CODES.INVALID_TIMEOUT_RANGE);
+        expect(result.state).toBe(state);
+        expect(state).toEqual(before);
+    });
+
+    it('rejects a non-finite timeoutMs (NaN) with INVALID_TIMEOUT_RANGE', () => {
+        const state = buildGameState({ phase: 'lobby' });
+
+        const result = applyMove(state, { type: 'SET_TURN_TIMEOUT', playerId: state.host, timeoutMs: NaN });
+
+        expect(result.error?.code).toBe(ERROR_CODES.INVALID_TIMEOUT_RANGE);
+        expect(result.state).toBe(state);
+    });
+
+    it('rejects a non-finite timeoutMs (Infinity) with INVALID_TIMEOUT_RANGE', () => {
+        const state = buildGameState({ phase: 'lobby' });
+
+        const result = applyMove(state, { type: 'SET_TURN_TIMEOUT', playerId: state.host, timeoutMs: Infinity });
+
+        expect(result.error?.code).toBe(ERROR_CODES.INVALID_TIMEOUT_RANGE);
+        expect(result.state).toBe(state);
+    });
+
+    it('rejects a seated non-host player with HOST_ONLY, leaving turnTimeoutMs untouched', () => {
+        const state = buildGameState({
+            phase: 'lobby',
+            host: 'p0',
+            players: [buildPlayer({ id: 'p0' }), buildPlayer({ id: 'p1' })],
+        });
+        const before = snapshot(state);
+
+        const result = applyMove(state, { type: 'SET_TURN_TIMEOUT', playerId: 'p1', timeoutMs: 90000 });
+
+        expect(result.error?.code).toBe(ERROR_CODES.HOST_ONLY);
+        expect(result.state).toBe(state);
+        expect(state).toEqual(before);
+    });
+
+    it('rejects a playerId matching no seated player with UNKNOWN_PLAYER', () => {
+        const state = buildGameState({ phase: 'lobby' });
+        const before = snapshot(state);
+
+        const result = applyMove(state, { type: 'SET_TURN_TIMEOUT', playerId: 'not-a-player', timeoutMs: 90000 });
+
+        expect(result.error?.code).toBe(ERROR_CODES.UNKNOWN_PLAYER);
+        expect(result.state).toBe(state);
+        expect(state).toEqual(before);
+    });
+
+    it('rejects SET_TURN_TIMEOUT while phase is setup', () => {
+        const state = buildGameState({ phase: 'setup' });
+        const before = snapshot(state);
+
+        const result = applyMove(state, { type: 'SET_TURN_TIMEOUT', playerId: state.host, timeoutMs: 90000 });
+
+        expect(result.error?.code).toBe(ERROR_CODES.WRONG_PHASE);
+        expect(result.state).toBe(state);
+        expect(state).toEqual(before);
+    });
+
+    it('rejects SET_TURN_TIMEOUT while phase is playing', () => {
+        const state = buildGameState({ phase: 'playing' });
+        const before = snapshot(state);
+
+        const result = applyMove(state, { type: 'SET_TURN_TIMEOUT', playerId: state.host, timeoutMs: 90000 });
 
         expect(result.error?.code).toBe(ERROR_CODES.WRONG_PHASE);
         expect(result.state).toBe(state);

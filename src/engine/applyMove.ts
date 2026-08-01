@@ -10,6 +10,7 @@
  * PICK_UP_PILE, and PLAY_CARDS.
  */
 import * as GameLogic from '../gameLogic.ts';
+import { MAX_TURN_TIMEOUT_MS, MIN_TURN_TIMEOUT_MS } from '../supabase/roomTypes.ts';
 import type { Card, CardSource, GameState, Player } from '../types.ts';
 import { ERROR_CODES } from './errors.ts';
 import type { ApplyMoveResult, Move } from './moves.ts';
@@ -29,6 +30,8 @@ export function applyMove(state: GameState, move: Move): ApplyMoveResult {
             return applyPickUpPile(state, move, playerIndex);
         case 'PLAY_CARDS':
             return applyPlayCards(state, move, playerIndex);
+        case 'SET_TURN_TIMEOUT':
+            return applySetTurnTimeout(state, move, playerIndex);
         default:
             // WR-01: runtime guard for malformed/unexpected move objects - TypeScript's
             // exhaustiveness only holds statically. Without this, a bad-input call falls
@@ -282,6 +285,41 @@ function applyReadyUp(state: GameState, playerIndex: number): ApplyMoveResult {
             ...state,
             players: updatedPlayers,
             lastAction: `${player.name} is ready`,
+        },
+    };
+}
+
+function applySetTurnTimeout(
+    state: GameState,
+    move: Extract<Move, { type: 'SET_TURN_TIMEOUT' }>,
+    playerIndex: number
+): ApplyMoveResult {
+    if (state.phase !== 'lobby') {
+        return {
+            state,
+            error: { code: ERROR_CODES.WRONG_PHASE, message: 'Cannot change the turn timeout outside the lobby phase' },
+        };
+    }
+    if (move.playerId !== state.host) {
+        return { state, error: { code: ERROR_CODES.HOST_ONLY, message: 'Only the host can change the turn timeout' } };
+    }
+    if (!Number.isFinite(move.timeoutMs) || move.timeoutMs < MIN_TURN_TIMEOUT_MS || move.timeoutMs > MAX_TURN_TIMEOUT_MS) {
+        return {
+            state,
+            error: {
+                code: ERROR_CODES.INVALID_TIMEOUT_RANGE,
+                message: `Turn timeout must be between ${MIN_TURN_TIMEOUT_MS / 1000}s and ${MAX_TURN_TIMEOUT_MS / 1000}s`,
+            },
+        };
+    }
+
+    const player = state.players[playerIndex];
+
+    return {
+        state: {
+            ...state,
+            turnTimeoutMs: move.timeoutMs,
+            lastAction: `${player.name} set the auto-pickup timeout to ${move.timeoutMs / 1000}s`,
         },
     };
 }

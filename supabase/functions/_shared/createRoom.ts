@@ -9,7 +9,7 @@
  */
 import type { GameState } from '../../../src/types.ts';
 import type { EdgeResult, RoomRow } from '../../../src/supabase/roomTypes.ts';
-import { EDGE_ERROR_CODES, rowToServerRoom } from '../../../src/supabase/roomTypes.ts';
+import { EDGE_ERROR_CODES, rowToServerRoom, TURN_GRACE_MS } from '../../../src/supabase/roomTypes.ts';
 import type { RoomStore } from './db.ts';
 
 const MAX_CODE_ATTEMPTS = 5;
@@ -65,6 +65,7 @@ export async function createRoom(store: RoomStore, input: CreateRoomInput): Prom
         burnPile: [],
         lastAction: `${trimmedName} created the room`,
         isFirstTurn: true,
+        turnTimeoutMs: TURN_GRACE_MS,
     };
 
     for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {

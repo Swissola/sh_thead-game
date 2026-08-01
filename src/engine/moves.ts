@@ -42,6 +42,14 @@ export type Move =
     | {
           type: 'READY_UP';
           playerId: string;
+      }
+    | {
+          // MPLAY-07's host-configurable auto-pickup grace period, bounds-checked
+          // server-side inside applyMove against MIN_TURN_TIMEOUT_MS/MAX_TURN_TIMEOUT_MS -
+          // not merely by a client-side control's range.
+          type: 'SET_TURN_TIMEOUT';
+          playerId: string;
+          timeoutMs: number;
       };
 
 export interface MoveError {

@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { rowToServerRoom, EDGE_ERROR_CODES, TURN_GRACE_MS, type RoomRow } from '../../supabase/roomTypes';
+import {
+    rowToServerRoom,
+    EDGE_ERROR_CODES,
+    TURN_GRACE_MS,
+    MIN_TURN_TIMEOUT_MS,
+    MAX_TURN_TIMEOUT_MS,
+    type RoomRow,
+} from '../../supabase/roomTypes';
 import { ERROR_CODES } from '../../engine/errors';
 import type { GameState } from '../../types';
 
@@ -14,6 +21,7 @@ const baseState: GameState = {
     burnPile: [],
     lastAction: '',
     isFirstTurn: true,
+    turnTimeoutMs: 60000,
 };
 
 function makeRow(overrides: Partial<RoomRow> = {}): RoomRow {
@@ -74,6 +82,16 @@ describe('EDGE_ERROR_CODES', () => {
 
     it('exposes the D-05 grace period constant at 60000ms', () => {
         expect(TURN_GRACE_MS).toBe(60000);
+    });
+});
+
+describe('turn timeout bounds (MPLAY-07)', () => {
+    it('MIN_TURN_TIMEOUT_MS is 30000', () => {
+        expect(MIN_TURN_TIMEOUT_MS).toBe(30000);
+    });
+
+    it('MAX_TURN_TIMEOUT_MS is 300000', () => {
+        expect(MAX_TURN_TIMEOUT_MS).toBe(300000);
     });
 });
 
