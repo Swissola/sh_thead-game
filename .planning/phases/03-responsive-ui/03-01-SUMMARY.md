@@ -92,3 +92,7 @@ The worktree branch (`worktree-agent-a018f41c881c8417d`) was created from an old
 ---
 *Phase: 03-responsive-ui*
 *Completed: 2026-08-01*
+
+## Self-Check: PASSED
+
+All created files verified present (`src/hooks/useRovingTabindex.ts`, `src/hooks/useFocusTrap.ts`, both test files, this SUMMARY.md). All three commit hashes (`3f543e0`, `f21b9cc`, `3f905f6`) verified present in git log.
