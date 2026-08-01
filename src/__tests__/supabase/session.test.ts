@@ -11,6 +11,9 @@ import {
   readLastUsedName,
   writeLastUsedName,
   LAST_NAME_STORAGE_KEY,
+  readLastUsedRoomCode,
+  writeLastUsedRoomCode,
+  LAST_ROOM_CODE_STORAGE_KEY,
 } from '../../supabase/session';
 
 function makeFakeClient(overrides: {
@@ -166,6 +169,43 @@ describe('readLastUsedName / writeLastUsedName', () => {
 
     expect(() => readLastUsedName()).not.toThrow();
     expect(readLastUsedName()).toBe('');
+
+    getItemSpy.mockRestore();
+  });
+});
+
+describe('readLastUsedRoomCode / writeLastUsedRoomCode', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('readLastUsedRoomCode returns "" when nothing has been stored', () => {
+    expect(readLastUsedRoomCode()).toBe('');
+  });
+
+  it('writeLastUsedRoomCode("abc123") followed by readLastUsedRoomCode() returns the trimmed, uppercased value', () => {
+    writeLastUsedRoomCode('  abc123  ');
+
+    expect(readLastUsedRoomCode()).toBe('ABC123');
+  });
+
+  it('writeLastUsedRoomCode("") clears the stored value rather than storing an empty string entry', () => {
+    writeLastUsedRoomCode('ABC123');
+    expect(window.localStorage.getItem(LAST_ROOM_CODE_STORAGE_KEY)).not.toBeNull();
+
+    writeLastUsedRoomCode('');
+
+    expect(window.localStorage.getItem(LAST_ROOM_CODE_STORAGE_KEY)).toBeNull();
+    expect(readLastUsedRoomCode()).toBe('');
+  });
+
+  it('readLastUsedRoomCode returns "" and does not throw when localStorage.getItem throws', () => {
+    const getItemSpy = vi.spyOn(window.localStorage.__proto__, 'getItem').mockImplementation(() => {
+      throw new Error('storage disabled');
+    });
+
+    expect(() => readLastUsedRoomCode()).not.toThrow();
+    expect(readLastUsedRoomCode()).toBe('');
 
     getItemSpy.mockRestore();
   });

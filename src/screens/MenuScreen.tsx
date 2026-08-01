@@ -5,7 +5,12 @@ import type { GameState } from '../types';
 import { useGameContext } from '../context/GameContext';
 import { getSupabaseClient } from '../supabase/client';
 import { EDGE_ERROR_CODES, type EdgeErrorCode, type EdgeResult } from '../supabase/roomTypes';
-import { readLastUsedName, writeLastUsedName } from '../supabase/session';
+import {
+    readLastUsedName,
+    writeLastUsedName,
+    readLastUsedRoomCode,
+    writeLastUsedRoomCode,
+} from '../supabase/session';
 
 const GENERIC_RETRY_COPY = 'Failed to join room - please retry.';
 
@@ -49,7 +54,12 @@ export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
     const [playerName, setPlayerName] = useState(() => readLastUsedName());
     // Not named `roomCode` - the room's actual code lives on gameState.roomCode
     // once one exists; this local field is only the join-room text input.
-    const [roomCodeInput, setRoomCodeInput] = useState(() => initialRoomCode.toUpperCase());
+    // A join-link deep link (initialRoomCode) always wins over a stored
+    // last-used code - it reflects the user's current intent, not a stale
+    // device preference.
+    const [roomCodeInput, setRoomCodeInput] = useState(() =>
+        initialRoomCode ? initialRoomCode.toUpperCase() : readLastUsedRoomCode()
+    );
     const { setGameState, setTestMode, setControllingPlayer, showToast } = useGameContext();
 
     const createTestGame = () => {
@@ -154,6 +164,7 @@ export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
             if (result?.room) {
                 await setGameState(result.room.state);
                 writeLastUsedName(playerName.trim());
+                writeLastUsedRoomCode(result.room.roomCode);
             }
         } catch {
             showToast(GENERIC_RETRY_COPY);
@@ -185,6 +196,7 @@ export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
             if (result?.room) {
                 await setGameState(result.room.state);
                 writeLastUsedName(playerName.trim());
+                writeLastUsedRoomCode(result.room.roomCode);
             }
         } catch {
             showToast(GENERIC_RETRY_COPY);

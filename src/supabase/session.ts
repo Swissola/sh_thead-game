@@ -88,3 +88,38 @@ export function writeLastUsedName(name: string): void {
     // unrecoverable-session fallback.
   }
 }
+
+export const LAST_ROOM_CODE_STORAGE_KEY = 'shithead:lastRoomCode';
+
+/**
+ * Reads back the last-used room code, so a player who was disconnected,
+ * timed out, or left the game finds the join-form field already pre-filled
+ * rather than having to retype it. Same device-preference rationale as
+ * `readLastUsedName` - not game state, not `src/storage.ts`.
+ */
+export function readLastUsedRoomCode(): string {
+  try {
+    return window.localStorage.getItem(LAST_ROOM_CODE_STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Persists the last-used room code, trimmed and uppercased to match the
+ * join-form input's own normalisation. Writing an empty (post-trim) code
+ * clears the stored value rather than storing an empty string entry.
+ */
+export function writeLastUsedRoomCode(roomCode: string): void {
+  const normalized = roomCode.trim().toUpperCase();
+  try {
+    if (normalized === '') {
+      window.localStorage.removeItem(LAST_ROOM_CODE_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(LAST_ROOM_CODE_STORAGE_KEY, normalized);
+    }
+  } catch {
+    // Private-mode/storage-disabled: degrade to a no-op, same as D-02's
+    // unrecoverable-session fallback.
+  }
+}

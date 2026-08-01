@@ -10,9 +10,12 @@ vi.mock('../supabase/client', () => ({
 vi.mock('../supabase/session', () => ({
     ensurePlayerIdentity: vi.fn(),
     // MenuScreen (rendered by Router when there is no gameState) also reads
-    // from this module for its D-09 name pre-fill - not under test here.
+    // from this module for its D-09 name pre-fill and last-used room code -
+    // not under test here.
     readLastUsedName: vi.fn(() => ''),
     writeLastUsedName: vi.fn(),
+    readLastUsedRoomCode: vi.fn(() => ''),
+    writeLastUsedRoomCode: vi.fn(),
 }));
 
 import { GameProvider, useGameContext } from '../context/GameContext';

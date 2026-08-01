@@ -9,10 +9,17 @@ vi.mock('../../supabase/client', () => ({
 vi.mock('../../supabase/session', () => ({
     readLastUsedName: vi.fn(),
     writeLastUsedName: vi.fn(),
+    readLastUsedRoomCode: vi.fn(),
+    writeLastUsedRoomCode: vi.fn(),
 }));
 
 import { getSupabaseClient } from '../../supabase/client';
-import { readLastUsedName, writeLastUsedName } from '../../supabase/session';
+import {
+    readLastUsedName,
+    writeLastUsedName,
+    readLastUsedRoomCode,
+    writeLastUsedRoomCode,
+} from '../../supabase/session';
 import { GameProvider, useGameContext } from '../../context/GameContext';
 import { MenuScreen } from '../../screens/MenuScreen';
 import { Toast } from '../../components/Toast';
@@ -63,6 +70,8 @@ describe('MenuScreen', () => {
         vi.mocked(getSupabaseClient).mockReset();
         vi.mocked(readLastUsedName).mockReset().mockReturnValue('');
         vi.mocked(writeLastUsedName).mockReset();
+        vi.mocked(readLastUsedRoomCode).mockReset().mockReturnValue('');
+        vi.mocked(writeLastUsedRoomCode).mockReset();
     });
 
     it('clicking "Test Mode (3 Players)" sets testMode and a 3-player setup gameState, with zero functions.invoke calls', async () => {
@@ -423,6 +432,105 @@ describe('MenuScreen', () => {
         renderMenu();
 
         expect(screen.getByPlaceholderText('Room code')).toHaveValue('');
+    });
+
+    it('with no initialRoomCode prop but a stored last-used room code, the room-code input pre-fills with it', () => {
+        vi.mocked(readLastUsedRoomCode).mockReturnValue('ZYX999');
+
+        renderMenu();
+
+        expect(screen.getByPlaceholderText('Room code')).toHaveValue('ZYX999');
+    });
+
+    it('an initialRoomCode prop (join-link deep link) takes priority over a stored last-used room code', () => {
+        vi.mocked(readLastUsedRoomCode).mockReturnValue('OLDCODE');
+
+        renderMenu('newlink');
+
+        expect(screen.getByPlaceholderText('Room code')).toHaveValue('NEWLINK');
+    });
+
+    it('a successful create writes the room code back as last-used', async () => {
+        const room = buildGameState({
+            roomCode: 'ROOM01',
+            phase: 'lobby',
+            players: [buildPlayer({ id: 'server-assigned-id', name: 'Alice' })],
+        });
+        const { supabase } = makeFakeSupabase(() =>
+            Promise.resolve({
+                data: { room: { roomCode: 'ROOM01', state: room, version: 0, turnStartedAt: '', playerSeen: {} } },
+                error: null,
+            })
+        );
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+        renderMenu();
+
+        fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
+            target: { value: 'Alice' },
+        });
+        fireEvent.click(screen.getByText('Create Room'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('probe')).toHaveTextContent('phase:lobby');
+        });
+
+        expect(writeLastUsedRoomCode).toHaveBeenCalledWith('ROOM01');
+    });
+
+    it('a successful join writes the server-confirmed room code back as last-used', async () => {
+        const room = buildGameState({
+            roomCode: 'ABC123',
+            phase: 'lobby',
+            players: [
+                buildPlayer({ id: 'host-player', name: 'Host' }),
+                buildPlayer({ id: 'server-assigned-id', name: 'Alice' }),
+            ],
+        });
+        const { supabase } = makeFakeSupabase(() =>
+            Promise.resolve({
+                data: { room: { roomCode: 'ABC123', state: room, version: 1, turnStartedAt: '', playerSeen: {} } },
+                error: null,
+            })
+        );
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+        renderMenu();
+
+        fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
+            target: { value: 'Alice' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('Room code'), {
+            target: { value: 'abc123' },
+        });
+        fireEvent.click(screen.getByText('Join'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('probe')).toHaveTextContent('phase:lobby');
+        });
+
+        expect(writeLastUsedRoomCode).toHaveBeenCalledWith('ABC123');
+    });
+
+    it('a failed join (Room not found) does not write the room code back as last-used', async () => {
+        const { supabase } = makeFakeSupabase(() =>
+            Promise.resolve({ data: { error: { code: 'ROOM_NOT_FOUND', message: 'not found' } }, error: null })
+        );
+        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+        renderMenu();
+
+        fireEvent.change(screen.getByPlaceholderText('Enter your name'), {
+            target: { value: 'Alice' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('Room code'), {
+            target: { value: 'NOPE99' },
+        });
+        fireEvent.click(screen.getByText('Join'));
+
+        await screen.findByRole('alert');
+
+        expect(writeLastUsedRoomCode).not.toHaveBeenCalled();
     });
 
     it('pre-filling the room code does not auto-submit the join', () => {
