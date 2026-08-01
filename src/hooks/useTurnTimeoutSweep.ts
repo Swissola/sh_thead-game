@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSupabaseClient } from '../supabase/client';
-import { EDGE_ERROR_CODES, TURN_GRACE_MS, type EdgeResult } from '../supabase/roomTypes';
+import { EDGE_ERROR_CODES, type EdgeResult } from '../supabase/roomTypes';
 
 /**
  * D-05's client-side lazy trigger cadence - a purely client-side
  * display/polling concern with no server counterpart (RESEARCH.md), so it
  * lives here rather than in roomTypes.ts's shared client/server contract.
  * 5s means the badge flips and the auto-pickup lands within five seconds of
- * expiry, comfortably inside the human tolerance for a 60s grace period.
+ * expiry, comfortably inside the human tolerance for the room's configured
+ * (30s-300s) grace period.
  */
 export const TURN_SWEEP_INTERVAL_MS = 5000;
 
@@ -18,6 +19,13 @@ export interface UseTurnTimeoutSweepArgs {
   turnStartedAt: string;
   currentTurnPlayerId: string | undefined;
   playerId: string;
+  /**
+   * MPLAY-07 (plan 02-19): the room's own configured auto-pickup grace
+   * period, read from gameState.turnTimeoutMs by the caller - the value
+   * this hook now compares elapsed time against, replacing the previously
+   * hardcoded 60s constant this file used to import from roomTypes.ts.
+   */
+  turnTimeoutMs: number;
 }
 
 export interface UseTurnTimeoutSweepResult {
@@ -49,6 +57,14 @@ interface SweepState {
  * changes" pattern (calling setState directly in the render body, not a
  * ref, not an effect) resets graceExpired to false the instant a new turn
  * starts, rather than waiting up to TURN_SWEEP_INTERVAL_MS for the next tick.
+ *
+ * MPLAY-07 (plan 02-19): the room's own turnTimeoutMs value, read from
+ * gameState and passed in by the caller, is exactly as much of a hint as
+ * the clock comparison already was - checkTurnTimeout (02-18) recomputes
+ * elapsed time against its own server-stored row.state.turnTimeoutMs, so a
+ * client carrying a stale or spoofed turnTimeoutMs only changes when *that
+ * client* calls the sweep endpoint, never whether the sweep actually
+ * succeeds.
  */
 export function useTurnTimeoutSweep({
   roomCode,
@@ -57,8 +73,9 @@ export function useTurnTimeoutSweep({
   turnStartedAt,
   currentTurnPlayerId,
   playerId,
+  turnTimeoutMs,
 }: UseTurnTimeoutSweepArgs): UseTurnTimeoutSweepResult {
-  const armKey = `${roomCode}|${String(testMode)}|${phase}|${turnStartedAt}|${currentTurnPlayerId ?? ''}|${playerId}`;
+  const armKey = `${roomCode}|${String(testMode)}|${phase}|${turnStartedAt}|${currentTurnPlayerId ?? ''}|${playerId}|${turnTimeoutMs}`;
   const [state, setState] = useState<SweepState>({ armKey, graceExpired: false });
 
   if (state.armKey !== armKey) {
@@ -75,7 +92,7 @@ export function useTurnTimeoutSweep({
 
     const tick = () => {
       const elapsedMs = Date.now() - Date.parse(turnStartedAt);
-      const expired = elapsedMs >= TURN_GRACE_MS;
+      const expired = elapsedMs >= turnTimeoutMs;
       setState((prev) =>
         prev.graceExpired === expired ? prev : { ...prev, graceExpired: expired }
       );
@@ -132,7 +149,7 @@ export function useTurnTimeoutSweep({
       intervalRef.current = null;
       inFlightRef.current = false;
     };
-  }, [roomCode, testMode, phase, turnStartedAt, currentTurnPlayerId, playerId]);
+  }, [roomCode, testMode, phase, turnStartedAt, currentTurnPlayerId, playerId, turnTimeoutMs]);
 
   return { graceExpired: state.graceExpired };
 }

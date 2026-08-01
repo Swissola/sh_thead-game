@@ -44,6 +44,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -69,6 +70,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -92,6 +94,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -115,6 +118,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: '',
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -138,6 +142,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: new Date(NOW).toISOString(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -161,6 +166,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: new Date(NOW).toISOString(),
         currentTurnPlayerId: 'me', // own turn - isolates the graceExpired flag from invoke behaviour
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -169,6 +175,119 @@ describe('useTurnTimeoutSweep', () => {
     });
 
     expect(result.current.graceExpired).toBe(true);
+  });
+
+  it('with turnTimeoutMs: 30000, reports graceExpired true strictly before TURN_GRACE_MS (60000) would have elapsed', () => {
+    const { supabase } = makeFakeSupabase();
+    vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+    const { result } = renderHook(() =>
+      useTurnTimeoutSweep({
+        roomCode: 'ABC123',
+        testMode: false,
+        phase: 'playing',
+        turnStartedAt: new Date(NOW).toISOString(),
+        currentTurnPlayerId: 'me', // own turn - isolates the graceExpired flag from invoke behaviour
+        playerId: 'me',
+        turnTimeoutMs: 30000,
+      })
+    );
+
+    // 30000ms elapsed - crosses the configured 30000 but is well short of the
+    // old hardcoded TURN_GRACE_MS (60000).
+    act(() => {
+      vi.advanceTimersByTime(30000);
+    });
+
+    expect(result.current.graceExpired).toBe(true);
+  });
+
+  it('with turnTimeoutMs: 120000, graceExpired stays false once TURN_GRACE_MS (60000) has elapsed, and only becomes true at 120000', () => {
+    const { supabase } = makeFakeSupabase();
+    vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+    const { result } = renderHook(() =>
+      useTurnTimeoutSweep({
+        roomCode: 'ABC123',
+        testMode: false,
+        phase: 'playing',
+        turnStartedAt: new Date(NOW).toISOString(),
+        currentTurnPlayerId: 'me', // own turn - isolates the graceExpired flag from invoke behaviour
+        playerId: 'me',
+        turnTimeoutMs: 120000,
+      })
+    );
+
+    // Elapsed reaches exactly TURN_GRACE_MS (60000) - the old hardcoded
+    // ceiling - but the configured value (120000) has not yet elapsed.
+    act(() => {
+      vi.advanceTimersByTime(TURN_GRACE_MS);
+    });
+    expect(result.current.graceExpired).toBe(false);
+
+    // Elapsed now reaches the full configured 120000.
+    act(() => {
+      vi.advanceTimersByTime(120000 - TURN_GRACE_MS);
+    });
+    expect(result.current.graceExpired).toBe(true);
+  });
+
+  it('check-turn-timeout is invoked at the moment elapsedMs >= turnTimeoutMs becomes true, for a shorter-than-default configured value', async () => {
+    const { supabase, invoke } = makeFakeSupabase();
+    vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+    // turnStartedAt chosen so the first TURN_SWEEP_INTERVAL_MS tick lands
+    // exactly at 30000ms elapsed - the same shape as nearExpiryStart(), but
+    // against a 30000ms configured timeout rather than TURN_GRACE_MS.
+    const turnStartedAt = new Date(NOW - 30000 + TURN_SWEEP_INTERVAL_MS).toISOString();
+
+    renderHook(() =>
+      useTurnTimeoutSweep({
+        roomCode: 'ABC123',
+        testMode: false,
+        phase: 'playing',
+        turnStartedAt,
+        currentTurnPlayerId: 'other',
+        playerId: 'me',
+        turnTimeoutMs: 30000,
+      })
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(TURN_SWEEP_INTERVAL_MS);
+      await Promise.resolve();
+    });
+
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith('check-turn-timeout', { body: { roomCode: 'ABC123' } });
+  });
+
+  it('a rerender that changes only turnTimeoutMs (all other args held constant) resets graceExpired to false immediately', () => {
+    const { supabase } = makeFakeSupabase();
+    vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+    const { result, rerender } = renderHook(
+      (props: { turnTimeoutMs: number }) =>
+        useTurnTimeoutSweep({
+          roomCode: 'ABC123',
+          testMode: false,
+          phase: 'playing',
+          turnStartedAt: new Date(NOW - TURN_GRACE_MS - 1000).toISOString(),
+          currentTurnPlayerId: 'me',
+          playerId: 'me',
+          turnTimeoutMs: props.turnTimeoutMs,
+        }),
+      { initialProps: { turnTimeoutMs: TURN_GRACE_MS } }
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(TURN_SWEEP_INTERVAL_MS);
+    });
+    expect(result.current.graceExpired).toBe(true);
+
+    rerender({ turnTimeoutMs: 120000 });
+
+    expect(result.current.graceExpired).toBe(false);
   });
 
   it('invokes check-turn-timeout with a body containing exactly roomCode once expired, when not on your own turn', async () => {
@@ -183,6 +302,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -209,6 +329,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'me',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -239,6 +360,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -281,6 +403,7 @@ describe('useTurnTimeoutSweep', () => {
           turnStartedAt: props.turnStartedAt,
           currentTurnPlayerId: 'me',
           playerId: 'me',
+          turnTimeoutMs: TURN_GRACE_MS,
         }),
       { initialProps: { turnStartedAt: new Date(NOW - TURN_GRACE_MS - 1000).toISOString() } }
     );
@@ -311,6 +434,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -353,6 +477,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -392,6 +517,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -431,6 +557,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -458,6 +585,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 
@@ -491,6 +619,7 @@ describe('useTurnTimeoutSweep', () => {
         turnStartedAt: nearExpiryStart(),
         currentTurnPlayerId: 'other',
         playerId: 'me',
+        turnTimeoutMs: TURN_GRACE_MS,
       })
     );
 

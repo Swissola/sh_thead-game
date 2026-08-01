@@ -13,6 +13,7 @@ import { useGameContext } from '../context/GameContext';
 import { useSelection } from '../hooks/useSelection';
 import { useHandSorting } from '../hooks/useHandSorting';
 import { useTurnTimeoutSweep } from '../hooks/useTurnTimeoutSweep';
+import { TURN_GRACE_MS } from '../supabase/roomTypes';
 
 const getOrdinalLabel = (n: number): string => {
   if (n === 1) return '1st';
@@ -191,6 +192,7 @@ export function GameScreen({
     turnStartedAt,
     currentTurnPlayerId: gameState?.players[gameState.currentTurn]?.id,
     playerId,
+    turnTimeoutMs: gameState?.turnTimeoutMs ?? TURN_GRACE_MS,
   });
 
   // Intercept console.log in test mode, ported from App.tsx:356-386.

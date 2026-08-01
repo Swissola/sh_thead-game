@@ -7,6 +7,7 @@ import { GameScreen } from '../../screens/GameScreen';
 import { Toast } from '../../components/Toast';
 import * as supabaseClientModule from '../../supabase/client';
 import { buildGameState, buildPlayer, buildCard } from '../testUtils/buildGameState';
+import { TURN_GRACE_MS } from '../../supabase/roomTypes';
 
 // The hook's own timing/invocation behaviour is covered exhaustively by
 // useTurnTimeoutSweep.test.ts - mocking it here keeps these assertions about
@@ -687,6 +688,43 @@ describe('GameScreen', () => {
       await screen.findByText('Bob');
       expect(screen.queryByText('Offline')).not.toBeInTheDocument();
     });
+  });
+
+  it('forwards the room configured turnTimeoutMs into useTurnTimeoutSweep (MPLAY-07, plan 02-19)', async () => {
+    vi.mocked(useTurnTimeoutSweep).mockReturnValue({ graceExpired: false });
+    const state = buildGameState({
+      phase: 'playing',
+      turnTimeoutMs: 90000,
+      players: [
+        buildPlayer({ id: 'test-player', name: 'Alice' }),
+        buildPlayer({ id: 'p1', name: 'Bob' }),
+      ],
+    });
+
+    renderGame('test-player', state);
+
+    await screen.findByText('Bob');
+    expect(vi.mocked(useTurnTimeoutSweep)).toHaveBeenCalledWith(
+      expect.objectContaining({ turnTimeoutMs: 90000 })
+    );
+  });
+
+  it('forwards TURN_GRACE_MS (the default) when the seeded gameState carries no override', async () => {
+    vi.mocked(useTurnTimeoutSweep).mockReturnValue({ graceExpired: false });
+    const state = buildGameState({
+      phase: 'playing',
+      players: [
+        buildPlayer({ id: 'test-player', name: 'Alice' }),
+        buildPlayer({ id: 'p1', name: 'Bob' }),
+      ],
+    });
+
+    renderGame('test-player', state);
+
+    await screen.findByText('Bob');
+    expect(vi.mocked(useTurnTimeoutSweep)).toHaveBeenCalledWith(
+      expect.objectContaining({ turnTimeoutMs: TURN_GRACE_MS })
+    );
   });
 
   describe('grace-period auto-pickup badge state (D-10 state 2, D-05, plan 02-12)', () => {

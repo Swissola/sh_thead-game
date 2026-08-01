@@ -299,3 +299,19 @@ boundary rules.
   two touched files) is clean with zero output. Not re-fixed here per scope boundary;
   still carried forward for the same future lint-cleanup pass first logged under
   Plan 02-01.
+
+## Plan 02-19 (Task 2)
+
+- **`npm run lint` still exits 1** (this plan's own `<verification>` expects exit 0) -
+  `GameContext.tsx:221`'s pre-existing issue is untouched by this task (not modified).
+  `GameScreen.tsx`'s pre-existing `react-hooks/set-state-in-effect` issue moved from
+  line 111 to line 112 purely because this task's own one-line `TURN_GRACE_MS` import
+  addition shifted every later line down by one - the flagged `setCelebrationModal`
+  call itself is untouched by this task. Confirmed via `git status --short`: only
+  `src/hooks/useTurnTimeoutSweep.ts`, `src/screens/GameScreen.tsx`,
+  `src/__tests__/hooks/useTurnTimeoutSweep.test.ts` and
+  `src/__tests__/screens/GameScreen.test.tsx` are modified. `npx eslint
+  src/hooks/useTurnTimeoutSweep.ts src/__tests__/hooks/useTurnTimeoutSweep.test.ts
+  src/screens/GameScreen.tsx src/__tests__/screens/GameScreen.test.tsx` reports only
+  this one pre-existing error. Not re-fixed here per scope boundary; still carried
+  forward for the same future lint-cleanup pass first logged under Plan 02-01.
