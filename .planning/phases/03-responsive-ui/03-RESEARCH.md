@@ -468,17 +468,19 @@ className={`
 
 **If this table is empty:** N/A — see A1 above; every other claim in this research is either read directly from the project's own source files (`[VERIFIED: ...]`), sourced from the official WAI-ARIA APG / WCAG 2.2 specification pages (`[CITED: ...]`), or drawn from the Tailwind CSS official documentation.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should the "Play" button be duplicated/pinned for the mobile scroll-strip layout, or reached only by continuing keyboard/scroll navigation past the hand?**
+1. **Should the "Play" button be duplicated/pinned for the mobile scroll-strip layout, or reached only by continuing keyboard/scroll navigation past the hand?** — RESOLVED
    - What we know: CONTEXT.md explicitly leaves this to Claude's discretion ("whichever fits the phone-rearranged layout from D-09 more naturally").
    - What's unclear: Whether a pinned/sticky Play button competes for vertical space with the D-09 "hand pinned to the bottom" layout on very small phone heights (e.g. landscape phone, D-12's single-layout-serves-both constraint).
    - Recommendation: Planner should treat this as an implementation-detail task, not a separate research gap — prototype both during Wave 1 and pick based on real viewport testing (a `checkpoint:human-verify` on a real or emulated phone width, consistent with this phase's UI-heavy nature).
+   - **Resolution:** `03-07-PLAN.md` keeps the Play control in normal document flow (`max-sm:flex-col` full-width buttons) rather than pinning/sticking it, and `03-08-PLAN.md`'s blocking human checkpoint verifies this against a real/emulated phone width before the phase closes.
 
-2. **Exact wording/reading of the celebration modal's accessible name (`aria-label` vs `aria-labelledby`) once it moves from `role="alert"` to `role="dialog"`.**
+2. **Exact wording/reading of the celebration modal's accessible name (`aria-label` vs `aria-labelledby`) once it moves from `role="alert"` to `role="dialog"`.** — RESOLVED
    - What we know: The modal has visible heading text ("SH!THEAD!" / "SAFE!") already in the DOM.
    - What's unclear: Whether to point `aria-labelledby` at that existing heading `div` (cleanest, no duplicated string) or add a fresh `aria-label` — both are valid APG approaches.
    - Recommendation: Prefer `aria-labelledby` pointing at the existing heading element (add an `id` to it) — avoids maintaining two copies of the same string, standard APG guidance for dialogs with a visible title.
+   - **Resolution:** `03-UI-SPEC.md`'s Copywriting Contract locks in `aria-labelledby` pointing at the existing heading element, implemented verbatim by `03-05-PLAN.md`.
 
 ## Environment Availability
 
