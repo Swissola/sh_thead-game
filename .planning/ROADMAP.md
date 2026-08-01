@@ -81,7 +81,7 @@ Plans:
 
 **Goal**: A friend can join a room from any device and play a full game with you in real time
 **Depends on**: Phase 1 (the engine must exist before it can also be the server's authority)
-**Requirements**: MPLAY-01, MPLAY-02, MPLAY-03, MPLAY-04, MPLAY-05, MPLAY-06
+**Requirements**: MPLAY-01, MPLAY-02, MPLAY-03, MPLAY-04, MPLAY-05, MPLAY-06, MPLAY-07
 **Success Criteria** (what must be TRUE):
 
   1. Two people on two different devices/browsers can join the same room code and see the same live game state
@@ -89,8 +89,9 @@ Plans:
   3. A move submitted by a modified/cheating client is rejected, because the server validates every move through the same `applyMove` engine
   4. A card played by the local player appears instantly, then reconciles with what the server confirms
   5. Players can see when an opponent has disconnected mid-game
+  6. The room host can set the turn auto-pickup timeout (30s-300s) in the lobby, visible to all players (MPLAY-07)
 
-**Plans:** 16/17 plans executed
+**Plans:** 16/19 plans executed
 Plans:
 **Wave 1**
 
@@ -130,6 +131,22 @@ Plans:
 **Wave 8** *(gap closure — blocked on Wave 7)*
 
 - [x] 02-15-PLAN.md — Gap closure (major): version-exempt player_seen write path so heartbeats and D-01 auto-rejoins stop polluting the reconciliation stream
+
+**Wave 9** *(gap closure — blocked on Wave 8)*
+
+- [x] 02-16-PLAN.md — Gap closure (major): per-client pending-move tracker gates the reconciliation toast on GameContext/useGameState/useRoomSubscription, closing 02-UAT.md test 7
+
+**Wave 10** *(gap closure — blocked on Wave 9)*
+
+- [x] 02-17-PLAN.md — Gap closure (blocker): self-healing room-data channel reconnect with dwell-gated backoff and a drop-gated recovery refetch, closing 02-UAT.md test 8
+
+**Wave 11** *(blocked on Wave 10)*
+
+- [ ] 02-18-PLAN.md — MPLAY-07 server authority: host-configurable, bounds-validated SET_TURN_TIMEOUT move, enforced in applyMove and check-turn-timeout
+
+**Wave 12** *(blocked on Wave 11)*
+
+- [ ] 02-19-PLAN.md — MPLAY-07 UI: lobby host control + all-players display for the turn timeout, and client-side sweep cadence wired to the room's configured value
 
 ### Phase 3: Responsive UI
 
@@ -215,7 +232,7 @@ rework lands).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
-| 2. Real Cross-Device Multiplayer | 16/17 | In Progress|  |
+| 2. Real Cross-Device Multiplayer | 16/19 | In Progress|  |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
