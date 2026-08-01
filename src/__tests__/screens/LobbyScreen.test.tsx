@@ -544,4 +544,162 @@ describe('LobbyScreen', () => {
             );
         });
     });
+
+    describe('auto-pickup timeout control (MPLAY-07, plan 02-19)', () => {
+        it('renders a <select> for the host with the current turnTimeoutMs selected, formatted in seconds', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                turnTimeoutMs: 60000,
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+
+            renderLobby('p0', state);
+
+            const select = (await screen.findByLabelText('Auto-pickup timeout')) as HTMLSelectElement;
+            expect(select).toBeInTheDocument();
+            expect(select.value).toBe('60000');
+            expect(within(select).getByText('60s')).toBeInTheDocument();
+        });
+
+        it('renders read-only text (no <select>) for a non-host, showing the same value', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                turnTimeoutMs: 60000,
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+
+            renderLobby('p1', state);
+
+            expect(screen.queryByLabelText('Auto-pickup timeout')).not.toBeInTheDocument();
+            expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+            expect(await screen.findByText('60s')).toBeInTheDocument();
+        });
+
+        it("the <select>'s option values are exactly TURN_TIMEOUT_OPTIONS_MS, bounded by [30000, 300000] inclusive", async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                turnTimeoutMs: 60000,
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+
+            renderLobby('p0', state);
+
+            const select = await screen.findByLabelText('Auto-pickup timeout');
+            const optionValues = within(select).getAllByRole('option').map((o) => Number((o as HTMLOptionElement).value));
+
+            expect(optionValues).toEqual([30000, 45000, 60000, 90000, 120000, 150000, 180000, 240000, 300000]);
+            expect(Math.min(...optionValues)).toBe(30000);
+            expect(Math.max(...optionValues)).toBe(300000);
+        });
+
+        it('as host, changing the select dispatches SET_TURN_TIMEOUT via apply-move, and the select value updates immediately (no await)', async () => {
+            const { supabase, invoke } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                turnTimeoutMs: 60000,
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+
+            renderLobby('p0', state);
+
+            const select = (await screen.findByLabelText('Auto-pickup timeout')) as HTMLSelectElement;
+            fireEvent.change(select, { target: { value: '90000' } });
+
+            // Assert immediately after fireEvent, not inside waitFor - per
+            // CLAUDE.md's testing note, this applies to synchronous state
+            // changes (the optimistic dispatchMove leg) too, not just
+            // timer-driven state.
+            expect(invoke).toHaveBeenCalledWith('apply-move', {
+                body: {
+                    roomCode: 'ABC123',
+                    move: { type: 'SET_TURN_TIMEOUT', playerId: 'p0', timeoutMs: 90000 },
+                },
+            });
+            expect(select.value).toBe('90000');
+        });
+
+        it('a non-host has no way to trigger a SET_TURN_TIMEOUT dispatch - no interactive control exists', async () => {
+            const { supabase, invoke } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                turnTimeoutMs: 60000,
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+
+            renderLobby('p1', state);
+
+            await screen.findByText('60s');
+            expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+            expect(invoke).not.toHaveBeenCalledWith('apply-move', expect.anything());
+        });
+
+        it('when state.host changes to the viewer mid-session, the edit control appears on the next render', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const initialState = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                turnTimeoutMs: 60000,
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+
+            function TransferHarness() {
+                const { setGameState, toast, dismissToast } = useGameContext();
+                const [current, setCurrent] = useState(initialState);
+                useEffect(() => {
+                    void setGameState(current);
+                    // eslint-disable-next-line react-hooks/exhaustive-deps
+                }, []);
+                return (
+                    <>
+                        <LobbyScreen isPlayerOffline={() => false} />
+                        <button
+                            onClick={() => {
+                                const next = { ...current, host: 'p1' };
+                                setCurrent(next);
+                                void setGameState(next);
+                            }}
+                        >
+                            transfer host
+                        </button>
+                        <Toast toast={toast} onDismiss={dismissToast} />
+                    </>
+                );
+            }
+
+            render(
+                <GameProvider playerId="p1">
+                    <TransferHarness />
+                </GameProvider>
+            );
+
+            expect(await screen.findByText('60s')).toBeInTheDocument();
+            expect(screen.queryByLabelText('Auto-pickup timeout')).not.toBeInTheDocument();
+
+            fireEvent.click(screen.getByText('transfer host'));
+
+            await waitFor(() => {
+                expect(screen.getByLabelText('Auto-pickup timeout')).toBeInTheDocument();
+            });
+        });
+    });
 });

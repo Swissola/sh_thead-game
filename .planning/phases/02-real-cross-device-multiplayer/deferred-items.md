@@ -287,3 +287,15 @@ boundary rules.
   fixture/test files are modified. `npx eslint` scoped to exactly those fourteen files
   is clean with zero output. Not re-fixed here per scope boundary; still carried forward
   for the same future lint-cleanup pass first logged under Plan 02-01.
+
+## Plan 02-19 (Task 1)
+
+- **`npm run lint` still exits 1** (Task 1's `<acceptance_criteria>` expects exit 0) -
+  the same two pre-existing issues logged under Plan 02-16/02-17/02-18 above, in the
+  same two files (`GameContext.tsx:221`, `GameScreen.tsx:111`), neither of which this
+  task touches. Confirmed via `git status --short`: only `src/screens/LobbyScreen.tsx`
+  and `src/__tests__/screens/LobbyScreen.test.tsx` are modified. `npx eslint
+  src/screens/LobbyScreen.tsx src/__tests__/screens/LobbyScreen.test.tsx` (this task's
+  two touched files) is clean with zero output. Not re-fixed here per scope boundary;
+  still carried forward for the same future lint-cleanup pass first logged under
+  Plan 02-01.

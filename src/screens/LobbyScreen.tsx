@@ -2,7 +2,27 @@ import { useState } from 'react';
 import { Users, Copy, Check, Crown, Link2, WifiOff, UserX } from 'lucide-react';
 import { useGameContext } from '../context/GameContext';
 import { getSupabaseClient } from '../supabase/client';
-import type { EdgeResult } from '../supabase/roomTypes';
+import { MIN_TURN_TIMEOUT_MS, MAX_TURN_TIMEOUT_MS, type EdgeResult } from '../supabase/roomTypes';
+
+/**
+ * MPLAY-07 (plan 02-19): a UI-presentation-only preset list of auto-pickup
+ * timeout choices, not a new shared contract - deliberately bounded at both
+ * ends by the imported MIN_TURN_TIMEOUT_MS/MAX_TURN_TIMEOUT_MS constants
+ * rather than duplicating the literal 30000/300000 values a second time, so
+ * it can never silently drift out of sync with 02-18's own bounds if they
+ * are ever retuned.
+ */
+const TURN_TIMEOUT_OPTIONS_MS = [
+    MIN_TURN_TIMEOUT_MS,
+    45000,
+    60000,
+    90000,
+    120000,
+    150000,
+    180000,
+    240000,
+    MAX_TURN_TIMEOUT_MS,
+];
 
 /**
  * Room code display, player list, host-only start button, extracted from
@@ -18,7 +38,7 @@ import type { EdgeResult } from '../supabase/roomTypes';
  * Presence channel for the same room and double the heartbeat rate.
  */
 export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: string) => boolean }) {
-    const { gameState, playerId, applyServerRoom, showToast } = useGameContext();
+    const { gameState, playerId, applyServerRoom, showToast, dispatchMove } = useGameContext();
     const [copied, setCopied] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
 
@@ -60,6 +80,17 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
         } catch {
             showToast('Failed to start the game - please retry.');
         }
+    };
+
+    // MPLAY-07 (plan 02-19): host-only, matching this file's own
+    // Start Game/removePlayerFromLobby defense-in-depth convention even
+    // though only the host ever sees the control that calls this. Unlike
+    // those two, this does not call an Edge Function directly or need a
+    // try/catch - dispatchMove already owns its own full
+    // submit-and-toast-on-failure lifecycle (via useGameStateUpdater).
+    const setTurnTimeout = (timeoutMs: number) => {
+        if (!gameState || gameState.host !== playerId) return;
+        dispatchMove({ type: 'SET_TURN_TIMEOUT', playerId, timeoutMs });
     };
 
     // D-07: the host removes an AFK player. The disabled-for-connected-players
@@ -129,6 +160,27 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
                         </button>
                     </div>
                     <p className="text-slate-400 text-sm">Share this code with your friends!</p>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700 rounded-lg p-3 mb-6">
+                    <span className="text-slate-300">Auto-pickup timeout</span>
+                    {isHost ? (
+                        <select
+                            aria-label="Auto-pickup timeout"
+                            value={gameState?.turnTimeoutMs ?? MIN_TURN_TIMEOUT_MS}
+                            onChange={(e) => setTurnTimeout(Number(e.target.value))}
+                            className="bg-slate-600 text-white px-3 py-1 rounded border border-slate-500 font-semibold"
+                        >
+                            {TURN_TIMEOUT_OPTIONS_MS.map((ms) => (
+                                <option key={ms} value={ms}>
+                                    {ms / 1000}s
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <span className="text-white font-semibold">
+                            {gameState ? gameState.turnTimeoutMs / 1000 : 0}s
+                        </span>
+                    )}
                 </div>
                 <div className="mb-6">
                     <div className="flex items-center gap-2 mb-3">
