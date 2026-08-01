@@ -91,7 +91,7 @@ Plans:
   5. Players can see when an opponent has disconnected mid-game
   6. The room host can set the turn auto-pickup timeout (30s-300s) in the lobby, visible to all players (MPLAY-07)
 
-**Plans:** 16/19 plans executed
+**Plans:** 17/19 plans executed
 Plans:
 **Wave 1**
 
@@ -142,7 +142,7 @@ Plans:
 
 **Wave 11** *(blocked on Wave 10)*
 
-- [ ] 02-18-PLAN.md — MPLAY-07 server authority: host-configurable, bounds-validated SET_TURN_TIMEOUT move, enforced in applyMove and check-turn-timeout
+- [x] 02-18-PLAN.md — MPLAY-07 server authority: host-configurable, bounds-validated SET_TURN_TIMEOUT move, enforced in applyMove and check-turn-timeout
 
 **Wave 12** *(blocked on Wave 11)*
 
@@ -232,7 +232,7 @@ rework lands).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
-| 2. Real Cross-Device Multiplayer | 16/19 | In Progress|  |
+| 2. Real Cross-Device Multiplayer | 17/19 | In Progress|  |
 | 3. Responsive UI | 0/TBD | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
