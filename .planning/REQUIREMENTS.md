@@ -64,8 +64,15 @@ prior staged plan in the repo's `ROADMAP.md` (7 stages), captured as context in
 
 ## v2 Requirements
 
-None identified yet — the source document scoped exactly these 7 stages as
-the full plan to app-store readiness. Add here if new scope emerges.
+New scope surfaced during Phase 2 gap-closure/live testing, beyond the
+original 7-stage plan.
+
+### Multiplayer (real cross-device play via Supabase)
+
+- [ ] **MPLAY-07**: The room host can set the turn auto-pickup timeout
+  (currently fixed at 60s) to any value between 30s and 300s, adjustable in
+  the lobby before the game starts and visible to all players, not just the
+  host
 
 ## Out of Scope
 
@@ -94,6 +101,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MPLAY-04 | Phase 2 | Complete |
 | MPLAY-05 | Phase 2 | Complete |
 | MPLAY-06 | Phase 2 | Complete |
+| MPLAY-07 | Phase 2 | Pending |
 | RESP-01 | Phase 3 | Pending |
 | RESP-02 | Phase 3 | Pending |
 | RESP-03 | Phase 3 | Pending |
@@ -118,7 +126,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 - v1 requirements: 32 total
 - Mapped to phases: 32
 - Unmapped: 0 ✓
+- v2 requirements: 1 total (MPLAY-07), mapped to Phase 2
 
 ---
 *Requirements defined: 2026-07-25*
-*Last updated: 2026-07-25 after initial roadmap creation*
+*Last updated: 2026-07-31 — added MPLAY-07 (configurable turn-timeout) from exploration*
