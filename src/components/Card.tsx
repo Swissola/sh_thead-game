@@ -1,7 +1,20 @@
 import React, { useRef, useState } from 'react';
 import type { CardProps } from '../types';
 
-export const Card: React.FC<CardProps> = ({ card, faceDown, onClick, selectable, selected, small, title }) => {
+export const Card: React.FC<CardProps> = ({
+    card,
+    faceDown,
+    onClick,
+    selectable,
+    selected,
+    small,
+    title,
+    role,
+    ariaSelected,
+    ariaLabel,
+    tabIndex,
+    onFocus,
+}) => {
     const [hover, setHover] = useState(false);
     const showTimer = useRef<number | null>(null);
     const hideTimer = useRef<number | null>(null);
@@ -56,7 +69,18 @@ export const Card: React.FC<CardProps> = ({ card, faceDown, onClick, selectable,
     if (faceDown) {
         return (
             <div
+                role={role}
+                aria-selected={role === 'option' ? ariaSelected : undefined}
+                aria-label={ariaLabel}
+                tabIndex={tabIndex}
+                onFocus={onFocus}
                 onClick={onClick}
+                onKeyDown={(event) => {
+                    if (event.key === ' ' || event.key === 'Enter') {
+                        event.preventDefault();
+                        onClick?.();
+                    }
+                }}
                 onMouseEnter={() => {
                     if (hideTimer.current) {
                         window.clearTimeout(hideTimer.current);
@@ -142,7 +166,20 @@ export const Card: React.FC<CardProps> = ({ card, faceDown, onClick, selectable,
 
     return (
         <div
+            role={role}
+            aria-selected={role === 'option' ? ariaSelected : undefined}
+            aria-label={ariaLabel}
+            tabIndex={tabIndex}
+            onFocus={onFocus}
             onClick={selectable ? onClick : undefined}
+            onKeyDown={(event) => {
+                if (event.key === ' ' || event.key === 'Enter') {
+                    event.preventDefault();
+                    if (selectable) {
+                        onClick?.();
+                    }
+                }
+            }}
             onMouseEnter={() => {
                 if (hideTimer.current) {
                     window.clearTimeout(hideTimer.current);
