@@ -31,9 +31,9 @@ prior staged plan in the repo's `ROADMAP.md` (7 stages), captured as context in
 ### Responsive UI
 
 - [ ] **RESP-01**: The board and every component reflow to fit a phone-sized screen without overflow (Tailwind breakpoints replace fixed-pixel layouts)
-- [ ] **RESP-02**: Card details/tooltips are accessible via touch, not just mouse hover
+- [x] **RESP-02**: Card details/tooltips are accessible via touch, not just mouse hover
 - [ ] **RESP-03**: Every interactive control (sort buttons, cards, etc.) meets a minimum 44px touch target
-- [ ] **RESP-04**: A player can select and play cards using only the keyboard
+- [x] **RESP-04**: A player can select and play cards using only the keyboard
 - [ ] **RESP-05**: Turn changes are announced (`aria-live`) and modals have proper dialog semantics with focus trapping
 
 ### Mobile packaging (Capacitor)
@@ -103,9 +103,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MPLAY-06 | Phase 2 | Complete |
 | MPLAY-07 | Phase 2 | Complete |
 | RESP-01 | Phase 3 | Pending |
-| RESP-02 | Phase 3 | Pending |
+| RESP-02 | Phase 3 | Complete |
 | RESP-03 | Phase 3 | Pending |
-| RESP-04 | Phase 3 | Pending |
+| RESP-04 | Phase 3 | Complete |
 | RESP-05 | Phase 3 | Pending |
 | MOBILE-01 | Phase 4 | Pending |
 | MOBILE-02 | Phase 4 | Pending |
