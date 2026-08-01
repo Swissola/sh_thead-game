@@ -4,6 +4,7 @@ import type { Card, CardSelection, GameState, Player } from '../types';
 import { Card as CardComponent } from './Card';
 import { useGameContext } from '../context/GameContext';
 import { getCardPlayability, type CardPlayability } from '../uiLogic';
+import { useRovingTabindex } from '../hooks/useRovingTabindex';
 
 interface RevealedFaceDown {
     card: Card;
@@ -33,12 +34,24 @@ const Table: React.FC<TableProps> = ({
 }) => {
     const { dispatchMove, currentPlayerId } = useGameContext();
 
+    // Hooks must run before the early return below - declared here so a
+    // player with no face-up cards yet still gets a stable (zero-item) cursor
+    // rather than skipping the hook call on some renders.
+    const faceUpCount = currentPlayer?.faceUp ? currentPlayer.faceUp.filter((c) => c !== null).length : 0;
+    const faceUpRoving = useRovingTabindex(faceUpCount);
+
     if (!currentPlayer) return null;
 
     const resolvedFaceUpSelection = selectedCards
         .filter((s) => s.type === 'faceUp')
         .map((s) => currentPlayer.faceUp[s.index])
         .filter((c): c is Card => c !== null);
+
+    // Running counter for the face-up listbox's DOM option order - only
+    // incremented for non-null entries, kept separate from `i` (the array
+    // index used for every selection expression) since null slots render no
+    // role="option" element and must not consume a cursor position.
+    let faceUpOptionPosition = -1;
 
     return (
         <div className="space-y-4">
@@ -82,11 +95,21 @@ const Table: React.FC<TableProps> = ({
 
                     {/* Face Up cards - overlaid on top with margins and preserved positions */}
                     {currentPlayer.faceUp.some((c) => c !== null) && (
-                        <div className="flex gap-2" style={{ marginTop: '-80px', marginLeft: '10px', position: 'relative', zIndex: 10 }}>
+                        <div
+                            ref={faceUpRoving.containerRef}
+                            onKeyDown={faceUpRoving.onKeyDown}
+                            role="listbox"
+                            aria-multiselectable="true"
+                            aria-label="Your face-up cards"
+                            className="flex gap-2"
+                            style={{ marginTop: '-80px', marginLeft: '10px', position: 'relative', zIndex: 10 }}
+                        >
                             {currentPlayer.faceUp.map((card, i) => {
                                 if (card === null) {
                                     return <div key={`faceUp-empty-${i}`} className="w-16 h-24" />;
                                 }
+                                faceUpOptionPosition += 1;
+                                const optionPosition = faceUpOptionPosition;
 
                                 const deckEmpty = gameState.deck.length === 0;
                                 const currentSource = GameLogic.getAvailableCardSource(currentPlayer);
@@ -130,14 +153,20 @@ const Table: React.FC<TableProps> = ({
                                     (!isSetupPhase && isMyTurn && !revealedFaceDown && currentSource === 'faceUp' && isPlayable) ||
                                     (!isSetupPhase && isMyTurn && !revealedFaceDown && canCombineWithHand);
 
+                                const isFaceUpSelected = selectedCards.some((s) => s.type === 'faceUp' && s.index === i);
+
                                 return (
                                     <div key={card.id} data-faceup-index={i}>
                                         <CardComponent
                                             card={card}
                                             small
                                             selectable={faceUpSelectable}
-                                            selected={selectedCards.some((s) => s.type === 'faceUp' && s.index === i)}
+                                            selected={isFaceUpSelected}
                                             title={tooltip}
+                                            role="option"
+                                            ariaSelected={isFaceUpSelected}
+                                            ariaLabel={tooltip}
+                                            {...faceUpRoving.getItemProps(optionPosition)}
                                             onClick={() => {
                                                 if (isSetupPhase) {
                                                     const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
