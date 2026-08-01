@@ -29,7 +29,11 @@ const getOrdinalLabel = (n: number): string => {
  */
 export function GameScreen({
   isPlayerOffline = () => false,
-}: { isPlayerOffline?: (id: string) => boolean } = {}) {
+  consumeJustReconnected = () => false,
+}: {
+  isPlayerOffline?: (id: string) => boolean;
+  consumeJustReconnected?: () => boolean;
+} = {}) {
   const {
     gameState,
     dispatchMove,
@@ -154,13 +158,28 @@ export function GameScreen({
       return;
     }
 
+    // 02-UAT.md test 10 (D-10): this client's own Presence channel just
+    // dropped and recovered, and usePresence's onlinePlayerIds view of every
+    // OTHER player just caught up in a single batch as a result (see
+    // usePresence.ts's sync handler) - not a genuine reconnect by any of
+    // them. Treat this pass exactly like the initial-mount seed above:
+    // adopt the caught-up values silently, fire no toasts, so the batch
+    // catch-up doesn't get misattributed to whichever other player happened
+    // to look stale during this client's own outage. Every other pass (this
+    // client's own connection never dropped) falls through to the ordinary
+    // per-player transition check below unchanged.
+    if (consumeJustReconnected()) {
+      lastOfflineRef.current = nextOffline;
+      return;
+    }
+
     for (const player of gameState.players) {
       if (lastOfflineRef.current[player.id] && !nextOffline[player.id]) {
         showToast(`${player.name} reconnected`, 'RECONNECTED', 'reconnect');
       }
     }
     lastOfflineRef.current = nextOffline;
-  }, [gameState, testMode, playerId, isPlayerOffline, showToast]);
+  }, [gameState, testMode, playerId, isPlayerOffline, showToast, consumeJustReconnected]);
 
   // D-05: the client-side trigger that makes check-turn-timeout reachable
   // at all - see useTurnTimeoutSweep.ts. graceExpired, combined with
