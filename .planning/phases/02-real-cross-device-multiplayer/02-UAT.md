@@ -11,11 +11,11 @@ updated: 2026-07-31T00:00:00Z
 number: 9
 name: Retest after 02-16/02-17 deploy - reconciliation toast scoping and Realtime self-heal
 expected: |
-  Playing several turns across two devices produces no unexpected "didn't
-  stick" toasts on the idle screen; and a backgrounded/throttled tab's
-  Realtime connection recovers on its own (screen resumes reflecting the
+  A tab that is genuinely backgrounded or network-throttled while
+  connected should recover on its own (screen resumes reflecting the
   opponent's moves) without requiring a manual rejoin.
-awaiting: live two-device retest, plus outstanding item from test 6 (test 4b confirmed pass)
+awaiting: deliberate backgrounding/throttling retest - toast-scoping half
+  already confirmed (test 6 passed, test 9 marked partial)
 
 ## Tests
 
@@ -137,7 +137,11 @@ note: |
 expected: Pressing Leave Game and confirming lands on the menu; rejoining
   with the same room code and name returns the player to their same seat
   with their hand intact
-result: [pending]
+result: pass
+note: |
+  Live retest confirms Leave Game + rejoin works correctly. No unexpected
+  toasts seen apart from the reconnect toast (whose known misattribution
+  issue is separately tracked as test 10).
 
 ### 7. Retest after 02-14/02-15 deploy: reconciliation toast on the idle player
 expected: With both fixes deployed, playing several turns across two devices
@@ -217,7 +221,14 @@ expected: |
   Playing several turns across two devices produces no unexpected "didn't
   stick" toasts on the idle screen (setup and normal play); backgrounding or
   throttling a tab's connection self-heals without a manual rejoin.
-result: [pending]
+result: partial
+note: |
+  Toast-scoping half confirmed across this session's disconnect/reconnect
+  and Leave Game/rejoin testing: no unexpected "didn't stick" toasts seen,
+  only the (separately tracked, test 10) reconnect toast. The self-heal
+  half - a tab genuinely backgrounded or network-throttled while
+  connected, recovering without a manual rejoin - has not been deliberately
+  exercised yet.
 
 ### 10. Reconnect toast (D-10) misattributes a player's own connection recovery to the other player
 expected: The reconnect toast ("X reconnected") should only fire on a
@@ -256,9 +267,9 @@ debug_session: ""
 ## Summary
 
 total: 10
-passed: 3
+passed: 4
 issues: 6
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 
