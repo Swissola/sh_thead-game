@@ -161,8 +161,32 @@ Plans:
   4. A player can select and play cards using only the keyboard
   5. Turn changes are announced and modals trap focus properly for screen reader/keyboard users
 
-**Plans**: TBD
+**Plans:** 0/8 plans complete
 **UI hint**: yes
+
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Accessibility primitives: useRovingTabindex + useFocusTrap hooks, sr-only utility
+- [ ] 03-02-PLAN.md — Card leaf a11y: role=option, Enter/Space activation, cyan focus-visible ring, blind-play-safe accessible name
+- [ ] 03-06-PLAN.md — LobbyScreen: 44px control audit and phone-width row wrapping
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 03-03-PLAN.md — Hand as a multi-selectable listbox, 44px sort buttons, phone-width scroll-snap strip with the same-rank overlap removed
+- [ ] 03-04-PLAN.md — Table split into two listboxes: multi-select face-up, single-select face-down
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 03-05-PLAN.md — GameScreen RESP-05: always-mounted turn announcer and the celebration modal as a focus-trapped dialog
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 03-07-PLAN.md — GameScreen board reflow below sm, responsive piles, and the remaining 44px control audit
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 03-08-PLAN.md — Phase gate plus the blocking human checkpoint: real-device touch, keyboard-only play, screen-reader announcement, VALIDATION.md sign-off
 
 ### Phase 4: Mobile Packaging (Capacitor)
 
@@ -233,7 +257,7 @@ rework lands).
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
 | 2. Real Cross-Device Multiplayer | 19/19 | Complete    | 2026-08-01 |
-| 3. Responsive UI | 0/TBD | Not started | - |
+| 3. Responsive UI | 0/8 | Not started | - |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
 | 6. Visual/Gameplay Polish | 0/TBD | Not started | - |
