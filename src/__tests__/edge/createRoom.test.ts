@@ -79,6 +79,7 @@ describe('createRoom', () => {
         expect(result.room?.state.players).toEqual([
             { id: 'player-1', name: 'Alice', hand: [], faceUp: [], faceDown: [], isReady: false },
         ]);
+        expect(result.room?.state.turnTimeoutMs).toBe(60000);
     });
 
     it('generates a 6-character uppercase code from crypto.getRandomValues', async () => {

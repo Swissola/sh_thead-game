@@ -18,7 +18,7 @@ export interface ApplyRoomMoveInput {
     move: unknown;
 }
 
-const VALID_MOVE_TYPES = new Set(['PLAY_CARDS', 'PICK_UP_PILE', 'SWAP_CARDS', 'READY_UP']);
+const VALID_MOVE_TYPES = new Set(['PLAY_CARDS', 'PICK_UP_PILE', 'SWAP_CARDS', 'READY_UP', 'SET_TURN_TIMEOUT']);
 
 function isValidMoveShape(move: unknown): move is Move {
     return (

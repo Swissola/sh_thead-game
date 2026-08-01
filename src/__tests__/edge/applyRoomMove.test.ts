@@ -108,7 +108,7 @@ describe('applyRoomMove', () => {
         expect(store.writeCount).toBe(0);
     });
 
-    it('rejects a move whose type is outside the four-member union with BAD_REQUEST, untouched room', async () => {
+    it('rejects a move whose type is outside the five-member union with BAD_REQUEST, untouched room', async () => {
         const store = new FakeRoomStore(makeRoomRow({ state: playingState() }));
 
         const result = await applyRoomMove(store, {
@@ -148,6 +148,42 @@ describe('applyRoomMove', () => {
         expect(result.error).toBeUndefined();
         expect(result.room?.version).toBe(1);
         expect(result.room?.state.players.find((p) => p.id === 'p0')?.isReady).toBe(true);
+    });
+
+    it('SET_TURN_TIMEOUT from the host in the lobby phase writes through withVersionRetry, incrementing version by exactly 1', async () => {
+        const store = new FakeRoomStore(makeRoomRow({ state: buildGameState({ phase: 'lobby', host: 'p0' }) }));
+
+        const result = await applyRoomMove(store, {
+            playerId: 'p0',
+            roomCode: 'ABC123',
+            move: { type: 'SET_TURN_TIMEOUT', playerId: 'p0', timeoutMs: 120000 },
+        });
+
+        expect(result.error).toBeUndefined();
+        expect(result.room?.state.turnTimeoutMs).toBe(120000);
+        expect(result.room?.version).toBe(1);
+        expect(store.writeCount).toBe(1);
+    });
+
+    it('SET_TURN_TIMEOUT from a non-host player is rejected HOST_ONLY, performing no write', async () => {
+        const store = new FakeRoomStore(
+            makeRoomRow({
+                state: buildGameState({
+                    phase: 'lobby',
+                    host: 'p0',
+                    players: [buildPlayer({ id: 'p0' }), buildPlayer({ id: 'p1' })],
+                }),
+            })
+        );
+
+        const result = await applyRoomMove(store, {
+            playerId: 'p1',
+            roomCode: 'ABC123',
+            move: { type: 'SET_TURN_TIMEOUT', playerId: 'p1', timeoutMs: 120000 },
+        });
+
+        expect(result.error?.code).toBe(ERROR_CODES.HOST_ONLY);
+        expect(store.writeCount).toBe(0);
     });
 
     it('sets turn_started_at on every successful move, including burn-and-go-again (currentTurn unchanged)', async () => {

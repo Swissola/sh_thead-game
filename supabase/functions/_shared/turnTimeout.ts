@@ -110,7 +110,13 @@ export function checkTurnTimeout(store: RoomStore, input: CheckTurnTimeoutInput)
 
         const nowMs = Date.parse(store.now());
         const elapsedMs = nowMs - Date.parse(row.turn_started_at);
-        if (elapsedMs < TURN_GRACE_MS) {
+        // GameState.turnTimeoutMs is a *required* field in the type, but this specific
+        // call site reads a raw Postgres state JSONB column whose actual persisted shape
+        // predates this plan for any already-existing room, so the type's guarantee
+        // cannot be trusted here the way it can everywhere else in the codebase - this is
+        // the one place this plan intentionally distrusts its own type.
+        const turnTimeoutMs = row.state.turnTimeoutMs ?? TURN_GRACE_MS;
+        if (elapsedMs < turnTimeoutMs) {
             return {
                 code: EDGE_ERROR_CODES.TIMEOUT_NOT_ELAPSED,
                 message: 'Grace period has not yet elapsed',

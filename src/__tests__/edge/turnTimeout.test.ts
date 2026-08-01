@@ -107,6 +107,53 @@ describe('checkTurnTimeout (D-05)', () => {
         expect(store.writeCount).toBe(0);
     });
 
+    it('auto-picks-up once elapsed time passes a configured turnTimeoutMs lower than TURN_GRACE_MS, even though still under TURN_GRACE_MS', async () => {
+        const store = new FakeRoomStore(
+            makeRoomRow({ state: playingState({ turnTimeoutMs: 30000 }) }),
+            afterMs(45000)
+        );
+
+        const result = await checkTurnTimeout(store, { roomCode: 'ABC123' });
+
+        expect(result.error).toBeUndefined();
+        expect(store.writeCount).toBe(1);
+    });
+
+    it('does not auto-pick-up once elapsed time passes TURN_GRACE_MS when a configured turnTimeoutMs is higher, proving the sweep no longer secretly uses 60s as a ceiling', async () => {
+        const store = new FakeRoomStore(
+            makeRoomRow({ state: playingState({ turnTimeoutMs: 120000 }) }),
+            afterMs(90000)
+        );
+
+        const result = await checkTurnTimeout(store, { roomCode: 'ABC123' });
+
+        expect(result.error?.code).toBe(EDGE_ERROR_CODES.TIMEOUT_NOT_ELAPSED);
+        expect(store.writeCount).toBe(0);
+    });
+
+    it('falls back to TURN_GRACE_MS (60s) unchanged when the stored state has no turnTimeoutMs field at all (pre-existing room)', async () => {
+        const legacyState = { ...playingState(), turnTimeoutMs: undefined as unknown as number };
+        const notElapsedStore = new FakeRoomStore(
+            makeRoomRow({ state: legacyState }),
+            afterMs(TURN_GRACE_MS - 1)
+        );
+
+        const notElapsedResult = await checkTurnTimeout(notElapsedStore, { roomCode: 'ABC123' });
+
+        expect(notElapsedResult.error?.code).toBe(EDGE_ERROR_CODES.TIMEOUT_NOT_ELAPSED);
+        expect(notElapsedStore.writeCount).toBe(0);
+
+        const elapsedStore = new FakeRoomStore(
+            makeRoomRow({ state: legacyState }),
+            afterMs(TURN_GRACE_MS + 1)
+        );
+
+        const elapsedResult = await checkTurnTimeout(elapsedStore, { roomCode: 'ABC123' });
+
+        expect(elapsedResult.error).toBeUndefined();
+        expect(elapsedStore.writeCount).toBe(1);
+    });
+
     it('computes elapsed time from store.now() against the stored turn_started_at, not a caller-supplied timestamp', async () => {
         const store = new FakeRoomStore(
             makeRoomRow({ state: playingState(), turn_started_at: TURN_STARTED_AT }),
