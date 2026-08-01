@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '../../storage';
 import { GameProvider, useGameContext } from '../../context/GameContext';
@@ -67,13 +67,20 @@ function Probe() {
 function renderGame(
   playerId: string,
   state: ReturnType<typeof buildGameState>,
-  options: { isPlayerOffline?: (id: string) => boolean; testMode?: boolean } = {}
+  options: {
+    isPlayerOffline?: (id: string) => boolean;
+    consumeJustReconnected?: () => boolean;
+    testMode?: boolean;
+  } = {}
 ) {
   return render(
     <GameProvider playerId={playerId}>
       <SeedGameState state={state} />
       {options.testMode && <SetTestMode value />}
-      <GameScreen isPlayerOffline={options.isPlayerOffline} />
+      <GameScreen
+        isPlayerOffline={options.isPlayerOffline}
+        consumeJustReconnected={options.consumeJustReconnected}
+      />
       <ToastProbe />
       <Probe />
     </GameProvider>
@@ -577,6 +584,82 @@ describe('GameScreen', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByText('Clear offline'));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('Bob reconnected');
+      });
+      expect(screen.getAllByRole('alert')).toHaveLength(1);
+    });
+
+    it("suppresses the reconnect toast when this client's own presence connection just recovered (02-UAT.md test 10), but still reseeds so a later genuine reconnect fires normally", async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      // Mirrors usePresence's real consumeJustReconnected: a ref-based
+      // read-and-clear signal, set true by a "Simulate self-recovery" click
+      // (standing in for usePresence's sync-handler flag) and consumed
+      // (returned true once, then false) exactly like the real hook.
+      function Harness() {
+        const [offlineIds, setOfflineIds] = useState<string[]>(['p1']);
+        const justReconnectedRef = useRef(false);
+        const isPlayerOffline = useCallback((id: string) => offlineIds.includes(id), [offlineIds]);
+        const consumeJustReconnected = useCallback(() => {
+          if (justReconnectedRef.current) {
+            justReconnectedRef.current = false;
+            return true;
+          }
+          return false;
+        }, []);
+        return (
+          <>
+            <GameScreen isPlayerOffline={isPlayerOffline} consumeJustReconnected={consumeJustReconnected} />
+            <button
+              onClick={() => {
+                // This client's own presence channel just batch-caught-up
+                // Bob's state as a side effect of ITS OWN recovery, not a
+                // genuine reconnect by Bob.
+                justReconnectedRef.current = true;
+                setOfflineIds([]);
+              }}
+            >
+              Simulate self-recovery batch catch-up
+            </button>
+            <button onClick={() => setOfflineIds(['p1'])}>Bob goes offline</button>
+            <button onClick={() => setOfflineIds([])}>Bob genuinely reconnects</button>
+          </>
+        );
+      }
+
+      render(
+        <GameProvider playerId="test-player">
+          <SeedGameState state={state} />
+          <Harness />
+          <ToastProbe />
+          <Probe />
+        </GameProvider>
+      );
+
+      await screen.findByText('Bob');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Simulate self-recovery batch catch-up'));
+
+      // No toast for the suppressed self-recovery pass, even though Bob's
+      // tracked offline state genuinely flipped true -> false this render.
+      await waitFor(() => {
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      });
+
+      // A later, genuine transition (this client's own connection is now
+      // stable) must still raise the toast as normal - the suppression must
+      // not have permanently disabled the effect.
+      fireEvent.click(screen.getByText('Bob goes offline'));
+      fireEvent.click(screen.getByText('Bob genuinely reconnects'));
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toHaveTextContent('Bob reconnected');

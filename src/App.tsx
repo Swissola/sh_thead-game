@@ -50,14 +50,18 @@ export function Router({ initialRoomCode = '' }: { initialRoomCode?: string } = 
     // D-10: drives the offline badge on both LobbyScreen's and GameScreen's
     // player tiles. usePresence is called here, exactly once (never inside a
     // screen), so only one Presence channel/heartbeat exists per room
-    // regardless of which screen is rendered.
-    const { isPlayerOffline } = usePresence({ roomCode, playerId, testMode });
+    // regardless of which screen is rendered. consumeJustReconnected (02-UAT.md
+    // test 10) is only threaded into GameScreen - LobbyScreen has no
+    // reconnect-toast logic of its own to suppress.
+    const { isPlayerOffline, consumeJustReconnected } = usePresence({ roomCode, playerId, testMode });
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
             {!gameState && <MenuScreen initialRoomCode={initialRoomCode} />}
             {gameState?.phase === 'lobby' && <LobbyScreen isPlayerOffline={isPlayerOffline} />}
-            {gameState && gameState.phase !== 'lobby' && <GameScreen isPlayerOffline={isPlayerOffline} />}
+            {gameState && gameState.phase !== 'lobby' && (
+                <GameScreen isPlayerOffline={isPlayerOffline} consumeJustReconnected={consumeJustReconnected} />
+            )}
             <Toast toast={toast} onDismiss={dismissToast} />
         </div>
     );

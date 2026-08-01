@@ -13,7 +13,9 @@ type SubscribeCb = (status: string) => void;
 type PresenceHandler = (payload?: { key: string }) => void;
 
 /** A fake presence `.channel()` return value recording `.on` registrations
- * by presence event name and exposing `_fire*` helpers plus spies. */
+ * by presence event name and exposing `_fire*` helpers plus spies.
+ * `_fireStatus` (matching useRoomSubscription.test.ts's established shape)
+ * lets a test simulate any subscribe-status transition, not just SUBSCRIBED. */
 function makeFakeChannel(presenceKeys: string[] = []) {
     const handlers: Record<string, PresenceHandler> = {};
     let subscribeCb: SubscribeCb | null = null;
@@ -30,6 +32,9 @@ function makeFakeChannel(presenceKeys: string[] = []) {
         presenceState: vi.fn(() => Object.fromEntries(presenceKeys.map((k) => [k, [{}]]))),
         _fireSubscribed() {
             subscribeCb?.('SUBSCRIBED');
+        },
+        _fireStatus(status: string) {
+            subscribeCb?.(status);
         },
         _fireSync(keys: string[]) {
             presenceKeys.length = 0;
@@ -224,5 +229,130 @@ describe('usePresence', () => {
 
         expect(result.current.isPlayerOffline('p1')).toBe(false);
         expect(result.current.isPlayerOffline('p2')).toBe(true);
+    });
+
+    describe('consumeJustReconnected (D-10, 02-UAT.md test 10)', () => {
+        it('returns false when the channel has never dropped', async () => {
+            const { supabase, channels } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() =>
+                usePresence({ roomCode: 'ABC123', playerId: 'p1', testMode: false })
+            );
+
+            await act(async () => {
+                channels[0]._fireSubscribed();
+                await Promise.resolve();
+            });
+
+            act(() => {
+                channels[0]._fireSync(['p1', 'p2']);
+            });
+
+            expect(result.current.consumeJustReconnected()).toBe(false);
+        });
+
+        it.each(['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'])(
+            'returns true exactly once for the sync that lands after a %s recovers',
+            async (dropStatus) => {
+                const { supabase, channels } = makeFakeSupabase();
+                vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+                const { result } = renderHook(() =>
+                    usePresence({ roomCode: 'ABC123', playerId: 'p1', testMode: false })
+                );
+
+                await act(async () => {
+                    channels[0]._fireSubscribed();
+                    await Promise.resolve();
+                });
+                act(() => {
+                    channels[0]._fireSync(['p1']);
+                });
+                // Not yet reconnected - nothing has dropped.
+                expect(result.current.consumeJustReconnected()).toBe(false);
+
+                // The channel drops...
+                act(() => {
+                    channels[0]._fireStatus(dropStatus);
+                });
+                // ...and later recovers, immediately followed by the batched
+                // presence sync catch-up described in 02-UAT.md test 10's
+                // root_cause - this is the pass that must be flagged.
+                await act(async () => {
+                    channels[0]._fireSubscribed();
+                    await Promise.resolve();
+                });
+                act(() => {
+                    channels[0]._fireSync(['p1', 'p2']);
+                });
+
+                expect(result.current.consumeJustReconnected()).toBe(true);
+                // Consuming clears the signal - a second read must not
+                // re-report the same recovery.
+                expect(result.current.consumeJustReconnected()).toBe(false);
+            }
+        );
+
+        it('does not flag a routine sync that happens without any prior drop, even after SUBSCRIBED fires again on remount-free re-track', async () => {
+            const { supabase, channels } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result } = renderHook(() =>
+                usePresence({ roomCode: 'ABC123', playerId: 'p1', testMode: false })
+            );
+
+            await act(async () => {
+                channels[0]._fireSubscribed();
+                await Promise.resolve();
+            });
+            act(() => {
+                channels[0]._fireSync(['p1']);
+            });
+            act(() => {
+                channels[0]._fireSync(['p1', 'p2']);
+            });
+
+            expect(result.current.consumeJustReconnected()).toBe(false);
+        });
+
+        it('does not carry an unconsumed recovery flag from one room into the next room on the same mounted hook', async () => {
+            const { supabase, channels } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+
+            const { result, rerender } = renderHook(
+                ({ roomCode }: { roomCode: string }) =>
+                    usePresence({ roomCode, playerId: 'p1', testMode: false }),
+                { initialProps: { roomCode: 'ABC123' } }
+            );
+
+            await act(async () => {
+                channels[0]._fireSubscribed();
+                await Promise.resolve();
+            });
+            act(() => {
+                channels[0]._fireStatus('CHANNEL_ERROR');
+            });
+            await act(async () => {
+                channels[0]._fireSubscribed();
+                await Promise.resolve();
+            });
+            // The recovery flag is now live but deliberately left unconsumed
+            // (no _fireSync yet, and no consumeJustReconnected() call) before
+            // the room changes out from under this same hook instance -
+            // Router keeps usePresence mounted across a room change, only its
+            // effect's cleanup/re-run fires (roomCode is an effect dependency).
+            rerender({ roomCode: 'XYZ789' });
+
+            await act(async () => {
+                channels[1]._fireSubscribed();
+                await Promise.resolve();
+            });
+            act(() => {
+                channels[1]._fireSync(['p1']);
+            });
+
+            expect(result.current.consumeJustReconnected()).toBe(false);
+        });
     });
 });

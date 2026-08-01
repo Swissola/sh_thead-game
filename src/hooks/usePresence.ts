@@ -11,6 +11,18 @@ export interface UsePresenceArgs {
 export interface UsePresenceResult {
     onlinePlayerIds: string[];
     isPlayerOffline: (id: string) => boolean;
+    /**
+     * Read-and-clear signal for 02-UAT.md test 10 (D-10): returns true
+     * exactly once per recovery if this client's own Presence channel just
+     * dropped (CHANNEL_ERROR/TIMED_OUT/CLOSED) and has now caught back up
+     * (the first presence `sync` delivered after recovering). Calling it
+     * clears the flag, so a later, genuinely unrelated sync does not
+     * re-report the same recovery. See GameScreen.tsx's reconnect-toast
+     * effect for the consumer - it must not attribute this client's own
+     * connection recovering (and onlinePlayerIds batch-catching-up as a
+     * result) to another player's genuine reconnect.
+     */
+    consumeJustReconnected: () => boolean;
 }
 
 /**
@@ -27,6 +39,21 @@ export interface UsePresenceResult {
 export function usePresence({ roomCode, playerId, testMode }: UsePresenceArgs): UsePresenceResult {
     const [onlinePlayerIds, setOnlinePlayerIds] = useState<string[]>([]);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    // 02-UAT.md test 10 (D-10): mirrors useRoomSubscription.ts's own
+    // hadDisconnected/hadPendingMoveAtDrop pattern, but deliberately does not
+    // borrow its manual resubscribe/backoff machinery - a Presence channel's
+    // 'sync' event is itself the recovery signal (the batched catch-up this
+    // gap is about), so all that is needed here is to remember "did this
+    // channel's own status go bad since the last successful sync" and flag
+    // the very next sync that lands after it did. hadDisconnectedRef is only
+    // ever set on CHANNEL_ERROR/TIMED_OUT/CLOSED; justReconnectedRef is only
+    // ever set (from hadDisconnectedRef) inside the sync handler, so a
+    // consumer reading justReconnectedRef can only ever observe "the drop
+    // that just got caught up by this exact sync", never a stale one - both
+    // refs reset on cleanup (room/player change or unmount) so nothing leaks
+    // across rooms.
+    const hadDisconnectedRef = useRef(false);
+    const justReconnectedRef = useRef(false);
 
     useEffect(() => {
         // No setState here for the bail-out case (react-hooks/set-state-in-effect) -
@@ -48,6 +75,15 @@ export function usePresence({ roomCode, playerId, testMode }: UsePresenceArgs): 
 
         channel
             .on('presence', { event: 'sync' }, () => {
+                // Must run before setOnlinePlayerIds below: this is the exact
+                // sync payload GameScreen's reconcile effect will observe as
+                // the trigger (isPlayerOffline's identity changes with
+                // onlinePlayerIds) - the flag has to already be true by the
+                // time that re-render happens, not merely be scheduled to be.
+                if (hadDisconnectedRef.current) {
+                    hadDisconnectedRef.current = false;
+                    justReconnectedRef.current = true;
+                }
                 const state = channel.presenceState() as Record<string, unknown>;
                 setOnlinePlayerIds(Object.keys(state));
             })
@@ -59,6 +95,11 @@ export function usePresence({ roomCode, playerId, testMode }: UsePresenceArgs): 
                     await channel.track({ player_id: playerId, online_at: new Date().toISOString() });
                     sendHeartbeat();
                     intervalRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+                    return;
+                }
+
+                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    hadDisconnectedRef.current = true;
                 }
             });
 
@@ -67,6 +108,8 @@ export function usePresence({ roomCode, playerId, testMode }: UsePresenceArgs): 
             intervalRef.current = null;
             supabase.removeChannel(channel);
             setOnlinePlayerIds([]);
+            hadDisconnectedRef.current = false;
+            justReconnectedRef.current = false;
         };
     }, [roomCode, playerId, testMode]);
 
@@ -75,5 +118,13 @@ export function usePresence({ roomCode, playerId, testMode }: UsePresenceArgs): 
         [onlinePlayerIds]
     );
 
-    return { onlinePlayerIds, isPlayerOffline };
+    const consumeJustReconnected = useCallback(() => {
+        if (justReconnectedRef.current) {
+            justReconnectedRef.current = false;
+            return true;
+        }
+        return false;
+    }, []);
+
+    return { onlinePlayerIds, isPlayerOffline, consumeJustReconnected };
 }
