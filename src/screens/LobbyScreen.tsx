@@ -126,14 +126,14 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
 
     return (
         <div className="flex items-center justify-center">
-            <div className="max-w-2xl w-full bg-slate-800 rounded-2xl shadow-2xl p-8 border-2 border-purple-500">
+            <div className="max-w-2xl w-full bg-slate-800 rounded-2xl shadow-2xl p-8 max-sm:p-4 border-2 border-purple-500">
                 <div className="text-center mb-6">
                     <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500 mb-4">
                         Game Lobby
                     </h1>
-                    <div className="flex items-center justify-center gap-2 mb-2">
+                    <div className="flex items-center justify-center gap-2 mb-2 max-sm:flex-wrap">
                         <span className="text-slate-400">Room Code:</span>
-                        <span className="text-2xl font-mono font-bold text-purple-400">
+                        <span className="text-xl sm:text-2xl font-mono font-bold text-purple-400">
                             {gameState?.roomCode}
                         </span>
                         <button
@@ -161,7 +161,7 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
                     </div>
                     <p className="text-slate-400 text-sm">Share this code with your friends!</p>
                 </div>
-                <div className="flex items-center justify-between bg-slate-700 rounded-lg p-3 mb-6">
+                <div className="flex items-center justify-between bg-slate-700 rounded-lg p-3 mb-6 max-sm:flex-wrap max-sm:gap-2">
                     <span className="text-slate-300">Auto-pickup timeout</span>
                     {isHost ? (
                         <select
@@ -195,12 +195,12 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
                             return (
                                 <div
                                     key={player.id}
-                                    className={`flex items-center gap-3 bg-slate-700 rounded-lg p-3 ${offline ? 'opacity-60 border-2 border-slate-600' : ''}`}
+                                    className={`flex items-center gap-3 bg-slate-700 rounded-lg p-3 max-sm:flex-wrap ${offline ? 'opacity-60 border-2 border-slate-600' : ''}`}
                                 >
                                     {player.id === gameState.host && (
                                         <Crown size={20} className="text-yellow-400" />
                                     )}
-                                    <span className="text-white font-semibold flex-1">{player.name}</span>
+                                    <span className="text-white font-semibold flex-1 min-w-0 truncate">{player.name}</span>
                                     {offline && (
                                         <span className="text-xs px-2 py-1 rounded bg-slate-600 text-slate-300 flex items-center gap-1">
                                             <WifiOff size={12} />

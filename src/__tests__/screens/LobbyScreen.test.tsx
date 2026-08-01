@@ -710,6 +710,59 @@ describe('LobbyScreen', () => {
         });
     });
 
+    describe('phone-width layout (RESP-01, plan 03-06 Task 2)', () => {
+        it('the room-code row wraps at phone width and the room code shrinks below sm', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            const roomCode = await screen.findByText('ABC123');
+            expect(roomCode).toHaveClass('text-xl');
+            expect(roomCode).toHaveClass('sm:text-2xl');
+            expect(roomCode).not.toHaveClass('text-2xl');
+
+            const roomCodeRow = roomCode.closest('div.flex') as HTMLElement;
+            expect(roomCodeRow).toHaveClass('max-sm:flex-wrap');
+        });
+
+        it('the player-name element carries min-w-0 so a long name truncates instead of forcing the row wider', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            renderLobby('p0', state);
+
+            const aliceName = screen.getByText('Alice');
+            expect(aliceName).toHaveClass('min-w-0');
+        });
+
+        it('renders with no portrait: or landscape: variant on any node (D-12: one phone layout serves both orientations)', async () => {
+            const { supabase } = makeFakeSupabase();
+            vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
+            const state = buildGameState({
+                roomCode: 'ABC123',
+                phase: 'lobby',
+                host: 'p0',
+                players: [buildPlayer({ id: 'p0', name: 'Alice' }), buildPlayer({ id: 'p1', name: 'Bob' })],
+            });
+            const { container } = renderLobby('p0', state);
+            await screen.findByText('ABC123');
+
+            expect(container.querySelector('[class*="portrait:"]')).toBeNull();
+            expect(container.querySelector('[class*="landscape:"]')).toBeNull();
+        });
+    });
+
     describe('auto-pickup timeout control (MPLAY-07, plan 02-19)', () => {
         it('renders a <select> for the host with the current turnTimeoutMs selected, formatted in seconds', async () => {
             const { supabase } = makeFakeSupabase();
