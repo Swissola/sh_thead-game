@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-last_updated: "2026-08-01T15:09:44.142Z"
-last_activity: 2026-07-31 -- Plan 02-17 executed (worktree was 197 commits stale off an old
+last_updated: "2026-08-01T15:29:42.397Z"
+last_activity: 2026-08-01 -- Plan 02-19 executed (MPLAY-07's lobby UI and client-side sweep wiring; MPLAY-07 fully closed)
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 26
-  completed_plans: 24
+  completed_plans: 25
   percent: 14
 ---
 
@@ -25,22 +25,23 @@ See: .planning/PROJECT.md (updated 2026-07-25)
 ## Current Position
 
 Phase: 02 (real-cross-device-multiplayer) — EXECUTING
-Plan: 02-18 — COMPLETE (both tasks). MPLAY-07's server-authority half: `SET_TURN_TIMEOUT` is
-a fifth `Move` type through the existing `applyMove`/`apply-move` Edge Function pipeline,
-lobby-phase-only, host-only, bounds-validated to `[30000, 300000]`ms inclusive.
-`GameState.turnTimeoutMs` is now a required field (default `TURN_GRACE_MS`, 60000ms).
-`checkTurnTimeout` honours a room's own configured value, with a tested fallback to
-`TURN_GRACE_MS` for any room whose stored state predates this field. No lobby UI yet -
-`02-19` (already planned) delivers the UI-facing halves of MPLAY-07.
-Status: 17/19 plans fully complete and merged (02-01..02-12, 02-14..02-18); 02-13 is 2/3
+Plan: 02-19 — COMPLETE (both tasks). MPLAY-07's UI/wiring half, closing both gaps 02-18
+deliberately left open: a host-editable, all-players-visible auto-pickup timeout `<select>`
+in `LobbyScreen.tsx`, dispatching `SET_TURN_TIMEOUT` through the standard `dispatchMove`
+pipeline and bounded by 02-18's own `MIN_TURN_TIMEOUT_MS`/`MAX_TURN_TIMEOUT_MS`; and
+`useTurnTimeoutSweep` now comparing elapsed time against the room's actual configured
+`turnTimeoutMs` (threaded from `GameScreen.tsx`) instead of the previously hardcoded
+`TURN_GRACE_MS`. MPLAY-07 is now fully closed end-to-end (server-validated by 02-18,
+reachable by 02-19) - `REQUIREMENTS.md`'s MPLAY-07 checkbox ticked.
+Status: 18/19 plans fully complete and merged (02-01..02-12, 02-14..02-19); 02-13 is 2/3
 tasks merged, its final Task 3 (blocking human-verify checkpoint) still pending human
-sign-off; 02-19 is planned but not yet executed. 02-13 remains the only plan blocking
-Phase 02's close.
-Last activity: 2026-08-01 -- Plan 02-18 executed (worktree was 216 commits stale off an old
-ancestor of `stage-1-refactor`; fast-forwarded via `git merge --ff-only` before starting).
-`npm run build`/`npm test -- --run` (466 tests, up from 448)/scoped `npx eslint` all green.
-Full-suite `npm run lint` still exits 1 on the same two pre-existing, unrelated issues
-carried since 02-01 (neither touched by this plan).
+sign-off. 02-13 remains the only plan blocking Phase 02's close.
+Last activity: 2026-08-01 -- Plan 02-19 executed (worktree was 168 files/~31.8k lines stale
+off an old ancestor of `stage-1-refactor` that predated `.planning/` itself; fast-forwarded
+via `git merge --ff-only` before starting, to pick up its own 02-18 dependency and the
+02-19 plan file). `npm run build`/`npm test -- --run` (478 tests, up from 466)/scoped
+`npx eslint` all green. Full-suite `npm run lint` still exits 1 on the same two
+pre-existing, unrelated issues carried since 02-01 (neither touched by this plan).
 
 Previously (2026-07-28): Plan 02-13's executor hit the account's weekly usage limit mid-task
 (twice — once on first dispatch before any commits, once again mid-debug of Task 2's audit-trail
@@ -53,7 +54,7 @@ wrappers reading the wrong JWT-claims field (`.sub` instead of `.id`) so `player
 `undefined`, and missing local Postgres table-level grants beneath otherwise-correct RLS
 policies. All four fixed and merged (migration `0002_local_dev_grants.sql`).
 
-Progress: [█████████░] 92%
+Progress: [██████████] 96%
 
 **Resolved:** 02-03-SUMMARY.md now documents full completion (3/3 tasks). Migration confirmed
 present on both Local and Remote via `supabase migration list`; anonymous sign-in confirmed
@@ -89,6 +90,7 @@ working via a live `/auth/v1/signup` call, not just a dashboard setting. Wave 3 
 | Phase 02 P15 | 55min | 3 tasks | 13 files |
 | Phase 02 P17 | 35min | 2 tasks | 3 files |
 | Phase 02 P18 | 70min | 2 tasks | 18 files |
+| Phase 02 P19 | 25min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -120,6 +122,7 @@ Recent decisions affecting current work:
 - [Phase 02]: [Phase 02-17]: room-data channel reconnect backoff resets only after a SUBSCRIPTION_RECONNECT_RESET_DWELL_MS (5s) dwell period of uninterrupted connectivity, scheduled not applied immediately on SUBSCRIBED, so a flapping connection keeps escalating instead of resetting on every brief reconnect; retries are capped only in delay (30s ceiling), never in count
 - [Phase 02-18]: HOST_ONLY (engine tier) is deliberately not named NOT_HOST, since EDGE_ERROR_CODES.NOT_HOST already exists for the edge tier's own host-only Edge Functions - the two closed sets must never collide
 - [Phase 02-18]: checkTurnTimeout's turnTimeoutMs ?? TURN_GRACE_MS fallback is the one place this plan intentionally distrusts GameState's required-field guarantee, since that read is against a raw Postgres JSONB column whose persisted shape predates this plan for any pre-existing room
+- [Phase 02-19]: Worktree branch was 168 files/31.8k lines stale off an old ancestor of stage-1-refactor - fast-forwarded via git merge --ff-only before starting, to pick up its own 02-18 dependency and the 02-19 plan file itself
 
 ### Pending Todos
 
@@ -168,11 +171,12 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-01T15:09:44.131Z
-Stopped at: Completed 02-18-PLAN.md (MPLAY-07's server-authority half: SET_TURN_TIMEOUT move, host/lobby/bounds-validated, checkTurnTimeout honouring the configured value); 02-13 Task 3 checkpoint still awaits the human operator
-work left in the entire phase — needs the human operator to run it against the hosted Supabase
-project and report back per the resume-signal ("approved" or a description of what didn't
-behave as written). Once signed off, a session needs to: tick the two Manual-Only Verifications
-rows in 02-VALIDATION.md with the date performed, record any grace-period timing feedback,
-write 02-13-SUMMARY.md, then close out Phase 02 in STATE.md/ROADMAP.md.
+Last session: 2026-08-01T15:29:42.389Z
+Stopped at: Completed 02-19-PLAN.md (MPLAY-07's lobby UI/client-side sweep wiring: host-editable turn-timeout select in LobbyScreen dispatching SET_TURN_TIMEOUT, useTurnTimeoutSweep reading gameState.turnTimeoutMs instead of hardcoded TURN_GRACE_MS). MPLAY-07 fully closed end-to-end.
+02-13 Task 3 remains the only work left in the entire phase — needs the human operator to run it
+against the hosted Supabase project and report back per the resume-signal ("approved" or a
+description of what didn't behave as written). Once signed off, a session needs to: tick the two
+Manual-Only Verifications rows in 02-VALIDATION.md with the date performed, record any
+grace-period timing feedback, write 02-13-SUMMARY.md, then close out Phase 02 in
+STATE.md/ROADMAP.md.
 Resume file: None

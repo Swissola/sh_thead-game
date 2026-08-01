@@ -69,7 +69,7 @@ original 7-stage plan.
 
 ### Multiplayer (real cross-device play via Supabase)
 
-- [ ] **MPLAY-07**: The room host can set the turn auto-pickup timeout
+- [x] **MPLAY-07**: The room host can set the turn auto-pickup timeout
   (currently fixed at 60s) to any value between 30s and 300s, adjustable in
   the lobby before the game starts and visible to all players, not just the
   host
@@ -101,7 +101,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MPLAY-04 | Phase 2 | Complete |
 | MPLAY-05 | Phase 2 | Complete |
 | MPLAY-06 | Phase 2 | Complete |
-| MPLAY-07 | Phase 2 | Pending |
+| MPLAY-07 | Phase 2 | Complete |
 | RESP-01 | Phase 3 | Pending |
 | RESP-02 | Phase 3 | Pending |
 | RESP-03 | Phase 3 | Pending |
