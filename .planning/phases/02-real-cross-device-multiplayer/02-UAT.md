@@ -8,14 +8,13 @@ updated: 2026-07-31T00:00:00Z
 
 ## Current Test
 
-number: 9
-name: Retest after 02-16/02-17 deploy - reconciliation toast scoping and Realtime self-heal
+number: 10
+name: Reconnect toast (D-10) misattributes a player's own connection recovery to the other player
 expected: |
-  A tab that is genuinely backgrounded or network-throttled while
-  connected should recover on its own (screen resumes reflecting the
-  opponent's moves) without requiring a manual rejoin.
-awaiting: deliberate backgrounding/throttling retest - toast-scoping half
-  already confirmed (test 6 passed, test 9 marked partial)
+  The reconnect toast only ever names the player who genuinely just came
+  back online, never the viewing client's own connection recovering.
+awaiting: gap logged - all live retesting otherwise complete (tests 1-9 all
+  pass or fixed-and-verified); this is the only open item in the phase
 
 ## Tests
 
@@ -221,14 +220,27 @@ expected: |
   Playing several turns across two devices produces no unexpected "didn't
   stick" toasts on the idle screen (setup and normal play); backgrounding or
   throttling a tab's connection self-heals without a manual rejoin.
-result: partial
+result: pass
 note: |
-  Toast-scoping half confirmed across this session's disconnect/reconnect
-  and Leave Game/rejoin testing: no unexpected "didn't stick" toasts seen,
-  only the (separately tracked, test 10) reconnect toast. The self-heal
-  half - a tab genuinely backgrounded or network-throttled while
-  connected, recovering without a manual rejoin - has not been deliberately
-  exercised yet.
+  Both halves now confirmed. Toast-scoping: no unexpected "didn't stick"
+  toasts across this session's disconnect/reconnect and Leave Game/rejoin
+  testing - only the separately-tracked test 10 reconnect toast. Self-heal:
+  live retest with the PC's actual network adapter disabled (DevTools
+  "Offline" and Windows Airplane Mode were both tried first and found
+  unreliable - see debug notes below) confirms the room-data channel
+  recovers on its own after a genuine ~20-30s network drop, with the
+  phone's move made during the outage appearing on PC automatically, no
+  manual rejoin needed.
+debug_session: |
+  Two false negatives during setup, useful to record: Chrome DevTools'
+  Network "Offline" throttling does not reliably close an already-open
+  WebSocket, so the room-data channel kept receiving broadcasts the whole
+  time - nothing to self-heal from. Windows Airplane Mode only disables
+  radios (Wi-Fi/Bluetooth/cellular); this PC is on a wired Ethernet
+  adapter (Realtek PCIe 2.5GbE), so it had no effect either. Disabling the
+  Ethernet adapter directly (Settings > Network & Internet > Ethernet >
+  Disable, or ncpa.cpl) was the method that actually severed the
+  connection and let the test run for real.
 
 ### 10. Reconnect toast (D-10) misattributes a player's own connection recovery to the other player
 expected: The reconnect toast ("X reconnected") should only fire on a
@@ -267,9 +279,9 @@ debug_session: ""
 ## Summary
 
 total: 10
-passed: 4
+passed: 5
 issues: 6
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
