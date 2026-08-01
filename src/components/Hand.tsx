@@ -3,6 +3,7 @@ import * as GameLogic from '../gameLogic';
 import type { Card as CardType, CardSelection, GameState, Player } from '../types';
 import { Card as CardComponent } from './Card';
 import { useGameContext } from '../context/GameContext';
+import { useRovingTabindex } from '../hooks/useRovingTabindex';
 import { getCardPlayability } from '../uiLogic';
 
 interface HandProps {
@@ -29,6 +30,13 @@ const Hand: React.FC<HandProps> = ({
     drawingCards,
 }) => {
     const { dispatchMove, currentPlayerId } = useGameContext();
+
+    // Hooks cannot run after the early return below, and the card count is
+    // not known until the sortHand IIFE runs inside JSX - so it's computed
+    // here instead. sortHand filters out nulls, so this equals
+    // sortedCards.length exactly.
+    const handCardCount = player?.hand ? player.hand.filter((c) => c !== null).length : 0;
+    const roving = useRovingTabindex(handCardCount);
 
     if (!player || !player.hand) return null;
 
@@ -62,7 +70,14 @@ const Hand: React.FC<HandProps> = ({
                 )}
             </div>
 
-            <div className="hand-area flex flex-wrap">
+            <div
+                className="hand-area flex flex-wrap"
+                ref={roving.containerRef}
+                onKeyDown={roving.onKeyDown}
+                role="listbox"
+                aria-multiselectable="true"
+                aria-label="Your hand"
+            >
                 {(() => {
                     if (isDrawing) {
                         return player.hand.map((card, arrayIndex) => {
@@ -115,6 +130,8 @@ const Hand: React.FC<HandProps> = ({
                             }
                         }
 
+                        const isSelected = selectedCards.some((s) => s.type === 'hand' && s.index === item.arrayIndex);
+
                         return (
                             <div key={item.card.id} data-card-key={item.card.id} className={sameGroup ? '-mr-12' : 'mr-2'} style={{ zIndex: index }}>
                                 <CardComponent
@@ -138,8 +155,12 @@ const Hand: React.FC<HandProps> = ({
                                             })()
                                         )
                                     }
-                                    selected={selectedCards.some((s) => s.type === 'hand' && s.index === item.arrayIndex)}
+                                    selected={isSelected}
                                     title={tooltip}
+                                    role="option"
+                                    ariaSelected={isSelected}
+                                    ariaLabel={tooltip}
+                                    {...roving.getItemProps(index)}
                                     onClick={() => {
                                         if (isSetupPhase) {
                                             const alreadySelected = selectedCards.findIndex((s) => s.type === 'hand' && s.index === item.arrayIndex);
