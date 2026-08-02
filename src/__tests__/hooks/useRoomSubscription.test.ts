@@ -714,8 +714,8 @@ describe('useRoomSubscription', () => {
 
             vi.advanceTimersByTime(SUBSCRIPTION_RECONNECT_MAX_MS);
 
-            expect(supabase.channel.mock.calls.length).toBe(channelCallsBeforeUnmount);
-            expect(supabase.removeChannel.mock.calls.length).toBe(removeChannelCallsBeforeUnmount);
+            expect(supabase.channel).toHaveBeenCalledTimes(channelCallsBeforeUnmount);
+            expect(supabase.removeChannel).toHaveBeenCalledTimes(removeChannelCallsBeforeUnmount);
         });
 
         it('changing the room code while a reconnect for the old room is pending cancels that pending reconnect', () => {

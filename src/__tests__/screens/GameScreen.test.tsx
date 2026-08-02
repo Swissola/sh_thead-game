@@ -314,7 +314,7 @@ describe('GameScreen', () => {
       const selected = container.querySelectorAll(
         '[data-card-key="hand-0"] .ring-yellow-400, [data-card-key="hand-1"] .ring-yellow-400'
       );
-      expect(selected.length).toBe(2);
+      expect(selected).toHaveLength(2);
     });
 
     fireEvent.click(screen.getByRole('button', { name: /^Play/ }));
@@ -322,7 +322,7 @@ describe('GameScreen', () => {
     // Ghost portal reflects the draw prediction synchronously, before the
     // 700ms setTimeout that clears it - checked immediately, no waitFor,
     // to avoid racing the real-timer clear.
-    expect(container.ownerDocument.querySelectorAll('.draw-card-ghost').length).toBe(2);
+    expect(container.ownerDocument.querySelectorAll('.draw-card-ghost')).toHaveLength(2);
 
     await waitFor(() => {
       expect(screen.getByTestId('probe')).toHaveTextContent('Alice(ready:false,hand:3)');

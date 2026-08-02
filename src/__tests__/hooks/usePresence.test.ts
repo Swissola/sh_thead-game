@@ -73,31 +73,15 @@ describe('usePresence', () => {
         vi.useRealTimers();
     });
 
-    it('with testMode true, creates no channel and returns an empty online set', () => {
+    it.each([
+        { name: 'testMode true', args: { roomCode: 'ABC123', playerId: 'p1', testMode: true } },
+        { name: 'an empty room code', args: { roomCode: '', playerId: 'p1', testMode: false } },
+        { name: 'an empty player id', args: { roomCode: 'ABC123', playerId: '', testMode: false } },
+    ])('with $name, creates no channel and returns an empty online set', ({ args }) => {
         const { supabase } = makeFakeSupabase();
         vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
 
-        const { result } = renderHook(() => usePresence({ roomCode: 'ABC123', playerId: 'p1', testMode: true }));
-
-        expect(supabase.channel).not.toHaveBeenCalled();
-        expect(result.current.onlinePlayerIds).toEqual([]);
-    });
-
-    it('with an empty room code, creates no channel and returns an empty online set', () => {
-        const { supabase } = makeFakeSupabase();
-        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
-
-        const { result } = renderHook(() => usePresence({ roomCode: '', playerId: 'p1', testMode: false }));
-
-        expect(supabase.channel).not.toHaveBeenCalled();
-        expect(result.current.onlinePlayerIds).toEqual([]);
-    });
-
-    it('with an empty player id, creates no channel and returns an empty online set', () => {
-        const { supabase } = makeFakeSupabase();
-        vi.mocked(getSupabaseClient).mockReturnValue(supabase as never);
-
-        const { result } = renderHook(() => usePresence({ roomCode: 'ABC123', playerId: '', testMode: false }));
+        const { result } = renderHook(() => usePresence(args));
 
         expect(supabase.channel).not.toHaveBeenCalled();
         expect(result.current.onlinePlayerIds).toEqual([]);
