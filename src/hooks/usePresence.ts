@@ -2,6 +2,13 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '../supabase/client';
 import { HEARTBEAT_INTERVAL_MS } from '../supabase/roomTypes';
 
+// Module-level (rather than an inline nested arrow inside the 'leave'
+// handler's setOnlinePlayerIds updater) so the filter predicate isn't a 5th
+// level of nested function literal - S2004 caps nesting at 4 levels deep.
+function removePlayerId(ids: string[], key: string): string[] {
+    return ids.filter((id) => id !== key);
+}
+
 export interface UsePresenceArgs {
     roomCode: string;
     playerId: string;
@@ -88,7 +95,7 @@ export function usePresence({ roomCode, playerId, testMode }: UsePresenceArgs): 
                 setOnlinePlayerIds(Object.keys(state));
             })
             .on('presence', { event: 'leave' }, ({ key }: { key: string }) => {
-                setOnlinePlayerIds((prev) => prev.filter((id) => id !== key));
+                setOnlinePlayerIds((prev) => removePlayerId(prev, key));
             })
             .subscribe(async (status: string) => {
                 if (status === 'SUBSCRIBED') {
