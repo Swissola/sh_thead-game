@@ -31,7 +31,7 @@ function stableStringify(value: unknown): string {
     return JSON.stringify(value, (_key, val: unknown) => {
         if (val && typeof val === 'object' && !Array.isArray(val)) {
             const sorted: Record<string, unknown> = {};
-            for (const k of Object.keys(val as Record<string, unknown>).sort()) {
+            for (const k of Object.keys(val as Record<string, unknown>).sort((a, b) => a.localeCompare(b))) {
                 sorted[k] = (val as Record<string, unknown>)[k];
             }
             return sorted;
@@ -184,6 +184,14 @@ export function useRoomSubscription({
             }, delay);
         };
 
+        // Named (rather than inline) so scheduling it doesn't add another
+        // level of nested function literal inside subscribeChannel's
+        // .subscribe() callback - S2004 caps nesting at 4 levels deep.
+        const resetBackoff = () => {
+            resetDwellTimeoutId = null;
+            reconnectAttempt = 0;
+        };
+
         // Creates and subscribes a fresh channel for this room, called once
         // synchronously at mount and again on every reconnect. Restructured
         // out of a single inline channel construction so a dropped
@@ -221,10 +229,7 @@ export function useRoomSubscription({
                         // have its retry cadence reset to base on every
                         // blip - only a connection that stays up for a
                         // genuine dwell period counts as recovered.
-                        resetDwellTimeoutId = setTimeout(() => {
-                            resetDwellTimeoutId = null;
-                            reconnectAttempt = 0;
-                        }, SUBSCRIPTION_RECONNECT_RESET_DWELL_MS);
+                        resetDwellTimeoutId = setTimeout(resetBackoff, SUBSCRIPTION_RECONNECT_RESET_DWELL_MS);
                         // hadDisconnected is only ever true here on a
                         // post-drop resubscribe - an initial mount's first
                         // SUBSCRIBED (which runs before any error could have
