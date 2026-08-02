@@ -157,4 +157,40 @@ describe('Hand', () => {
         const zeroTabIndex = options.filter((o) => o.getAttribute('tabindex') === '0');
         expect(zeroTabIndex).toHaveLength(1);
     });
+
+    it('Test 9: the sort buttons carry the min-h-11 44px touch-target class', () => {
+        const { player, gameState } = buildFixture();
+        render(<Harness player={player} gameState={gameState} />);
+
+        const originalButton = screen.getByRole('button', { name: 'Original' });
+        expect(originalButton.className).toContain('min-h-11');
+    });
+
+    it('Test 10: the hand-area container carries the phone-width scroll-strip classes', () => {
+        const { player, gameState } = buildFixture();
+        render(<Harness player={player} gameState={gameState} />);
+
+        const listbox = screen.getByRole('listbox');
+        expect(listbox.className).toContain('max-sm:overflow-x-auto');
+        expect(listbox.className).toContain('max-sm:flex-nowrap');
+        expect(listbox.className).toContain('max-sm:snap-x');
+        expect(listbox.className).toContain('max-sm:snap-mandatory');
+    });
+
+    it('Test 11: a same-rank card wrapper class list contains mr-2 and an sm:-prefixed -mr-12, not an unqualified overlap', () => {
+        const { player, gameState } = buildFixture();
+        render(<Harness player={player} gameState={gameState} />);
+
+        // cardA and cardB are both rank 5 (adjacent in 'original' order), so
+        // cardA's wrapper is the "sameGroup" case only under rank/suit sort -
+        // sort by rank to exercise the sameGroup branch.
+        const rankButton = screen.getByRole('button', { name: 'Rank' });
+        fireEvent.click(rankButton);
+
+        const wrapper = document.querySelector('[data-card-key="card-a"]') as HTMLElement;
+        expect(wrapper.className).toContain('mr-2');
+        expect(wrapper.className).toContain('sm:-mr-12');
+        expect(wrapper.className).toContain('max-sm:shrink-0');
+        expect(wrapper.className).toContain('max-sm:snap-start');
+    });
 });
