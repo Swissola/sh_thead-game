@@ -7,13 +7,13 @@ const VARIANT_BORDER_CLASS: Record<ToastVariant, string> = {
     reconnect: 'border-green-500',
 };
 
-function VariantIcon({ variant }: { variant: ToastVariant }) {
+function VariantIcon({ variant }: Readonly<{ variant: ToastVariant }>) {
     if (variant === 'reconcile') return <RotateCcw size={16} className="text-amber-500 shrink-0" />;
     if (variant === 'reconnect') return <CheckCircle2 size={16} className="text-green-500 shrink-0" />;
     return null;
 }
 
-export function Toast({ toast, onDismiss }: { toast: ToastState | null; onDismiss: () => void }) {
+export function Toast({ toast, onDismiss }: Readonly<{ toast: ToastState | null; onDismiss: () => void }>) {
     if (!toast) return null;
 
     const variant: ToastVariant = toast.variant ?? 'error';
