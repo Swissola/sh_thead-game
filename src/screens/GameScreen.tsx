@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { HelpCircle, LogOut, RotateCw, WifiOff, X } from 'lucide-react';
 import * as GameLogic from '../gameLogic';
-import type { Card as CardType, CardSelection } from '../types';
+import type { Card as CardType, CardSelection, CardSource, Player } from '../types';
 import { Card } from '../components/Card';
 import DiscardPile from '../components/piles/DiscardPile';
 import DrawPile from '../components/piles/DrawPile';
@@ -12,6 +12,7 @@ import Hand from '../components/Hand';
 import { useGameContext } from '../context/GameContext';
 import { useSelection } from '../hooks/useSelection';
 import { useHandSorting } from '../hooks/useHandSorting';
+import type { HandSortMode } from '../hooks/useHandSorting';
 import { useTurnTimeoutSweep } from '../hooks/useTurnTimeoutSweep';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { TURN_GRACE_MS } from '../supabase/roomTypes';
@@ -22,6 +23,141 @@ const getOrdinalLabel = (n: number): string => {
   if (n === 3) return '3rd';
   return `${n}th`;
 };
+
+const stringifyLogArg = (arg: unknown): string => {
+  if (typeof arg !== 'object' || arg === null) {
+    return String(arg);
+  }
+  return JSON.stringify(arg, null, 2);
+};
+
+type DrawingCard = {
+  card: CardType;
+  id: string;
+  targetPos: { x: number; y: number };
+  startPos?: { x: number; y: number };
+};
+
+// Reorders selections to match the visual sort order before dispatch
+// (App.tsx:553-602 behavior, ported verbatim) - the sorted view becomes the
+// new "original" baseline. Only applies to hand-sourced plays.
+function reorderHandForPlay(
+  player: Player,
+  cardSource: CardSource,
+  handSortMode: HandSortMode,
+  selections: CardSelection[]
+): {
+  reorderedHand: (CardType | null)[] | undefined;
+  selections: CardSelection[];
+  didReorder: boolean;
+} {
+  if (cardSource !== 'hand' || handSortMode === 'original') {
+    return { reorderedHand: undefined, selections, didReorder: false };
+  }
+  const sorted = GameLogic.sortHand(player.hand, handSortMode);
+  const reorderedHand = sorted.map((s) => s.card);
+  const remapped = selections.map((sel) =>
+    sel.type === 'hand'
+      ? { ...sel, index: sorted.findIndex((s) => s.arrayIndex === sel.index) }
+      : sel
+  );
+  return { reorderedHand, selections: remapped, didReorder: true };
+}
+
+// Client-side mixed hand+faceUp pre-check, purely to decide whether it's
+// worth predicting a draw-animation - applyMove re-validates this
+// authoritatively regardless and rejects with INVALID_COMBINATION (surfaced
+// as a toast) if this pre-check was somehow wrong.
+function shouldSkipAnimationPrediction(
+  selections: CardSelection[],
+  effectiveHand: (CardType | null)[],
+  player: Player,
+  cardSource: CardSource,
+  deckLength: number,
+  discardPile: CardType[]
+): boolean {
+  const hasMixedSelection =
+    selections.some((s) => s.type === 'hand') && selections.some((s) => s.type === 'faceUp');
+  if (!hasMixedSelection) return false;
+
+  const handSelected = selections
+    .filter((s) => s.type === 'hand')
+    .map((s) => effectiveHand[s.index])
+    .filter((c): c is CardType => c !== null && c !== undefined);
+  const faceUpSelected = selections
+    .filter((s) => s.type === 'faceUp')
+    .map((s) => player.faceUp[s.index])
+    .filter((c): c is CardType => c !== null && c !== undefined);
+  const ok =
+    cardSource === 'hand' &&
+    GameLogic.canPlayMixedSources(deckLength, handSelected, faceUpSelected, discardPile);
+  return !ok;
+}
+
+// getCardsToDrawCount needs the hand as it will be AFTER this play (cards.ts's
+// applyMove does the same via preDrawPlayer) - passing the still-full
+// pre-play hand under-counts by however many hand cards are being played,
+// since the function only asks "how many more do I need to reach 3" from
+// whatever hand it's given. Returns null when nothing should animate.
+function computeDrawAnimation(
+  player: Player,
+  cardSource: CardSource,
+  effectiveHandForDraw: (CardType | null)[],
+  selections: CardSelection[],
+  deck: CardType[]
+): DrawingCard[] | null {
+  const postPlayHand =
+    cardSource === 'hand'
+      ? effectiveHandForDraw.map((c, idx) =>
+          selections.some((s) => s.type === 'hand' && s.index === idx) ? null : c
+        )
+      : player.hand;
+  const cardsToDraw = GameLogic.getCardsToDrawCount({ ...player, hand: postPlayHand }, deck.length);
+  if (cardsToDraw <= 0) return null;
+
+  const drawnCards = deck.slice(0, cardsToDraw);
+  const deckElement = document.querySelector('.draw-pile-card');
+  let deckPos = { x: window.innerWidth / 2, y: 100 };
+  if (deckElement) {
+    const deckRect = deckElement.getBoundingClientRect();
+    deckPos = { x: deckRect.left + deckRect.width / 2, y: deckRect.top + deckRect.height / 2 };
+  }
+
+  // Target the screen position of the hand slot each drawn card lands in,
+  // read BEFORE dispatch while the about-to-be-played cards are still
+  // rendered at their real positions. applyMove fills vacated hand slots in
+  // ascending index order (see applyMove.ts's PLAY_CARDS case), so the Nth
+  // played hand card's position is the Nth drawn card's landing spot. Falls
+  // back to the hand-area container, then a fixed point, when no hand card
+  // was played (faceUp/faceDown-only plays).
+  const playedHandCards =
+    cardSource === 'hand'
+      ? selections
+          .filter((s) => s.type === 'hand')
+          .map((s) => effectiveHandForDraw[s.index])
+          .filter((c): c is CardType => c !== null && c !== undefined)
+      : [];
+  const handSlotPositions = playedHandCards
+    .map((card) => document.querySelector(`[data-card-key="${card.id}"]`))
+    .filter((el): el is Element => el !== null)
+    .map((el) => {
+      const rect = el.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    });
+  const handAreaElement = document.querySelector('.hand-area');
+  let handAreaPos = { x: window.innerWidth / 2, y: window.innerHeight - 200 };
+  if (handAreaElement) {
+    const areaRect = handAreaElement.getBoundingClientRect();
+    handAreaPos = { x: areaRect.left + areaRect.width / 2, y: areaRect.top + areaRect.height / 2 };
+  }
+
+  return drawnCards.map((card, i) => ({
+    card,
+    id: `draw-${card.id}-${Date.now()}-${i}`,
+    targetPos: handSlotPositions[i] ?? handAreaPos,
+    startPos: deckPos,
+  }));
+}
 
 /**
  * Full game screen, extracted from pre-refactor App.tsx:1065-1498. Every
@@ -52,15 +188,9 @@ export function GameScreen({
   const { selectedCards, setSelectedCards, revealedFaceDown, setRevealedFaceDown } = useSelection();
   const { handSortMode, setHandSortMode } = useHandSorting('original');
   const [showRules, setShowRules] = useState(false);
-  const [drawingCards, setDrawingCards] = useState<
-    Array<{
-      card: CardType;
-      id: string;
-      targetPos: { x: number; y: number };
-      startPos?: { x: number; y: number };
-    }>
-  >([]);
-  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
+  const [drawingCards, setDrawingCards] = useState<DrawingCard[]>([]);
+  const [consoleLogs, setConsoleLogs] = useState<Array<{ id: number; text: string }>>([]);
+  const logIdCounterRef = useRef(0);
   const [pickUpConfirmation, setPickUpConfirmation] = useState<{
     show: boolean;
     playerIndex: number;
@@ -219,24 +349,22 @@ export function GameScreen({
     let updateScheduled = false;
     const pendingLogs: string[] = [];
 
+    const flushPendingLogs = () => {
+      setConsoleLogs((prev) => [
+        ...prev.slice(-Math.max(0, 50 - pendingLogs.length)),
+        ...pendingLogs.map((text) => ({ id: logIdCounterRef.current++, text })),
+      ]);
+      pendingLogs.length = 0;
+      updateScheduled = false;
+    };
+
     console.log = (...args: unknown[]) => {
       originalLog(...args);
-      const message = args
-        .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
-        .join(' ');
-
-      pendingLogs.push(message);
+      pendingLogs.push(args.map(stringifyLogArg).join(' '));
 
       if (!updateScheduled) {
         updateScheduled = true;
-        setTimeout(() => {
-          setConsoleLogs((prev) => [
-            ...prev.slice(-Math.max(0, 50 - pendingLogs.length)),
-            ...pendingLogs,
-          ]);
-          pendingLogs.length = 0;
-          updateScheduled = false;
-        }, 0);
+        setTimeout(flushPendingLogs, 0);
       }
     };
 
@@ -349,124 +477,39 @@ export function GameScreen({
 
     const cardSource = GameLogic.getAvailableCardSource(player);
 
-    let selections: CardSelection[] =
+    const initialSelections: CardSelection[] =
       revealedFaceDown && selectedCards.length === 0
         ? [{ type: 'faceDown', index: revealedFaceDown.index }]
         : [...selectedCards];
 
-    // Reorder hand to match the current visual sort order before dispatch
-    // (App.tsx:553-602) - the sorted view becomes the new "original"
-    // baseline. applyMove adopts reorderedHand as-is rather than reading
-    // handSortMode itself, which stays a presentation-only concern.
-    let reorderedHand: (CardType | null)[] | undefined;
-    if (cardSource === 'hand' && handSortMode !== 'original') {
-      const sorted = GameLogic.sortHand(player.hand, handSortMode);
-      reorderedHand = sorted.map((s) => s.card);
-      selections = selections.map((sel) =>
-        sel.type === 'hand'
-          ? { ...sel, index: sorted.findIndex((s) => s.arrayIndex === sel.index) }
-          : sel
-      );
-      setHandSortMode('original');
-    }
+    const { reorderedHand, selections, didReorder } = reorderHandForPlay(
+      player,
+      cardSource,
+      handSortMode,
+      initialSelections
+    );
+    if (didReorder) setHandSortMode('original');
 
-    // Client-side mixed hand+faceUp pre-check, purely to decide whether it's
-    // worth predicting a draw-animation - applyMove re-validates this
-    // authoritatively regardless and rejects with INVALID_COMBINATION
-    // (surfaced as a toast) if this pre-check was somehow wrong.
-    const hasMixedSelection =
-      selections.some((s) => s.type === 'hand') && selections.some((s) => s.type === 'faceUp');
-    let skipAnimationPrediction = false;
-    if (hasMixedSelection) {
-      const effectiveHand = reorderedHand ?? player.hand;
-      const handSelected = selections
-        .filter((s) => s.type === 'hand')
-        .map((s) => effectiveHand[s.index])
-        .filter((c): c is CardType => c !== null && c !== undefined);
-      const faceUpSelected = selections
-        .filter((s) => s.type === 'faceUp')
-        .map((s) => player.faceUp[s.index])
-        .filter((c): c is CardType => c !== null && c !== undefined);
-      const ok =
-        cardSource === 'hand' &&
-        GameLogic.canPlayMixedSources(
-          gameState.deck.length,
-          handSelected,
-          faceUpSelected,
-          gameState.discardPile
-        );
-      skipAnimationPrediction = !ok;
-    }
+    const effectiveHand = reorderedHand ?? player.hand;
+    const skipAnimationPrediction = shouldSkipAnimationPrediction(
+      selections,
+      effectiveHand,
+      player,
+      cardSource,
+      gameState.deck.length,
+      gameState.discardPile
+    );
 
     if (!skipAnimationPrediction) {
-      // getCardsToDrawCount needs the hand as it will be AFTER this play
-      // (cards.ts's applyMove does the same via preDrawPlayer) - passing
-      // the still-full pre-play hand under-counts by however many hand
-      // cards are being played, since the function only asks "how many
-      // more do I need to reach 3" from whatever hand it's given.
-      const effectiveHandForDraw = reorderedHand ?? player.hand;
-      const postPlayHand =
-        cardSource === 'hand'
-          ? effectiveHandForDraw.map((c, idx) =>
-              selections.some((s) => s.type === 'hand' && s.index === idx) ? null : c
-            )
-          : player.hand;
-      const cardsToDraw = GameLogic.getCardsToDrawCount(
-        { ...player, hand: postPlayHand },
-        gameState.deck.length
+      const drawingCardsResult = computeDrawAnimation(
+        player,
+        cardSource,
+        effectiveHand,
+        selections,
+        gameState.deck
       );
-      if (cardsToDraw > 0) {
-        const drawnCards = gameState.deck.slice(0, cardsToDraw);
-        const deckElement = document.querySelector('.draw-pile-card');
-        let deckPos = { x: window.innerWidth / 2, y: 100 };
-        if (deckElement) {
-          const deckRect = deckElement.getBoundingClientRect();
-          deckPos = {
-            x: deckRect.left + deckRect.width / 2,
-            y: deckRect.top + deckRect.height / 2,
-          };
-        }
-
-        // Target the screen position of the hand slot each drawn card
-        // lands in, read BEFORE dispatch while the about-to-be-played
-        // cards are still rendered at their real positions. applyMove
-        // fills vacated hand slots in ascending index order (see
-        // applyMove.ts's PLAY_CARDS case), so the Nth played hand
-        // card's position is the Nth drawn card's landing spot. Falls
-        // back to the hand-area container, then a fixed point, when no
-        // hand card was played (faceUp/faceDown-only plays).
-        const playedHandCards =
-          cardSource === 'hand'
-            ? selections
-                .filter((s) => s.type === 'hand')
-                .map((s) => effectiveHandForDraw[s.index])
-                .filter((c): c is CardType => c !== null && c !== undefined)
-            : [];
-        const handSlotPositions = playedHandCards
-          .map((card) => document.querySelector(`[data-card-key="${card.id}"]`))
-          .filter((el): el is Element => el !== null)
-          .map((el) => {
-            const rect = el.getBoundingClientRect();
-            return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-          });
-        const handAreaElement = document.querySelector('.hand-area');
-        let handAreaPos = { x: window.innerWidth / 2, y: window.innerHeight - 200 };
-        if (handAreaElement) {
-          const areaRect = handAreaElement.getBoundingClientRect();
-          handAreaPos = {
-            x: areaRect.left + areaRect.width / 2,
-            y: areaRect.top + areaRect.height / 2,
-          };
-        }
-
-        setDrawingCards(
-          drawnCards.map((card, i) => ({
-            card,
-            id: `draw-${card.id}-${Date.now()}-${i}`,
-            targetPos: handSlotPositions[i] ?? handAreaPos,
-            startPos: deckPos,
-          }))
-        );
+      if (drawingCardsResult) {
+        setDrawingCards(drawingCardsResult);
         setTimeout(() => setDrawingCards([]), 700);
       }
     }
@@ -480,6 +523,12 @@ export function GameScreen({
     setSelectedCards([]);
     setRevealedFaceDown(null);
   };
+
+  const playCardCount = revealedFaceDown && selectedCards.length === 0 ? 1 : selectedCards.length;
+  let playButtonLabel = 'Cards';
+  if (playCardCount > 0) {
+    playButtonLabel = `${playCardCount} Card${playCardCount > 1 ? 's' : ''}`;
+  }
 
   return (
     <>
@@ -495,6 +544,11 @@ export function GameScreen({
             ) {
               setSelectedCards([]);
             }
+          }
+        }}
+        onKeyDown={(e) => {
+          if (isSetupPhase && e.key === 'Escape') {
+            setSelectedCards([]);
           }
         }}
       >
@@ -545,10 +599,14 @@ export function GameScreen({
 
             {testMode && (
               <div className="mt-3 bg-green-900 border-2 border-green-500 rounded p-4">
-                <label className="text-white text-base font-bold mr-3 block mb-2">
+                <label
+                  htmlFor="control-player-select"
+                  className="text-white text-base font-bold mr-3 block mb-2"
+                >
                   🎮 CONTROL PLAYER:
                 </label>
                 <select
+                  id="control-player-select"
                   value={controllingPlayer}
                   onChange={(e) => {
                     setControllingPlayer(Number(e.target.value));
@@ -570,12 +628,14 @@ export function GameScreen({
           {showRules && (
             <div
               className="fixed inset-0 bg-black bg-opacity-75 flex items-start justify-center p-4 z-50 overflow-y-auto"
-              onClick={() => setShowRules(false)}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setShowRules(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setShowRules(false);
+              }}
             >
-              <div
-                className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl my-8 border-2 border-purple-500"
-                onClick={(e) => e.stopPropagation()}
-              >
+              <div className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl my-8 border-2 border-purple-500">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">
                     SH!THEAD RULES
@@ -673,6 +733,11 @@ export function GameScreen({
                 setSelectedCards([]);
               }
             }}
+            onKeyDown={(e) => {
+              if (isSetupPhase && e.key === 'Escape') {
+                setSelectedCards([]);
+              }
+            }}
           >
             {currentPlayer && (
               <div className="border-t-2 border-slate-700 pt-6">
@@ -736,14 +801,7 @@ export function GameScreen({
                         disabled={(!revealedFaceDown && selectedCards.length === 0) || !isMyTurn}
                         className="min-h-11 flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-500 disabled:hover:to-emerald-500"
                       >
-                        Play{' '}
-                        {(() => {
-                          const count =
-                            revealedFaceDown && selectedCards.length === 0
-                              ? 1
-                              : selectedCards.length;
-                          return count > 0 ? `${count} Card${count > 1 ? 's' : ''}` : 'Cards';
-                        })()}
+                        Play {playButtonLabel}
                       </button>
                       <button
                         onClick={pickUpPile}
@@ -788,6 +846,16 @@ export function GameScreen({
                     setSelectedCards([]);
                   }
                 }}
+                onKeyDown={(e) => {
+                  if (testMode && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setControllingPlayer(index);
+                    setSelectedCards([]);
+                  }
+                }}
+                role={testMode ? 'button' : undefined}
+                tabIndex={testMode ? 0 : undefined}
+                aria-pressed={testMode ? isControlling : undefined}
                 className={`rounded-lg p-3 border-2 transition-all ${
                   isControlling
                     ? 'bg-green-900 border-green-500 shadow-lg ring-2 ring-green-400'
@@ -837,9 +905,9 @@ export function GameScreen({
           <div className="mt-6 bg-slate-950 border-2 border-slate-700 rounded-lg p-4">
             <h3 className="text-sm font-semibold text-slate-400 mb-2">Console Output</h3>
             <div className="bg-black text-slate-300 text-xs font-mono rounded p-3 max-h-40 overflow-y-auto space-y-1">
-              {consoleLogs.map((log, i) => (
-                <div key={i} className="text-cyan-400">
-                  &gt; {log}
+              {consoleLogs.map((log) => (
+                <div key={log.id} className="text-cyan-400">
+                  &gt; {log.text}
                 </div>
               ))}
             </div>
