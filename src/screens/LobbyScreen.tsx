@@ -37,7 +37,7 @@ const TURN_TIMEOUT_OPTIONS_MS = [
  * (plan 02-10) rather than called here - a second call would open a second
  * Presence channel for the same room and double the heartbeat rate.
  */
-export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: string) => boolean }) {
+export function LobbyScreen({ isPlayerOffline }: Readonly<{ isPlayerOffline: (playerId: string) => boolean }>) {
     const { gameState, playerId, applyServerRoom, showToast, dispatchMove } = useGameContext();
     const [copied, setCopied] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
@@ -178,7 +178,7 @@ export function LobbyScreen({ isPlayerOffline }: { isPlayerOffline: (playerId: s
                         </select>
                     ) : (
                         <span className="text-white font-semibold">
-                            {gameState ? gameState.turnTimeoutMs / 1000 : 0}s
+                            {(gameState?.turnTimeoutMs ?? 0) / 1000}s
                         </span>
                     )}
                 </div>
