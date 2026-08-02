@@ -161,7 +161,7 @@ Plans:
   4. A player can select and play cards using only the keyboard
   5. Turn changes are announced and modals trap focus properly for screen reader/keyboard users
 
-**Plans:** 3/8 plans executed
+**Plans:** 5/8 plans executed
 **UI hint**: yes
 
 Plans:
@@ -173,8 +173,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 03-03-PLAN.md — Hand as a multi-selectable listbox, 44px sort buttons, phone-width scroll-snap strip with the same-rank overlap removed
-- [ ] 03-04-PLAN.md — Table split into two listboxes: multi-select face-up, single-select face-down
+- [x] 03-03-PLAN.md — Hand as a multi-selectable listbox, 44px sort buttons, phone-width scroll-snap strip with the same-rank overlap removed
+- [x] 03-04-PLAN.md — Table split into two listboxes: multi-select face-up, single-select face-down
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -257,7 +257,7 @@ rework lands).
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
 | 2. Real Cross-Device Multiplayer | 19/19 | Complete    | 2026-08-01 |
-| 3. Responsive UI | 3/8 | In Progress|  |
+| 3. Responsive UI | 5/8 | In Progress|  |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
 | 6. Visual/Gameplay Polish | 0/TBD | Not started | - |
