@@ -44,9 +44,7 @@ async function resolvePlayerIdentity(): Promise<PlayerIdentityResult> {
  * than once concurrently.
  */
 export function ensurePlayerIdentity(): Promise<PlayerIdentityResult> {
-  if (!inFlight) {
-    inFlight = resolvePlayerIdentity();
-  }
+  inFlight ??= resolvePlayerIdentity();
   return inFlight;
 }
 
