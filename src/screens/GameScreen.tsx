@@ -767,18 +767,20 @@ export function GameScreen({
                 <h3 className="text-white font-bold mb-3">{currentPlayer.name}'s Cards</h3>
 
                 <div className="grid grid-cols-[auto_1fr] gap-8 mb-4 max-sm:grid-cols-1 max-sm:gap-4">
-                  <Table
-                    gameState={gameState}
-                    currentPlayer={currentPlayer}
-                    isSetupPhase={isSetupPhase}
-                    isMyTurn={isMyTurn}
-                    selectedCards={selectedCards}
-                    setSelectedCards={setSelectedCards}
-                    revealedFaceDown={revealedFaceDown}
-                    setRevealedFaceDown={setRevealedFaceDown}
-                  />
+                  <div className="max-sm:order-2">
+                    <Table
+                      gameState={gameState}
+                      currentPlayer={currentPlayer}
+                      isSetupPhase={isSetupPhase}
+                      isMyTurn={isMyTurn}
+                      selectedCards={selectedCards}
+                      setSelectedCards={setSelectedCards}
+                      revealedFaceDown={revealedFaceDown}
+                      setRevealedFaceDown={setRevealedFaceDown}
+                    />
+                  </div>
 
-                  <div className="grid grid-cols-[160px_100px_1fr] gap-12 items-start max-sm:flex max-sm:flex-wrap max-sm:justify-center max-sm:gap-4">
+                  <div className="grid grid-cols-[160px_100px_1fr] gap-12 items-start max-sm:order-1 max-sm:flex max-sm:flex-wrap max-sm:justify-center max-sm:gap-4">
                     <DiscardPile discardPile={gameState.discardPile} />
                     <DrawPile deck={gameState.deck} />
                     <BurnPile burnPile={gameState.burnPile} />
