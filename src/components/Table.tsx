@@ -11,6 +11,121 @@ interface RevealedFaceDown {
     index: number;
 }
 
+function computeFaceUpPlayability(
+    card: Card,
+    isSetupPhase: boolean,
+    isMyTurn: boolean,
+    currentSource: ReturnType<typeof GameLogic.getAvailableCardSource>,
+    gameState: GameState,
+    resolvedFaceUpSelection: Card[]
+): { isPlayable: boolean; facePlayability: CardPlayability | null } {
+    if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
+        const facePlayability = getCardPlayability(card, gameState.discardPile, resolvedFaceUpSelection);
+        return { isPlayable: facePlayability.isPlayable, facePlayability };
+    }
+    return { isPlayable: true, facePlayability: null };
+}
+
+function computeFaceUpTooltip(
+    isSetupPhase: boolean,
+    isMyTurn: boolean,
+    revealedFaceDown: RevealedFaceDown | null,
+    currentSource: ReturnType<typeof GameLogic.getAvailableCardSource>,
+    facePlayability: CardPlayability | null,
+    deckEmpty: boolean,
+    canCombineWithHand: boolean
+): string | undefined {
+    if (isSetupPhase) return undefined;
+    if (!isMyTurn) return 'Not your turn';
+    if (revealedFaceDown) return 'Revealing a face-down card';
+    if (currentSource === 'faceUp') return facePlayability?.tooltip;
+    if (!deckEmpty) return 'Cannot combine while deck has cards';
+    if (currentSource !== 'hand') return 'Combine only when selecting from your hand';
+    if (!canCombineWithHand) return 'Combine requires matching ranks';
+    return undefined;
+}
+
+function handleFaceUpClick(
+    i: number,
+    isSetupPhase: boolean,
+    isMyTurn: boolean,
+    currentSource: ReturnType<typeof GameLogic.getAvailableCardSource>,
+    canCombineWithHand: boolean,
+    currentPlayer: Player,
+    selectedCards: CardSelection[],
+    resolvedFaceUpSelection: Card[],
+    gameState: GameState,
+    setSelectedCards: (sel: CardSelection[]) => void,
+    dispatchMove: ReturnType<typeof useGameContext>['dispatchMove'],
+    currentPlayerId: string
+): void {
+    if (isSetupPhase) {
+        const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
+
+        if (alreadySelected >= 0) {
+            setSelectedCards([]);
+        } else if (selectedCards.length === 1 && selectedCards[0].type === 'hand') {
+            dispatchMove({
+                type: 'SWAP_CARDS',
+                playerId: currentPlayerId,
+                sourceA: 'hand',
+                indexA: selectedCards[0].index,
+                sourceB: 'faceUp',
+                indexB: i,
+            });
+            setSelectedCards([]);
+        } else if (selectedCards.length === 1 && selectedCards[0].type === 'faceUp') {
+            dispatchMove({
+                type: 'SWAP_CARDS',
+                playerId: currentPlayerId,
+                sourceA: 'faceUp',
+                indexA: selectedCards[0].index,
+                sourceB: 'faceUp',
+                indexB: i,
+            });
+            setSelectedCards([]);
+        } else {
+            setSelectedCards([{ type: 'faceUp', index: i }]);
+        }
+        return;
+    }
+
+    if (isMyTurn && currentSource === 'faceUp') {
+        const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
+        if (alreadySelected >= 0) {
+            setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
+        } else {
+            const clickedCard = currentPlayer.faceUp[i];
+            if (clickedCard && GameLogic.canAddToSelection(clickedCard, resolvedFaceUpSelection)) {
+                setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
+            }
+        }
+        return;
+    }
+
+    if (isMyTurn && canCombineWithHand) {
+        const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
+        if (alreadySelected >= 0) {
+            setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
+        } else {
+            const clickedCard = currentPlayer.faceUp[i];
+            if (!clickedCard) return;
+            const handCards = selectedCards
+                .filter((s) => s.type === 'hand')
+                .map((s) => currentPlayer.hand[s.index])
+                .filter((c): c is Card => c !== null);
+            const faceUpCards = selectedCards
+                .filter((s) => s.type === 'faceUp')
+                .map((s) => currentPlayer.faceUp[s.index])
+                .filter((c): c is Card => c !== null);
+            const ok = GameLogic.canPlayMixedSources(0, handCards, [...faceUpCards, clickedCard], gameState.discardPile);
+            if (ok) {
+                setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
+            }
+        }
+    }
+}
+
 interface TableProps {
     gameState: GameState;
     currentPlayer: Player;
@@ -41,13 +156,13 @@ const Table: React.FC<TableProps> = ({
     // list is explicit that merging them into a single listbox would let a
     // keyboard user select two face-down cards, which the mouse UI has never
     // permitted (D-03).
-    const faceUpCount = currentPlayer?.faceUp ? currentPlayer.faceUp.filter((c) => c !== null).length : 0;
+    const faceUpCount = currentPlayer?.faceUp?.filter((c) => c !== null).length ?? 0;
     const {
         containerRef: faceUpContainerRef,
         onKeyDown: faceUpOnKeyDown,
         getItemProps: getFaceUpItemProps,
     } = useRovingTabindex(faceUpCount);
-    const faceDownCount = currentPlayer?.faceDown ? currentPlayer.faceDown.filter((c) => c !== null).length : 0;
+    const faceDownCount = currentPlayer?.faceDown?.filter((c) => c !== null).length ?? 0;
     const {
         containerRef: faceDownContainerRef,
         onKeyDown: faceDownOnKeyDown,
@@ -155,29 +270,8 @@ const Table: React.FC<TableProps> = ({
                                     GameLogic.canPlayMixedSources(0, selectedHandCards as Card[], [card], gameState.discardPile);
 
                                 // WR-04: shared with Hand.tsx's non-first-turn branch - see uiLogic.ts.
-                                let isPlayable = true;
-                                let facePlayability: CardPlayability | null = null;
-                                if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
-                                    facePlayability = getCardPlayability(card, gameState.discardPile, resolvedFaceUpSelection);
-                                    isPlayable = facePlayability.isPlayable;
-                                }
-
-                                let tooltip: string | undefined;
-                                if (!isSetupPhase) {
-                                    if (!isMyTurn) {
-                                        tooltip = 'Not your turn';
-                                    } else if (revealedFaceDown) {
-                                        tooltip = 'Revealing a face-down card';
-                                    } else if (currentSource === 'faceUp') {
-                                        tooltip = facePlayability?.tooltip;
-                                    } else if (!deckEmpty) {
-                                        tooltip = 'Cannot combine while deck has cards';
-                                    } else if (currentSource !== 'hand') {
-                                        tooltip = 'Combine only when selecting from your hand';
-                                    } else if (!canCombineWithHand) {
-                                        tooltip = 'Combine requires matching ranks';
-                                    }
-                                }
+                                const { isPlayable, facePlayability } = computeFaceUpPlayability(card, isSetupPhase, isMyTurn, currentSource, gameState, resolvedFaceUpSelection);
+                                const tooltip = computeFaceUpTooltip(isSetupPhase, isMyTurn, revealedFaceDown, currentSource, facePlayability, deckEmpty, canCombineWithHand);
 
                                 const faceUpSelectable =
                                     (isSetupPhase && !revealedFaceDown) ||
@@ -198,67 +292,7 @@ const Table: React.FC<TableProps> = ({
                                             ariaSelected={isFaceUpSelected}
                                             ariaLabel={tooltip}
                                             {...getFaceUpItemProps(optionPosition)}
-                                            onClick={() => {
-                                                if (isSetupPhase) {
-                                                    const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
-
-                                                    if (alreadySelected >= 0) {
-                                                        setSelectedCards([]);
-                                                    } else if (selectedCards.length === 1 && selectedCards[0].type === 'hand') {
-                                                        dispatchMove({
-                                                            type: 'SWAP_CARDS',
-                                                            playerId: currentPlayerId,
-                                                            sourceA: 'hand',
-                                                            indexA: selectedCards[0].index,
-                                                            sourceB: 'faceUp',
-                                                            indexB: i,
-                                                        });
-                                                        setSelectedCards([]);
-                                                    } else if (selectedCards.length === 1 && selectedCards[0].type === 'faceUp') {
-                                                        dispatchMove({
-                                                            type: 'SWAP_CARDS',
-                                                            playerId: currentPlayerId,
-                                                            sourceA: 'faceUp',
-                                                            indexA: selectedCards[0].index,
-                                                            sourceB: 'faceUp',
-                                                            indexB: i,
-                                                        });
-                                                        setSelectedCards([]);
-                                                    } else {
-                                                        setSelectedCards([{ type: 'faceUp', index: i }]);
-                                                    }
-                                                } else if (!isSetupPhase && isMyTurn && currentSource === 'faceUp') {
-                                                    const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
-                                                    if (alreadySelected >= 0) {
-                                                        setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
-                                                    } else {
-                                                        const clickedCard = currentPlayer.faceUp[i];
-                                                        if (clickedCard && GameLogic.canAddToSelection(clickedCard, resolvedFaceUpSelection)) {
-                                                            setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
-                                                        }
-                                                    }
-                                                } else if (!isSetupPhase && isMyTurn && canCombineWithHand) {
-                                                    const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
-                                                    if (alreadySelected >= 0) {
-                                                        setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
-                                                    } else {
-                                                        const clickedCard = currentPlayer.faceUp[i];
-                                                        if (!clickedCard) return;
-                                                        const handCards = selectedCards
-                                                            .filter((s) => s.type === 'hand')
-                                                            .map((s) => currentPlayer.hand[s.index])
-                                                            .filter((c): c is Card => c !== null);
-                                                        const faceUpCards = selectedCards
-                                                            .filter((s) => s.type === 'faceUp')
-                                                            .map((s) => currentPlayer.faceUp[s.index])
-                                                            .filter((c): c is Card => c !== null);
-                                                        const ok = GameLogic.canPlayMixedSources(0, handCards, [...faceUpCards, clickedCard], gameState.discardPile);
-                                                        if (ok) {
-                                                            setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
-                                                        }
-                                                    }
-                                                }
-                                            }}
+                                            onClick={() => handleFaceUpClick(i, isSetupPhase, isMyTurn, currentSource, canCombineWithHand, currentPlayer, selectedCards, resolvedFaceUpSelection, gameState, setSelectedCards, dispatchMove, currentPlayerId)}
                                         />
                                     </div>
                                 );
