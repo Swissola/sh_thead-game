@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { applyMove } from '../engine/applyMove';
 import type { Move } from '../engine/moves';
 import type { GameState } from '../types';
@@ -40,7 +40,7 @@ export interface GameContextValue {
 
 const GameContext = createContext<GameContextValue | null>(null);
 
-export function GameProvider({ playerId, children }: { playerId: string; children: ReactNode }) {
+export function GameProvider({ playerId, children }: Readonly<{ playerId: string; children: ReactNode }>) {
     const [gameState, setGameStateInternal] = useState<GameState | null>(null);
     const [testMode, setTestMode] = useState(false);
     const [controllingPlayer, setControllingPlayer] = useState(0);
@@ -195,25 +195,44 @@ export function GameProvider({ playerId, children }: { playerId: string; childre
         showToast("Your move didn't stick - synced with the latest game state.", 'RECONCILED', 'reconcile');
     }, [showToast]);
 
-    const value: GameContextValue = {
-        gameState,
-        dispatchMove,
-        setGameState,
-        applyServerRoom,
-        notifyReconciled,
-        roomVersion,
-        turnStartedAt,
-        hasPendingMove,
-        toast,
-        showToast,
-        dismissToast,
-        currentPlayerId,
-        playerId,
-        testMode,
-        setTestMode,
-        controllingPlayer,
-        setControllingPlayer,
-    };
+    const value: GameContextValue = useMemo(
+        () => ({
+            gameState,
+            dispatchMove,
+            setGameState,
+            applyServerRoom,
+            notifyReconciled,
+            roomVersion,
+            turnStartedAt,
+            hasPendingMove,
+            toast,
+            showToast,
+            dismissToast,
+            currentPlayerId,
+            playerId,
+            testMode,
+            setTestMode,
+            controllingPlayer,
+            setControllingPlayer,
+        }),
+        [
+            gameState,
+            dispatchMove,
+            setGameState,
+            applyServerRoom,
+            notifyReconciled,
+            roomVersion,
+            turnStartedAt,
+            hasPendingMove,
+            toast,
+            showToast,
+            dismissToast,
+            currentPlayerId,
+            playerId,
+            testMode,
+            controllingPlayer,
+        ]
+    );
 
     return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }
