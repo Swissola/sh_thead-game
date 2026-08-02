@@ -929,4 +929,374 @@ describe('GameScreen', () => {
       expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
   });
+
+  describe('turn announcer live region (RESP-05, D-05)', () => {
+    it('is present with role="status" and aria-live="polite" during the playing phase, even before any turn change', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      const region = await screen.findByRole('status');
+      expect(region).toHaveAttribute('aria-live', 'polite');
+    });
+
+    it('is present with empty text during the setup phase - never conditionally unmounted', async () => {
+      const state = buildGameState({
+        phase: 'setup',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      const region = await screen.findByRole('status');
+      expect(region).toHaveTextContent('');
+    });
+
+    it('announces "Your turn" when currentTurn points at the local player', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent('Your turn');
+      });
+    });
+
+    it("announces \"Bob's turn\" when currentTurn points at another player named Bob", async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 1,
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent("Bob's turn");
+      });
+    });
+
+    it('does not rewrite the announcement text on a re-render that does not change currentTurn', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        lastAction: 'initial',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      function Harness() {
+        const { gameState, setGameState } = useGameContext();
+        return (
+          <button
+            onClick={() => {
+              if (!gameState) return;
+              void setGameState({ ...gameState, lastAction: 'unrelated update' });
+            }}
+          >
+            Trigger unrelated re-render
+          </button>
+        );
+      }
+
+      render(
+        <GameProvider playerId="test-player">
+          <SeedGameState state={state} />
+          <GameScreen />
+          <Harness />
+          <Probe />
+        </GameProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent('Your turn');
+      });
+
+      fireEvent.click(screen.getByText('Trigger unrelated re-render'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('probe')).toHaveTextContent('phase:playing');
+      });
+      expect(screen.getByText('unrelated update')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Your turn');
+    });
+
+    it('replaces the announcement text on a real turn transition from index 0 to index 1', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      function Harness() {
+        const { gameState, setGameState } = useGameContext();
+        return (
+          <button
+            onClick={() => {
+              if (!gameState) return;
+              void setGameState({ ...gameState, currentTurn: 1 });
+            }}
+          >
+            Advance turn
+          </button>
+        );
+      }
+
+      render(
+        <GameProvider playerId="test-player">
+          <SeedGameState state={state} />
+          <GameScreen />
+          <Harness />
+          <Probe />
+        </GameProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent('Your turn');
+      });
+
+      fireEvent.click(screen.getByText('Advance turn'));
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent("Bob's turn");
+      });
+    });
+  });
+
+  describe('celebration modal as a focus-trapped dialog (RESP-05, D-06, D-07)', () => {
+    /** Two players, both with cards - finishing player at `playerIndex` via
+     * the harness button triggers isGameOver (only one player left with
+     * cards), which opens the SH!THEAD! (loser) celebration variant. */
+    function twoPlayerState() {
+      return buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        deck: [],
+        discardPile: [],
+        players: [
+          buildPlayer({
+            id: 'test-player',
+            name: 'Alice',
+            hand: [buildCard({ id: 'hand-0', rank: '5', suit: '♠' })],
+          }),
+          buildPlayer({
+            id: 'p1',
+            name: 'Bob',
+            hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })],
+          }),
+        ],
+      });
+    }
+
+    /** Three players, all with cards - finishing player at `playerIndex`
+     * leaves two players still holding cards, so isGameOver stays false and
+     * the SAFE! (finished, not last) celebration variant opens instead. */
+    function threePlayerState() {
+      return buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        deck: [],
+        discardPile: [],
+        players: [
+          buildPlayer({
+            id: 'test-player',
+            name: 'Alice',
+            hand: [buildCard({ id: 'hand-0', rank: '5', suit: '♠' })],
+          }),
+          buildPlayer({
+            id: 'p1',
+            name: 'Bob',
+            hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })],
+          }),
+          buildPlayer({
+            id: 'p2',
+            name: 'Charlie',
+            hand: [buildCard({ id: 'charlie-0', rank: 'K', suit: '♣' })],
+          }),
+        ],
+      });
+    }
+
+    /** Renders GameScreen plus a trigger button that clears one player's
+     * hand/faceUp/faceDown, driving the pre-existing celebration effect
+     * (App.tsx:103-143's port) without going through a real PLAY_CARDS
+     * dispatch. `focusTriggerFirst` optionally focuses the trigger button
+     * before it's clicked, so tests can assert focus-return to it later. */
+    function renderWithCelebrationTrigger(
+      playerId: string,
+      state: ReturnType<typeof buildGameState>,
+      finishPlayerIndex: number
+    ) {
+      function TriggerHarness() {
+        const { gameState, setGameState } = useGameContext();
+        return (
+          <button
+            onClick={() => {
+              if (!gameState) return;
+              const players = gameState.players.map((p, i) =>
+                i === finishPlayerIndex ? { ...p, hand: [], faceUp: [], faceDown: [] } : p
+              );
+              void setGameState({ ...gameState, players });
+            }}
+          >
+            Finish player {finishPlayerIndex}
+          </button>
+        );
+      }
+
+      const { unmount } = render(
+        <GameProvider playerId={playerId}>
+          <SeedGameState state={state} />
+          <GameScreen />
+          <TriggerHarness />
+          <Probe />
+        </GameProvider>
+      );
+
+      return {
+        triggerButton: screen.getByRole('button', { name: `Finish player ${finishPlayerIndex}` }),
+        unmount,
+      };
+    }
+
+    it('is a role="dialog" with aria-modal="true" and no role="alert"/aria-live="assertive" when open', async () => {
+      const state = twoPlayerState();
+      const { triggerButton } = renderWithCelebrationTrigger('test-player', state, 1);
+      await screen.findByText('Hand');
+
+      fireEvent.click(triggerButton);
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveAttribute('aria-modal', 'true');
+      expect(dialog).not.toHaveAttribute('role', 'alert');
+      expect(dialog).not.toHaveAttribute('aria-live', 'assertive');
+    });
+
+    it("resolves the dialog's accessible name via aria-labelledby to the visible heading - SH!THEAD! for the loser variant, SAFE! for the finished variant", async () => {
+      const loserState = twoPlayerState();
+      const { triggerButton: loserTrigger, unmount } = renderWithCelebrationTrigger(
+        'test-player',
+        loserState,
+        1
+      );
+      await screen.findByText('Hand');
+      fireEvent.click(loserTrigger);
+      const loserDialog = await screen.findByRole('dialog', { name: 'SH!THEAD!' });
+      expect(loserDialog).toBeInTheDocument();
+      unmount();
+
+      const safeState = threePlayerState();
+      const { triggerButton: safeTrigger } = renderWithCelebrationTrigger(
+        'test-player',
+        safeState,
+        1
+      );
+      await screen.findAllByText('Hand');
+      fireEvent.click(safeTrigger);
+      const safeDialog = await screen.findByRole('dialog', { name: 'SAFE!' });
+      expect(safeDialog).toBeInTheDocument();
+    });
+
+    it('moves focus to the Dismiss button on open', async () => {
+      const state = twoPlayerState();
+      const { triggerButton } = renderWithCelebrationTrigger('test-player', state, 1);
+      await screen.findByText('Hand');
+
+      fireEvent.click(triggerButton);
+
+      await waitFor(() => {
+        expect(document.activeElement).toHaveAttribute('aria-label', 'Dismiss');
+      });
+    });
+
+    it('dismisses on Escape - the modal leaves the DOM', async () => {
+      const state = twoPlayerState();
+      const { triggerButton } = renderWithCelebrationTrigger('test-player', state, 1);
+      await screen.findByText('Hand');
+
+      fireEvent.click(triggerButton);
+      await screen.findByRole('dialog');
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+    });
+
+    it('keeps Tab focus inside the dialog - it never lands on a board element behind it', async () => {
+      const state = twoPlayerState();
+      const { triggerButton } = renderWithCelebrationTrigger('test-player', state, 1);
+      await screen.findByText('Hand');
+
+      fireEvent.click(triggerButton);
+      await waitFor(() => {
+        expect(document.activeElement).toHaveAttribute('aria-label', 'Dismiss');
+      });
+
+      fireEvent.keyDown(document, { key: 'Tab' });
+
+      expect(document.activeElement).toHaveAttribute('aria-label', 'Dismiss');
+      expect(document.activeElement).not.toBe(triggerButton);
+    });
+
+    it('returns focus to the pre-open element after the dialog closes', async () => {
+      const state = twoPlayerState();
+      const { triggerButton } = renderWithCelebrationTrigger('test-player', state, 1);
+      await screen.findByText('Hand');
+
+      triggerButton.focus();
+      fireEvent.click(triggerButton);
+      await waitFor(() => {
+        expect(document.activeElement).toHaveAttribute('aria-label', 'Dismiss');
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(document.activeElement).toBe(triggerButton);
+      });
+    });
+
+    it('still dismisses on a click of the Dismiss button - the existing mouse path is unregressed', async () => {
+      const state = twoPlayerState();
+      const { triggerButton } = renderWithCelebrationTrigger('test-player', state, 1);
+      await screen.findByText('Hand');
+
+      fireEvent.click(triggerButton);
+      const dismissButton = await screen.findByRole('button', { name: 'Dismiss' });
+
+      fireEvent.click(dismissButton);
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+    });
+  });
 });
