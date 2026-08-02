@@ -21,7 +21,7 @@ created: 2026-08-01
 | **Config file** | `vite.config.ts` (test config colocated with Vite config) |
 | **Quick run command** | `npm test -- --run src/__tests__/components` (scoped to touched files during a task) |
 | **Full suite command** | `npm test -- --run` |
-| **Estimated runtime** | ~30 seconds (478 tests per STATE.md) |
+| **Estimated runtime** | ~6 seconds (572 tests as of plan 03-08's Task 1 gate run, up from the 478 baseline recorded at Phase 02 close) |
 
 Note: `@testing-library/user-event` is not installed. Not a blocker — this phase's focus-trap and roving-tabindex logic are hand-rolled `onKeyDown` handlers, so `fireEvent.keyDown(element, { key: 'Tab' | 'ArrowRight' | ' ' })` against the focused element plus asserting `document.activeElement` is sufficient and matches this project's existing `fireEvent`-based test style.
 
@@ -40,21 +40,28 @@ Note: `@testing-library/user-event` is not installed. Not a blocker — this pha
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 03-01-01 | TBD | 0 | RESP-01 | — | Hand/table reflow below `sm` applies `max-sm:` classes, no overflow | unit (className assertion) | `npm test -- --run src/__tests__/components/Hand.test.tsx` | ❌ Wave 0 | ⬜ pending |
-| 03-01-02 | TBD | 0 | RESP-02 | — | Keyboard-focused card exposes playability text via `aria-label`/`aria-describedby`; face-down cards get no rank/suit exposure | unit (a11y attribute assertion) | `npm test -- --run src/__tests__/components/Card.test.tsx` | ❌ Wave 0 | ⬜ pending |
-| 03-01-03 | TBD | 0 | RESP-03 | — | Sort buttons and audited controls compute to ≥44px (`min-h-11`/`min-w-11`) | unit (className/computed-style assertion) | `npm test -- --run src/__tests__/components/Hand.test.tsx` | ❌ Wave 0 | ⬜ pending |
-| 03-01-04 | TBD | 1+ | RESP-04 | — | ArrowRight/Left moves roving focus without changing selection; Space/Enter toggles focused card's selection; face-down listbox rejects a second simultaneous selection | integration (`fireEvent.keyDown` round-trip via `applyMove`) | `npm test -- --run src/__tests__/screens/GameScreen.test.tsx` | ✅ (extend existing harness) | ⬜ pending |
-| 03-01-05 | TBD | 1+ | RESP-05 | — | Turn change updates always-mounted live-region text; Escape closes celebration modal and returns focus to trigger; Tab wraps within modal | integration + manual (AT announcement is manual-only) | `npm test -- --run src/__tests__/screens/GameScreen.test.tsx` | ✅ (extend existing harness) | ⬜ pending |
+| 03-03-02 | 03-03 | 2 | RESP-01 | — | Below-640px hand becomes a horizontally scroll-snapping strip with same-rank overlap removed; no overflow | unit (className assertion) | `npm test -- --run src/__tests__/components/Hand.test.tsx` | ✅ | ✅ green |
+| 03-02-02 | 03-02 | 1 | RESP-02 | — | Keyboard focus reveals playability text immediately via the existing tooltip mechanism; face-down cards get no rank/suit exposure | unit (a11y attribute assertion) | `npm test -- --run src/__tests__/components/Card.test.tsx` | ✅ | ✅ green |
+| 03-03-02 | 03-03 | 2 | RESP-03 | — | Hand-sort buttons grow to `min-h-11` (≥44px) | unit (className assertion) | `npm test -- --run src/__tests__/components/Hand.test.tsx` | ✅ | ✅ green |
+| 03-03-01 | 03-03 | 2 | RESP-04 | — | ArrowRight/Left moves roving focus across the hand without changing selection; Space/Enter toggles the focused card's selection | integration (`fireEvent.keyDown` round-trip via `applyMove`) | `npm test -- --run src/__tests__/components/Hand.test.tsx` | ✅ | ✅ green |
+| 03-05-01/02 | 03-05 | 3 | RESP-05 | T-03-02 | Turn change updates always-mounted live-region text; Escape closes celebration modal and returns focus to trigger; Tab wraps within modal | integration + manual (AT announcement is manual-only, see Task 2) | `npm test -- --run src/__tests__/screens/GameScreen.test.tsx` | ✅ | ✅ green |
+| 03-01-01 | 03-01 | 1 | RESP-04 | — | `useRovingTabindex` generic hook: arrow/Home/End navigation, no-wraparound, single `tabIndex=0` invariant, shrink-under-cursor regression (Pitfall 1) | unit | `npm test -- --run src/__tests__/hooks/useRovingTabindex.test.tsx` | ✅ | ✅ green |
+| 03-01-02 | 03-01 | 1 | RESP-05 | — | `useFocusTrap` generic hook: initial focus, Tab wrap forward/backward, Escape callback, focus-return on unmount | unit | `npm test -- --run src/__tests__/hooks/useFocusTrap.test.tsx` | ✅ | ✅ green |
+| 03-02-01 | 03-02 | 1 | RESP-02, RESP-04 | T-03-01 | Card gains `role="option"`, Enter/Space activation through the existing `onClick`; face-down `aria-label` never exposes rank/suit | unit (a11y attribute assertion, blind-play scan) | `npm test -- --run src/__tests__/components/Card.test.tsx` | ✅ | ✅ green |
+| 03-04-01 | 03-04 | 2 | RESP-04 | — | Face-up pile is a multi-selectable listbox; same-rank keyboard multi-select via Space | integration | `npm test -- --run src/__tests__/components/Table.test.tsx` | ✅ | ✅ green |
+| 03-04-02 | 03-04 | 2 | RESP-04 | T-03-01 | Face-down pile is a strictly single-select listbox; fixed `aria-label="Face-down card"` regardless of the card underneath (blind-play invariant) | integration (`innerHTML` blind-play scan) | `npm test -- --run src/__tests__/components/Table.test.tsx` | ✅ | ✅ green |
+| 03-06-01/02 | 03-06 | 1 | RESP-01, RESP-03 | — | Every LobbyScreen interactive control resolves to ≥44px; room-code/auto-pickup/player rows wrap instead of overflow at 375px | unit (className assertion) | `npm test -- --run src/__tests__/screens/LobbyScreen.test.tsx` | ✅ | ✅ green |
+| 03-07-01/02 | 03-07 | 4 | RESP-01, RESP-03 | — | Game board reflows below `sm` (Table stacks over piles, piles wrap, player tiles single-column); eleven remaining controls grow to ≥44px | unit (className assertion) | `npm test -- --run src/__tests__/screens/GameScreen.test.tsx` | ✅ | ✅ green |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status legend: ⬜=not yet run · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `src/__tests__/components/Hand.test.tsx` — dedicated component test file (Hand is currently only exercised indirectly via `GameScreen.test.tsx`); needed for RESP-01/03 className-level assertions without re-mounting full GameScreen
-- [ ] `src/__tests__/components/Card.test.tsx` — dedicated component test file for RESP-02/04 per-card ARIA attribute assertions (`role="option"`, `aria-selected`, `tabIndex`, `aria-label`)
-- [ ] `src/__tests__/components/Table.test.tsx` — same rationale for the face-up/face-down listbox split (RESP-04, D-03)
+- [x] `src/__tests__/components/Hand.test.tsx` — dedicated component test file (Hand is currently only exercised indirectly via `GameScreen.test.tsx`); needed for RESP-01/03 className-level assertions without re-mounting full GameScreen. Created in 03-03 (11 tests).
+- [x] `src/__tests__/components/Card.test.tsx` — dedicated component test file for RESP-02/04 per-card ARIA attribute assertions (`role="option"`, `aria-selected`, `tabIndex`, `aria-label`). Created in 03-02 (15 tests).
+- [x] `src/__tests__/components/Table.test.tsx` — same rationale for the face-up/face-down listbox split (RESP-04, D-03). Created in 03-04 (16 tests).
 - No framework install needed — Vitest/RTL already fully configured
 
 ---
