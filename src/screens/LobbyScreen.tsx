@@ -59,7 +59,7 @@ export function LobbyScreen({ isPlayerOffline }: Readonly<{ isPlayerOffline: (pl
     };
 
     const startGame = async () => {
-        if (!gameState || gameState.host !== playerId || gameState.players.length < 2) return;
+        if (gameState?.host !== playerId || (gameState?.players.length ?? 0) < 2) return;
 
         try {
             const { data, error } = await getSupabaseClient().functions.invoke('start-game', {
@@ -89,7 +89,7 @@ export function LobbyScreen({ isPlayerOffline }: Readonly<{ isPlayerOffline: (pl
     // try/catch - dispatchMove already owns its own full
     // submit-and-toast-on-failure lifecycle (via useGameStateUpdater).
     const setTurnTimeout = (timeoutMs: number) => {
-        if (!gameState || gameState.host !== playerId) return;
+        if (gameState?.host !== playerId) return;
         dispatchMove({ type: 'SET_TURN_TIMEOUT', playerId, timeoutMs });
     };
 

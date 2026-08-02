@@ -4,30 +4,36 @@ import type { Card as CardType, CardSelection, CardSource, GameState, Player } f
 import { Card as CardComponent } from './Card';
 import { useGameContext } from '../context/GameContext';
 import { useRovingTabindex } from '../hooks/useRovingTabindex';
+import { type HandSortMode } from '../hooks/useHandSorting';
 import { getCardPlayability } from '../uiLogic';
 
 type SortedHandItem = ReturnType<typeof GameLogic.sortHand>[number];
 
-function computeSameGroup(
-    item: SortedHandItem,
-    nextItem: SortedHandItem | undefined,
-    handSortMode: 'original' | 'rank' | 'suit'
-): boolean {
+// Bundles every value the per-card render/interaction helpers below need, so
+// each helper takes (item, ctx) rather than a long positional parameter list
+// (S107) - built once per render, not per card.
+interface HandInteractionContext {
+    isSetupPhase: boolean;
+    isMyTurn: boolean;
+    currentSource: CardSource;
+    gameState: GameState;
+    player: Player;
+    selectedCards: CardSelection[];
+    resolvedHandSelection: CardType[];
+    setSelectedCards: (sel: CardSelection[]) => void;
+    dispatchMove: ReturnType<typeof useGameContext>['dispatchMove'];
+    currentPlayerId: string;
+}
+
+function computeSameGroup(item: SortedHandItem, nextItem: SortedHandItem | undefined, handSortMode: HandSortMode): boolean {
     if (!nextItem) return false;
     if (handSortMode === 'rank') return item.card.rank === nextItem.card.rank;
     if (handSortMode === 'suit') return item.card.suit === nextItem.card.suit;
     return false;
 }
 
-function computeHandTooltip(
-    item: SortedHandItem,
-    isSetupPhase: boolean,
-    isMyTurn: boolean,
-    currentSource: CardSource,
-    gameState: GameState,
-    player: Player,
-    resolvedHandSelection: CardType[]
-): string | undefined {
+function computeHandTooltip(item: SortedHandItem, ctx: HandInteractionContext): string | undefined {
+    const { isSetupPhase, isMyTurn, currentSource, gameState, player, resolvedHandSelection } = ctx;
     if (isSetupPhase) return undefined;
     if (!isMyTurn) return 'Not your turn';
     if (currentSource !== 'hand') return 'Play from face-up or face-down first';
@@ -42,16 +48,8 @@ function computeHandTooltip(
     return getCardPlayability(item.card, gameState.discardPile, resolvedHandSelection).tooltip;
 }
 
-function computeHandSelectable(
-    item: SortedHandItem,
-    isSetupPhase: boolean,
-    isMyTurn: boolean,
-    currentSource: CardSource,
-    gameState: GameState,
-    player: Player,
-    selectedCards: CardSelection[],
-    resolvedHandSelection: CardType[]
-): boolean {
+function computeHandSelectable(item: SortedHandItem, ctx: HandInteractionContext): boolean {
+    const { isSetupPhase, isMyTurn, currentSource, gameState, player, selectedCards, resolvedHandSelection } = ctx;
     if (isSetupPhase) return true;
     if (!isMyTurn || currentSource !== 'hand') return false;
 
@@ -67,56 +65,64 @@ function computeHandSelectable(
     return getCardPlayability(item.card, gameState.discardPile, resolvedHandSelection).isPlayable;
 }
 
-function handleHandCardClick(
-    item: SortedHandItem,
-    isSetupPhase: boolean,
-    isMyTurn: boolean,
-    currentSource: CardSource,
-    player: Player,
-    selectedCards: CardSelection[],
-    resolvedHandSelection: CardType[],
-    setSelectedCards: (sel: CardSelection[]) => void,
-    dispatchMove: ReturnType<typeof useGameContext>['dispatchMove'],
-    currentPlayerId: string
-): void {
-    if (isSetupPhase) {
-        const alreadySelected = selectedCards.findIndex((s) => s.type === 'hand' && s.index === item.arrayIndex);
+function handleSetupPhaseHandClick(item: SortedHandItem, ctx: HandInteractionContext): void {
+    const { selectedCards, setSelectedCards, dispatchMove, currentPlayerId } = ctx;
+    const alreadySelected = selectedCards.findIndex((s) => s.type === 'hand' && s.index === item.arrayIndex);
 
-        if (alreadySelected >= 0) {
-            setSelectedCards([]);
-        } else if (selectedCards.length === 1 && selectedCards[0].type === 'faceUp') {
-            dispatchMove({
-                type: 'SWAP_CARDS',
-                playerId: currentPlayerId,
-                sourceA: 'hand',
-                indexA: item.arrayIndex,
-                sourceB: 'faceUp',
-                indexB: selectedCards[0].index,
-            });
-            setSelectedCards([]);
-        } else if (selectedCards.length === 1 && selectedCards[0].type === 'hand') {
-            dispatchMove({
-                type: 'SWAP_CARDS',
-                playerId: currentPlayerId,
-                sourceA: 'hand',
-                indexA: selectedCards[0].index,
-                sourceB: 'hand',
-                indexB: item.arrayIndex,
-            });
-            setSelectedCards([]);
-        } else {
-            setSelectedCards([{ type: 'hand', index: item.arrayIndex }]);
-        }
-    } else if (isMyTurn && currentSource === 'hand') {
-        const alreadySelected = selectedCards.findIndex((s) => s.type === 'hand' && s.index === item.arrayIndex);
-        if (alreadySelected >= 0) {
-            setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
-        } else {
-            const clickedCard = player.hand[item.arrayIndex];
-            if (clickedCard && GameLogic.canAddToSelection(clickedCard, resolvedHandSelection)) {
-                setSelectedCards([...selectedCards, { type: 'hand', index: item.arrayIndex }]);
-            }
-        }
+    if (alreadySelected >= 0) {
+        setSelectedCards([]);
+        return;
+    }
+    if (selectedCards.length === 1 && selectedCards[0].type === 'faceUp') {
+        dispatchMove({
+            type: 'SWAP_CARDS',
+            playerId: currentPlayerId,
+            sourceA: 'hand',
+            indexA: item.arrayIndex,
+            sourceB: 'faceUp',
+            indexB: selectedCards[0].index,
+        });
+        setSelectedCards([]);
+        return;
+    }
+    if (selectedCards.length === 1 && selectedCards[0].type === 'hand') {
+        dispatchMove({
+            type: 'SWAP_CARDS',
+            playerId: currentPlayerId,
+            sourceA: 'hand',
+            indexA: selectedCards[0].index,
+            sourceB: 'hand',
+            indexB: item.arrayIndex,
+        });
+        setSelectedCards([]);
+        return;
+    }
+    setSelectedCards([{ type: 'hand', index: item.arrayIndex }]);
+}
+
+function handlePlayPhaseHandClick(item: SortedHandItem, ctx: HandInteractionContext): void {
+    const { isMyTurn, currentSource, player, selectedCards, resolvedHandSelection, setSelectedCards } = ctx;
+    if (!isMyTurn || currentSource !== 'hand') return;
+
+    const alreadySelected = selectedCards.findIndex((s) => s.type === 'hand' && s.index === item.arrayIndex);
+    if (alreadySelected >= 0) {
+        setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
+        return;
+    }
+    const clickedCard = player.hand[item.arrayIndex];
+    if (clickedCard && GameLogic.canAddToSelection(clickedCard, resolvedHandSelection)) {
+        setSelectedCards([...selectedCards, { type: 'hand', index: item.arrayIndex }]);
+    }
+}
+
+// S2301: dispatch to a dedicated function per phase rather than branching on
+// isSetupPhase inline - setup-phase swap/select and play-phase selection are
+// different responsibilities that happen to share a click target.
+function handleHandCardClick(item: SortedHandItem, ctx: HandInteractionContext): void {
+    if (ctx.isSetupPhase) {
+        handleSetupPhaseHandClick(item, ctx);
+    } else {
+        handlePlayPhaseHandClick(item, ctx);
     }
 }
 
@@ -124,8 +130,8 @@ interface HandProps {
     player: Player;
     isSetupPhase: boolean;
     isMyTurn: boolean;
-    handSortMode: 'original' | 'rank' | 'suit';
-    setHandSortMode: (mode: 'original' | 'rank' | 'suit') => void;
+    handSortMode: HandSortMode;
+    setHandSortMode: (mode: HandSortMode) => void;
     selectedCards: CardSelection[];
     setSelectedCards: (sel: CardSelection[]) => void;
     gameState: GameState;
@@ -158,7 +164,7 @@ const Hand: React.FC<HandProps> = ({
     // this codebase.
     const { containerRef: handContainerRef, onKeyDown: handOnKeyDown, getItemProps: getHandItemProps } = useRovingTabindex(handCardCount);
 
-    if (!player || !player.hand) return null;
+    if (!player?.hand) return null;
 
     const isDrawing = drawingCards.length > 0;
 
@@ -223,11 +229,24 @@ const Hand: React.FC<HandProps> = ({
 
                     const currentSource = GameLogic.getAvailableCardSource(player);
 
+                    const ctx: HandInteractionContext = {
+                        isSetupPhase,
+                        isMyTurn,
+                        currentSource,
+                        gameState,
+                        player,
+                        selectedCards,
+                        resolvedHandSelection,
+                        setSelectedCards,
+                        dispatchMove,
+                        currentPlayerId,
+                    };
+
                     return sortedCards.map((item, index) => {
                         const nextItem = sortedCards[index + 1];
                         const sameGroup = computeSameGroup(item, nextItem, handSortMode);
-                        const tooltip = computeHandTooltip(item, isSetupPhase, isMyTurn, currentSource, gameState, player, resolvedHandSelection);
-                        const selectable = computeHandSelectable(item, isSetupPhase, isMyTurn, currentSource, gameState, player, selectedCards, resolvedHandSelection);
+                        const tooltip = computeHandTooltip(item, ctx);
+                        const selectable = computeHandSelectable(item, ctx);
                         const isSelected = selectedCards.some((s) => s.type === 'hand' && s.index === item.arrayIndex);
 
                         return (
@@ -241,7 +260,7 @@ const Hand: React.FC<HandProps> = ({
                                     ariaSelected={isSelected}
                                     ariaLabel={tooltip}
                                     {...getHandItemProps(index)}
-                                    onClick={() => handleHandCardClick(item, isSetupPhase, isMyTurn, currentSource, player, selectedCards, resolvedHandSelection, setSelectedCards, dispatchMove, currentPlayerId)}
+                                    onClick={() => handleHandCardClick(item, ctx)}
                                 />
                             </div>
                         );

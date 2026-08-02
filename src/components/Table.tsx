@@ -45,84 +45,106 @@ function computeFaceUpTooltip(
     return undefined;
 }
 
-function handleFaceUpClick(
-    i: number,
-    isSetupPhase: boolean,
-    isMyTurn: boolean,
-    currentSource: ReturnType<typeof GameLogic.getAvailableCardSource>,
-    canCombineWithHand: boolean,
-    currentPlayer: Player,
-    selectedCards: CardSelection[],
-    resolvedFaceUpSelection: Card[],
-    gameState: GameState,
-    setSelectedCards: (sel: CardSelection[]) => void,
-    dispatchMove: ReturnType<typeof useGameContext>['dispatchMove'],
-    currentPlayerId: string
-): void {
-    if (isSetupPhase) {
-        const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
+// Bundles every value the face-up click handlers below need, so each helper
+// takes (i, ctx) rather than a long positional parameter list (S107).
+interface FaceUpInteractionContext {
+    isSetupPhase: boolean;
+    isMyTurn: boolean;
+    currentSource: ReturnType<typeof GameLogic.getAvailableCardSource>;
+    canCombineWithHand: boolean;
+    currentPlayer: Player;
+    selectedCards: CardSelection[];
+    resolvedFaceUpSelection: Card[];
+    gameState: GameState;
+    setSelectedCards: (sel: CardSelection[]) => void;
+    dispatchMove: ReturnType<typeof useGameContext>['dispatchMove'];
+    currentPlayerId: string;
+}
 
-        if (alreadySelected >= 0) {
-            setSelectedCards([]);
-        } else if (selectedCards.length === 1 && selectedCards[0].type === 'hand') {
-            dispatchMove({
-                type: 'SWAP_CARDS',
-                playerId: currentPlayerId,
-                sourceA: 'hand',
-                indexA: selectedCards[0].index,
-                sourceB: 'faceUp',
-                indexB: i,
-            });
-            setSelectedCards([]);
-        } else if (selectedCards.length === 1 && selectedCards[0].type === 'faceUp') {
-            dispatchMove({
-                type: 'SWAP_CARDS',
-                playerId: currentPlayerId,
-                sourceA: 'faceUp',
-                indexA: selectedCards[0].index,
-                sourceB: 'faceUp',
-                indexB: i,
-            });
-            setSelectedCards([]);
-        } else {
-            setSelectedCards([{ type: 'faceUp', index: i }]);
-        }
+function handleSetupPhaseFaceUpClick(i: number, ctx: FaceUpInteractionContext): void {
+    const { selectedCards, setSelectedCards, dispatchMove, currentPlayerId } = ctx;
+    const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
+
+    if (alreadySelected >= 0) {
+        setSelectedCards([]);
         return;
     }
-
-    if (isMyTurn && currentSource === 'faceUp') {
-        const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
-        if (alreadySelected >= 0) {
-            setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
-        } else {
-            const clickedCard = currentPlayer.faceUp[i];
-            if (clickedCard && GameLogic.canAddToSelection(clickedCard, resolvedFaceUpSelection)) {
-                setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
-            }
-        }
+    if (selectedCards.length === 1 && selectedCards[0].type === 'hand') {
+        dispatchMove({
+            type: 'SWAP_CARDS',
+            playerId: currentPlayerId,
+            sourceA: 'hand',
+            indexA: selectedCards[0].index,
+            sourceB: 'faceUp',
+            indexB: i,
+        });
+        setSelectedCards([]);
         return;
     }
+    if (selectedCards.length === 1 && selectedCards[0].type === 'faceUp') {
+        dispatchMove({
+            type: 'SWAP_CARDS',
+            playerId: currentPlayerId,
+            sourceA: 'faceUp',
+            indexA: selectedCards[0].index,
+            sourceB: 'faceUp',
+            indexB: i,
+        });
+        setSelectedCards([]);
+        return;
+    }
+    setSelectedCards([{ type: 'faceUp', index: i }]);
+}
 
-    if (isMyTurn && canCombineWithHand) {
-        const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
-        if (alreadySelected >= 0) {
-            setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
-        } else {
-            const clickedCard = currentPlayer.faceUp[i];
-            if (!clickedCard) return;
-            const handCards = selectedCards
-                .filter((s) => s.type === 'hand')
-                .map((s) => currentPlayer.hand[s.index])
-                .filter((c): c is Card => c !== null);
-            const faceUpCards = selectedCards
-                .filter((s) => s.type === 'faceUp')
-                .map((s) => currentPlayer.faceUp[s.index])
-                .filter((c): c is Card => c !== null);
-            const ok = GameLogic.canPlayMixedSources(0, handCards, [...faceUpCards, clickedCard], gameState.discardPile);
-            if (ok) {
-                setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
-            }
-        }
+function handleFaceUpSourceClick(i: number, ctx: FaceUpInteractionContext): void {
+    const { selectedCards, resolvedFaceUpSelection, currentPlayer, setSelectedCards } = ctx;
+    const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
+    if (alreadySelected >= 0) {
+        setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
+        return;
+    }
+    const clickedCard = currentPlayer.faceUp[i];
+    if (clickedCard && GameLogic.canAddToSelection(clickedCard, resolvedFaceUpSelection)) {
+        setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
+    }
+}
+
+function handleCombineWithHandClick(i: number, ctx: FaceUpInteractionContext): void {
+    const { selectedCards, currentPlayer, gameState, setSelectedCards } = ctx;
+    const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
+    if (alreadySelected >= 0) {
+        setSelectedCards(selectedCards.filter((_, idx) => idx !== alreadySelected));
+        return;
+    }
+    const clickedCard = currentPlayer.faceUp[i];
+    if (!clickedCard) return;
+    const handCards = selectedCards
+        .filter((s) => s.type === 'hand')
+        .map((s) => currentPlayer.hand[s.index])
+        .filter((c): c is Card => c !== null);
+    const faceUpCards = selectedCards
+        .filter((s) => s.type === 'faceUp')
+        .map((s) => currentPlayer.faceUp[s.index])
+        .filter((c): c is Card => c !== null);
+    const ok = GameLogic.canPlayMixedSources(0, handCards, [...faceUpCards, clickedCard], gameState.discardPile);
+    if (ok) {
+        setSelectedCards([...selectedCards, { type: 'faceUp', index: i }]);
+    }
+}
+
+// S2301: dispatch to a dedicated function per case rather than branching on
+// isSetupPhase/currentSource/canCombineWithHand inline in one function body.
+function handleFaceUpClick(i: number, ctx: FaceUpInteractionContext): void {
+    if (ctx.isSetupPhase) {
+        handleSetupPhaseFaceUpClick(i, ctx);
+        return;
+    }
+    if (ctx.isMyTurn && ctx.currentSource === 'faceUp') {
+        handleFaceUpSourceClick(i, ctx);
+        return;
+    }
+    if (ctx.isMyTurn && ctx.canCombineWithHand) {
+        handleCombineWithHandClick(i, ctx);
     }
 }
 
@@ -280,6 +302,20 @@ const Table: React.FC<TableProps> = ({
 
                                 const isFaceUpSelected = selectedCards.some((s) => s.type === 'faceUp' && s.index === i);
 
+                                const faceUpCtx: FaceUpInteractionContext = {
+                                    isSetupPhase,
+                                    isMyTurn,
+                                    currentSource,
+                                    canCombineWithHand,
+                                    currentPlayer,
+                                    selectedCards,
+                                    resolvedFaceUpSelection,
+                                    gameState,
+                                    setSelectedCards,
+                                    dispatchMove,
+                                    currentPlayerId,
+                                };
+
                                 return (
                                     <div key={card.id} data-faceup-index={i}>
                                         <CardComponent
@@ -292,7 +328,7 @@ const Table: React.FC<TableProps> = ({
                                             ariaSelected={isFaceUpSelected}
                                             ariaLabel={tooltip}
                                             {...getFaceUpItemProps(optionPosition)}
-                                            onClick={() => handleFaceUpClick(i, isSetupPhase, isMyTurn, currentSource, canCombineWithHand, currentPlayer, selectedCards, resolvedFaceUpSelection, gameState, setSelectedCards, dispatchMove, currentPlayerId)}
+                                            onClick={() => handleFaceUpClick(i, faceUpCtx)}
                                         />
                                     </div>
                                 );
