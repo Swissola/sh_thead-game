@@ -4,6 +4,7 @@ import type { Card, CardSelection, GameState, Player } from '../types';
 import { Card as CardComponent } from './Card';
 import { useGameContext } from '../context/GameContext';
 import { getCardPlayability, type CardPlayability } from '../uiLogic';
+import { useRovingTabindex } from '../hooks/useRovingTabindex';
 
 interface RevealedFaceDown {
     card: Card;
@@ -33,6 +34,26 @@ const Table: React.FC<TableProps> = ({
 }) => {
     const { dispatchMove, currentPlayerId } = useGameContext();
 
+    // Hooks must run before the early return below - declared here so a
+    // player with no face-up/face-down cards yet still gets a stable
+    // (zero-item) cursor rather than skipping the hook call on some renders.
+    // Two independent instances, one per pile: RESEARCH.md's anti-pattern
+    // list is explicit that merging them into a single listbox would let a
+    // keyboard user select two face-down cards, which the mouse UI has never
+    // permitted (D-03).
+    const faceUpCount = currentPlayer?.faceUp ? currentPlayer.faceUp.filter((c) => c !== null).length : 0;
+    const {
+        containerRef: faceUpContainerRef,
+        onKeyDown: faceUpOnKeyDown,
+        getItemProps: getFaceUpItemProps,
+    } = useRovingTabindex(faceUpCount);
+    const faceDownCount = currentPlayer?.faceDown ? currentPlayer.faceDown.filter((c) => c !== null).length : 0;
+    const {
+        containerRef: faceDownContainerRef,
+        onKeyDown: faceDownOnKeyDown,
+        getItemProps: getFaceDownItemProps,
+    } = useRovingTabindex(faceDownCount);
+
     if (!currentPlayer) return null;
 
     const resolvedFaceUpSelection = selectedCards
@@ -40,17 +61,37 @@ const Table: React.FC<TableProps> = ({
         .map((s) => currentPlayer.faceUp[s.index])
         .filter((c): c is Card => c !== null);
 
+    // Each listbox's DOM option order is the order of *non-null* cards only,
+    // decoupled from `i` (the array index used for every selection
+    // expression) since null slots render no role="option" element and must
+    // not consume a cursor position. Computed as a pure expression per card
+    // (count of non-null entries before it) rather than a running counter
+    // mutated during the map - this project's React Compiler lint rule
+    // forbids reassigning a render-body variable after render completes.
+    const faceUpOptionPositionOf = (i: number) => currentPlayer.faceUp.slice(0, i).filter((c) => c !== null).length;
+    const faceDownOptionPositionOf = (i: number) =>
+        currentPlayer.faceDown.slice(0, i).filter((c) => c !== null).length;
+
     return (
         <div className="space-y-4">
             <div>
                 <p className="text-slate-400 text-sm mb-2">Table</p>
                 <div className="relative">
                     {/* Face Down cards - laid out horizontally with preserved positions */}
-                    <div className="flex gap-2">
+                    <div
+                        ref={faceDownContainerRef}
+                        onKeyDown={faceDownOnKeyDown}
+                        role="listbox"
+                        aria-label="Your face-down cards"
+                        className="flex gap-2"
+                    >
                         {currentPlayer.faceDown.map((card, i) => {
                             if (card === null) {
                                 return <div key={`faceDown-empty-${i}`} className="w-16 h-24" />;
                             }
+                            const optionPosition = faceDownOptionPositionOf(i);
+                            const isFaceDownSelected = revealedFaceDown?.index === i;
+
                             return (
                                 <div key={`faceDown-${i}`} data-facedown-index={i}>
                                     <CardComponent
@@ -63,7 +104,11 @@ const Table: React.FC<TableProps> = ({
                                             !revealedFaceDown &&
                                             GameLogic.getAvailableCardSource(currentPlayer) === 'faceDown'
                                         }
-                                        selected={revealedFaceDown?.index === i}
+                                        selected={isFaceDownSelected}
+                                        role="option"
+                                        ariaSelected={isFaceDownSelected}
+                                        ariaLabel="Face-down card"
+                                        {...getFaceDownItemProps(optionPosition)}
                                         onClick={() => {
                                             if (
                                                 !isSetupPhase &&
@@ -82,11 +127,20 @@ const Table: React.FC<TableProps> = ({
 
                     {/* Face Up cards - overlaid on top with margins and preserved positions */}
                     {currentPlayer.faceUp.some((c) => c !== null) && (
-                        <div className="flex gap-2" style={{ marginTop: '-80px', marginLeft: '10px', position: 'relative', zIndex: 10 }}>
+                        <div
+                            ref={faceUpContainerRef}
+                            onKeyDown={faceUpOnKeyDown}
+                            role="listbox"
+                            aria-multiselectable="true"
+                            aria-label="Your face-up cards"
+                            className="flex gap-2"
+                            style={{ marginTop: '-80px', marginLeft: '10px', position: 'relative', zIndex: 10 }}
+                        >
                             {currentPlayer.faceUp.map((card, i) => {
                                 if (card === null) {
                                     return <div key={`faceUp-empty-${i}`} className="w-16 h-24" />;
                                 }
+                                const optionPosition = faceUpOptionPositionOf(i);
 
                                 const deckEmpty = gameState.deck.length === 0;
                                 const currentSource = GameLogic.getAvailableCardSource(currentPlayer);
@@ -130,14 +184,20 @@ const Table: React.FC<TableProps> = ({
                                     (!isSetupPhase && isMyTurn && !revealedFaceDown && currentSource === 'faceUp' && isPlayable) ||
                                     (!isSetupPhase && isMyTurn && !revealedFaceDown && canCombineWithHand);
 
+                                const isFaceUpSelected = selectedCards.some((s) => s.type === 'faceUp' && s.index === i);
+
                                 return (
                                     <div key={card.id} data-faceup-index={i}>
                                         <CardComponent
                                             card={card}
                                             small
                                             selectable={faceUpSelectable}
-                                            selected={selectedCards.some((s) => s.type === 'faceUp' && s.index === i)}
+                                            selected={isFaceUpSelected}
                                             title={tooltip}
+                                            role="option"
+                                            ariaSelected={isFaceUpSelected}
+                                            ariaLabel={tooltip}
+                                            {...getFaceUpItemProps(optionPosition)}
                                             onClick={() => {
                                                 if (isSetupPhase) {
                                                     const alreadySelected = selectedCards.findIndex((s) => s.type === 'faceUp' && s.index === i);
