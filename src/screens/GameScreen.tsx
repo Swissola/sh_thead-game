@@ -515,14 +515,14 @@ export function GameScreen({
               <div className="flex items-center gap-3 max-sm:flex-wrap max-sm:gap-2">
                 <button
                   onClick={() => setShowRules(!showRules)}
-                  className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center p-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
                   title="Rules"
                 >
                   <HelpCircle size={24} className="text-white" />
                 </button>
                 <button
                   onClick={() => setShowLeaveConfirm(true)}
-                  className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
                   title="Leave Game"
                   aria-label="Leave Game"
                 >
@@ -554,7 +554,7 @@ export function GameScreen({
                     setControllingPlayer(Number(e.target.value));
                     setSelectedCards([]);
                   }}
-                  className="w-full bg-slate-600 text-white px-4 py-3 rounded border-2 border-green-400 font-bold text-lg"
+                  className="min-h-11 w-full bg-slate-600 text-white px-4 py-3 rounded border-2 border-green-400 font-bold text-lg"
                 >
                   {gameState.players.map((p, i) => (
                     <option key={p.id} value={i}>
@@ -734,7 +734,7 @@ export function GameScreen({
                       <button
                         onClick={playCards}
                         disabled={(!revealedFaceDown && selectedCards.length === 0) || !isMyTurn}
-                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-500 disabled:hover:to-emerald-500"
+                        className="min-h-11 flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-500 disabled:hover:to-emerald-500"
                       >
                         Play{' '}
                         {(() => {
@@ -748,7 +748,7 @@ export function GameScreen({
                       <button
                         onClick={pickUpPile}
                         disabled={gameState.discardPile.length === 0 || !isMyTurn}
-                        className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:from-red-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-red-500 disabled:hover:to-pink-500"
+                        className="min-h-11 flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:from-red-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-red-500 disabled:hover:to-pink-500"
                       >
                         Pick Up Pile ({gameState.discardPile.length})
                       </button>
@@ -876,13 +876,13 @@ export function GameScreen({
                   onClick={() => {
                     setPickUpConfirmation(null);
                   }}
-                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
+                  className="min-h-11 flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmPickUpAnyway}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
+                  className="min-h-11 flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
                 >
                   Pick Up Anyway
                 </button>
@@ -903,13 +903,13 @@ export function GameScreen({
               <div className="flex gap-4">
                 <button
                   onClick={() => setShowLeaveConfirm(false)}
-                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
+                  className="min-h-11 flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
                 >
                   Keep Playing
                 </button>
                 <button
                   onClick={confirmLeaveGame}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
+                  className="min-h-11 flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
                 >
                   Leave Game
                 </button>
@@ -933,7 +933,7 @@ export function GameScreen({
                 <button
                   onClick={dismissCelebration}
                   aria-label="Dismiss"
-                  className="absolute top-3 right-3 text-white/80 hover:text-white"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center absolute top-3 right-3 text-white/80 hover:text-white"
                 >
                   <X size={24} />
                 </button>
@@ -953,7 +953,7 @@ export function GameScreen({
                 <button
                   onClick={dismissCelebration}
                   aria-label="Dismiss"
-                  className="absolute top-3 right-3 text-white/80 hover:text-white"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center absolute top-3 right-3 text-white/80 hover:text-white"
                 >
                   <X size={24} />
                 </button>
