@@ -37,7 +37,7 @@ export function useFocusTrap(active: boolean, onEscape: () => void): React.RefOb
             const focusable = getFocusable();
             if (focusable.length === 0) return;
             const first = focusable[0];
-            const last = focusable[focusable.length - 1];
+            const last = focusable.at(-1) as HTMLElement;
 
             if (event.shiftKey && document.activeElement === first) {
                 event.preventDefault();
