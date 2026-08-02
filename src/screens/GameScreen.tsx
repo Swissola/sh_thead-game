@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { HelpCircle, LogOut, RotateCw, WifiOff, X } from 'lucide-react';
 import * as GameLogic from '../gameLogic';
-import type { Card as CardType, CardSelection, CardSource, Player } from '../types';
+import type { Card as CardType, CardSelection, CardSource, GameState, Player } from '../types';
 import { Card } from '../components/Card';
 import DiscardPile from '../components/piles/DiscardPile';
 import DrawPile from '../components/piles/DrawPile';
@@ -157,6 +157,36 @@ function computeDrawAnimation(
     targetPos: handSlotPositions[i] ?? handAreaPos,
     startPos: deckPos,
   }));
+}
+
+// Extracted purely to keep GameScreen's own cognitive complexity under the
+// S3776 threshold - a pure computation of "should the turn announcer update,
+// and to what", with the actual setState calls left in the component body.
+function computeTurnAnnouncement(
+  gameState: GameState,
+  currentPlayerId: string,
+  lastAnnouncedTurn: number | null
+): { turnIndex: number; text: string } | null {
+  if (gameState.phase !== 'playing' || lastAnnouncedTurn === gameState.currentTurn) return null;
+  const activePlayer = gameState.players[gameState.currentTurn];
+  if (!activePlayer) return null;
+  return {
+    turnIndex: gameState.currentTurn,
+    text: activePlayer.id === currentPlayerId ? 'Your turn' : `${activePlayer.name}'s turn`,
+  };
+}
+
+function computePlayCardCount(
+  revealedFaceDown: { card: CardType; index: number } | null,
+  selectedCards: CardSelection[]
+): number {
+  if (revealedFaceDown && selectedCards.length === 0) return 1;
+  return selectedCards.length;
+}
+
+function computePlayButtonLabel(playCardCount: number): string {
+  if (playCardCount === 0) return 'Cards';
+  return `${playCardCount} Card${playCardCount > 1 ? 's' : ''}`;
 }
 
 /**
@@ -350,10 +380,8 @@ export function GameScreen({
     const pendingLogs: string[] = [];
 
     const flushPendingLogs = () => {
-      setConsoleLogs((prev) => [
-        ...prev.slice(-Math.max(0, 50 - pendingLogs.length)),
-        ...pendingLogs.map((text) => ({ id: logIdCounterRef.current++, text })),
-      ]);
+      const newEntries = pendingLogs.map((text) => ({ id: logIdCounterRef.current++, text }));
+      setConsoleLogs((prev) => [...prev.slice(-Math.max(0, 50 - pendingLogs.length)), ...newEntries]);
       pendingLogs.length = 0;
       updateScheduled = false;
     };
@@ -382,12 +410,10 @@ export function GameScreen({
   // re-runs the render body immediately without committing/painting the
   // stale output first. lastAnnouncedTurn guards against re-announcing on
   // re-renders that don't change gameState.currentTurn (Pitfall 3).
-  if (gameState.phase === 'playing' && lastAnnouncedTurn !== gameState.currentTurn) {
-    const activePlayer = gameState.players[gameState.currentTurn];
-    if (activePlayer) {
-      setLastAnnouncedTurn(gameState.currentTurn);
-      setTurnAnnouncement(activePlayer.id === currentPlayerId ? 'Your turn' : `${activePlayer.name}'s turn`);
-    }
+  const turnAnnouncementUpdate = computeTurnAnnouncement(gameState, currentPlayerId, lastAnnouncedTurn);
+  if (turnAnnouncementUpdate) {
+    setLastAnnouncedTurn(turnAnnouncementUpdate.turnIndex);
+    setTurnAnnouncement(turnAnnouncementUpdate.text);
   }
 
   const currentPlayer = gameState.players.find((p) => p.id === currentPlayerId);
@@ -524,11 +550,8 @@ export function GameScreen({
     setRevealedFaceDown(null);
   };
 
-  const playCardCount = revealedFaceDown && selectedCards.length === 0 ? 1 : selectedCards.length;
-  let playButtonLabel = 'Cards';
-  if (playCardCount > 0) {
-    playButtonLabel = `${playCardCount} Card${playCardCount > 1 ? 's' : ''}`;
-  }
+  const playCardCount = computePlayCardCount(revealedFaceDown, selectedCards);
+  const playButtonLabel = computePlayButtonLabel(playCardCount);
 
   return (
     <>
