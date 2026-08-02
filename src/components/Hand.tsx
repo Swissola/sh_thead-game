@@ -3,6 +3,7 @@ import * as GameLogic from '../gameLogic';
 import type { Card as CardType, CardSelection, GameState, Player } from '../types';
 import { Card as CardComponent } from './Card';
 import { useGameContext } from '../context/GameContext';
+import { useRovingTabindex } from '../hooks/useRovingTabindex';
 import { getCardPlayability } from '../uiLogic';
 
 interface HandProps {
@@ -30,6 +31,19 @@ const Hand: React.FC<HandProps> = ({
 }) => {
     const { dispatchMove, currentPlayerId } = useGameContext();
 
+    // Hooks cannot run after the early return below, and the card count is
+    // not known until the sortHand IIFE runs inside JSX - so it's computed
+    // here instead. sortHand filters out nulls, so this equals
+    // sortedCards.length exactly.
+    const handCardCount = player?.hand ? player.hand.filter((c) => c !== null).length : 0;
+    // Destructured to local bindings, not kept as a `roving.foo` property
+    // access - the react-compiler ESLint rule (react-hooks/refs) cannot
+    // prove a ref reached via object-property access on a hook's return
+    // value is safe to pass as a JSX ref, and flags it as a false positive.
+    // Direct bindings match the working useFocusTrap pattern elsewhere in
+    // this codebase.
+    const { containerRef: handContainerRef, onKeyDown: handOnKeyDown, getItemProps: getHandItemProps } = useRovingTabindex(handCardCount);
+
     if (!player || !player.hand) return null;
 
     const isDrawing = drawingCards.length > 0;
@@ -42,19 +56,19 @@ const Hand: React.FC<HandProps> = ({
                     <div className="flex gap-1">
                         <button
                             onClick={() => setHandSortMode('original')}
-                            className={`px-2 py-1 text-xs rounded ${handSortMode === 'original' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                            className={`min-h-11 px-3 py-2 text-sm font-semibold rounded ${handSortMode === 'original' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                         >
                             Original
                         </button>
                         <button
                             onClick={() => setHandSortMode('rank')}
-                            className={`px-2 py-1 text-xs rounded ${handSortMode === 'rank' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                            className={`min-h-11 px-3 py-2 text-sm font-semibold rounded ${handSortMode === 'rank' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                         >
                             Rank
                         </button>
                         <button
                             onClick={() => setHandSortMode('suit')}
-                            className={`px-2 py-1 text-xs rounded ${handSortMode === 'suit' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                            className={`min-h-11 px-3 py-2 text-sm font-semibold rounded ${handSortMode === 'suit' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                         >
                             Suit
                         </button>
@@ -62,7 +76,14 @@ const Hand: React.FC<HandProps> = ({
                 )}
             </div>
 
-            <div className="hand-area flex flex-wrap">
+            <div
+                className="hand-area flex flex-wrap max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:snap-x max-sm:snap-mandatory max-sm:py-4"
+                ref={handContainerRef}
+                onKeyDown={handOnKeyDown}
+                role="listbox"
+                aria-multiselectable="true"
+                aria-label="Your hand"
+            >
                 {(() => {
                     if (isDrawing) {
                         return player.hand.map((card, arrayIndex) => {
@@ -115,8 +136,10 @@ const Hand: React.FC<HandProps> = ({
                             }
                         }
 
+                        const isSelected = selectedCards.some((s) => s.type === 'hand' && s.index === item.arrayIndex);
+
                         return (
-                            <div key={item.card.id} data-card-key={item.card.id} className={sameGroup ? '-mr-12' : 'mr-2'} style={{ zIndex: index }}>
+                            <div key={item.card.id} data-card-key={item.card.id} className={`max-sm:shrink-0 max-sm:snap-start ${sameGroup ? 'mr-2 sm:mr-0 sm:-mr-12' : 'mr-2'}`} style={{ zIndex: index }}>
                                 <CardComponent
                                     card={item.card}
                                     selectable={
@@ -138,8 +161,12 @@ const Hand: React.FC<HandProps> = ({
                                             })()
                                         )
                                     }
-                                    selected={selectedCards.some((s) => s.type === 'hand' && s.index === item.arrayIndex)}
+                                    selected={isSelected}
                                     title={tooltip}
+                                    role="option"
+                                    ariaSelected={isSelected}
+                                    ariaLabel={tooltip}
+                                    {...getHandItemProps(index)}
                                     onClick={() => {
                                         if (isSetupPhase) {
                                             const alreadySelected = selectedCards.findIndex((s) => s.type === 'hand' && s.index === item.arrayIndex);
