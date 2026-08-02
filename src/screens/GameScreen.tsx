@@ -65,6 +65,12 @@ export function GameScreen({
     playerIndex: number;
   } | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [turnAnnouncement, setTurnAnnouncement] = useState('');
+  // Tracks the last-announced turn index as state, not a ref (plan 02-12's
+  // established pattern) - this project's react-hooks/refs lint rule
+  // forbids reading/writing a ref's .current during render, which the
+  // render-body "adjusting state" pattern below requires.
+  const [lastAnnouncedTurn, setLastAnnouncedTurn] = useState<number | null>(null);
   const [celebrationModal, setCelebrationModal] = useState<{
     show: boolean;
     playerName: string;
@@ -230,6 +236,21 @@ export function GameScreen({
   }, [testMode]);
 
   if (!gameState) return null;
+
+  // D-05: always-mounted aria-live="polite" turn announcer (RESEARCH.md
+  // Pattern 3). Adjusted during render, not inside a useEffect - this
+  // project's react-hooks/set-state-in-effect lint rule (plan 02-12)
+  // requires state derived from a gameState change to be set here; React
+  // re-runs the render body immediately without committing/painting the
+  // stale output first. lastAnnouncedTurn guards against re-announcing on
+  // re-renders that don't change gameState.currentTurn (Pitfall 3).
+  if (gameState.phase === 'playing' && lastAnnouncedTurn !== gameState.currentTurn) {
+    const activePlayer = gameState.players[gameState.currentTurn];
+    if (activePlayer) {
+      setLastAnnouncedTurn(gameState.currentTurn);
+      setTurnAnnouncement(activePlayer.id === currentPlayerId ? 'Your turn' : `${activePlayer.name}'s turn`);
+    }
+  }
 
   const currentPlayer = gameState.players.find((p) => p.id === currentPlayerId);
   const isMyTurn =
@@ -468,6 +489,9 @@ export function GameScreen({
         }}
       >
         <div className="max-w-6xl mx-auto">
+          <div aria-live="polite" role="status" className="sr-only">
+            {turnAnnouncement}
+          </div>
           <div className="bg-slate-800 rounded-xl p-4 mb-4 border-2 border-purple-500">
             <div className="flex items-center justify-between mb-2">
               <div>

@@ -929,4 +929,162 @@ describe('GameScreen', () => {
       expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
   });
+
+  describe('turn announcer live region (RESP-05, D-05)', () => {
+    it('is present with role="status" and aria-live="polite" during the playing phase, even before any turn change', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      const region = await screen.findByRole('status');
+      expect(region).toHaveAttribute('aria-live', 'polite');
+    });
+
+    it('is present with empty text during the setup phase - never conditionally unmounted', async () => {
+      const state = buildGameState({
+        phase: 'setup',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      const region = await screen.findByRole('status');
+      expect(region).toHaveTextContent('');
+    });
+
+    it('announces "Your turn" when currentTurn points at the local player', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent('Your turn');
+      });
+    });
+
+    it("announces \"Bob's turn\" when currentTurn points at another player named Bob", async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 1,
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent("Bob's turn");
+      });
+    });
+
+    it('does not rewrite the announcement text on a re-render that does not change currentTurn', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        lastAction: 'initial',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      function Harness() {
+        const { gameState, setGameState } = useGameContext();
+        return (
+          <button
+            onClick={() => {
+              if (!gameState) return;
+              void setGameState({ ...gameState, lastAction: 'unrelated update' });
+            }}
+          >
+            Trigger unrelated re-render
+          </button>
+        );
+      }
+
+      render(
+        <GameProvider playerId="test-player">
+          <SeedGameState state={state} />
+          <GameScreen />
+          <Harness />
+          <Probe />
+        </GameProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent('Your turn');
+      });
+
+      fireEvent.click(screen.getByText('Trigger unrelated re-render'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('probe')).toHaveTextContent('phase:playing');
+      });
+      expect(screen.getByText('unrelated update')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Your turn');
+    });
+
+    it('replaces the announcement text on a real turn transition from index 0 to index 1', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      function Harness() {
+        const { gameState, setGameState } = useGameContext();
+        return (
+          <button
+            onClick={() => {
+              if (!gameState) return;
+              void setGameState({ ...gameState, currentTurn: 1 });
+            }}
+          >
+            Advance turn
+          </button>
+        );
+      }
+
+      render(
+        <GameProvider playerId="test-player">
+          <SeedGameState state={state} />
+          <GameScreen />
+          <Harness />
+          <Probe />
+        </GameProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent('Your turn');
+      });
+
+      fireEvent.click(screen.getByText('Advance turn'));
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent("Bob's turn");
+      });
+    });
+  });
 });
