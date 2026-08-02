@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { HelpCircle, LogOut, RotateCw, WifiOff, X } from 'lucide-react';
 import * as GameLogic from '../gameLogic';
@@ -13,6 +13,7 @@ import { useGameContext } from '../context/GameContext';
 import { useSelection } from '../hooks/useSelection';
 import { useHandSorting } from '../hooks/useHandSorting';
 import { useTurnTimeoutSweep } from '../hooks/useTurnTimeoutSweep';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { TURN_GRACE_MS } from '../supabase/roomTypes';
 
 const getOrdinalLabel = (n: number): string => {
@@ -82,13 +83,22 @@ export function GameScreen({
   const celebratedGameOverRef = useRef(false);
   const celebratedPlayerIdsRef = useRef<Set<string>>(new Set());
 
-  const dismissCelebration = () => {
+  // useCallback keeps this a stable reference across renders - the focus
+  // trap hook's effect depends on [active, onEscape] (Task 2's read_first
+  // note), and an unstable callback would re-run that effect (and re-focus
+  // the dialog's first element) on every unrelated GameScreen render.
+  const dismissCelebration = useCallback(() => {
     if (celebrationTimeoutRef.current) {
       clearTimeout(celebrationTimeoutRef.current);
       celebrationTimeoutRef.current = null;
     }
     setCelebrationModal(null);
-  };
+  }, []);
+
+  // D-06/D-07: vanilla focus trap for the celebration modal - Tab/Shift+Tab
+  // wraps within it, Escape calls dismissCelebration, and focus returns to
+  // the pre-open element on close.
+  const celebrationDialogRef = useFocusTrap(celebrationModal?.show === true, dismissCelebration);
 
   // Derived celebration state from gameState (ported verbatim from
   // App.tsx:103-143), reading gameState from context instead of local
@@ -912,9 +922,11 @@ export function GameScreen({
       {celebrationModal?.show &&
         createPortal(
           <div
+            ref={celebrationDialogRef}
             className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-            role="alert"
-            aria-live="assertive"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="celebration-heading"
           >
             {celebrationModal.isShithead ? (
               <div className="celebration-modal relative bg-gradient-to-br from-red-600 to-pink-600 text-white px-12 py-8 rounded-2xl shadow-2xl border-4 border-slate-800 text-center max-w-md">
@@ -926,7 +938,9 @@ export function GameScreen({
                   <X size={24} />
                 </button>
                 <div className="text-7xl mb-4 celebration-emoji-pulse">💩</div>
-                <div className="text-5xl font-black mb-3">SH!THEAD!</div>
+                <div id="celebration-heading" className="text-5xl font-black mb-3">
+                  SH!THEAD!
+                </div>
                 <div className="text-2xl opacity-90">
                   {celebrationModal.playerName} is the loser!
                 </div>
@@ -944,7 +958,9 @@ export function GameScreen({
                   <X size={24} />
                 </button>
                 <div className="text-7xl mb-4 celebration-emoji">👑</div>
-                <div className="text-4xl font-black mb-3">SAFE!</div>
+                <div id="celebration-heading" className="text-4xl font-black mb-3">
+                  SAFE!
+                </div>
                 <div className="text-2xl mb-2">{celebrationModal.playerName} finished!</div>
                 <div className="text-lg opacity-90">
                   {getOrdinalLabel(celebrationModal.placement)} place
