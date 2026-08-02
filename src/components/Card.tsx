@@ -1,6 +1,55 @@
 import React, { useRef, useState } from 'react';
 import type { CardProps } from '../types';
 
+function useCardHoverState(onFocusProp?: (event: React.FocusEvent<HTMLDivElement>) => void) {
+    const [hover, setHover] = useState(false);
+    const showTimer = useRef<number | null>(null);
+    const hideTimer = useRef<number | null>(null);
+
+    const clearShowTimer = () => {
+        if (showTimer.current) {
+            window.clearTimeout(showTimer.current);
+            showTimer.current = null;
+        }
+    };
+    const clearHideTimer = () => {
+        if (hideTimer.current) {
+            window.clearTimeout(hideTimer.current);
+            hideTimer.current = null;
+        }
+    };
+
+    const onFocus = (event: React.FocusEvent<HTMLDivElement>) => {
+        clearShowTimer();
+        clearHideTimer();
+        setHover(true);
+        onFocusProp?.(event);
+    };
+    const onBlur = () => {
+        clearShowTimer();
+        clearHideTimer();
+        setHover(false);
+    };
+    const onMouseEnter = () => {
+        clearHideTimer();
+        clearShowTimer();
+        showTimer.current = window.setTimeout(() => {
+            setHover(true);
+            showTimer.current = null;
+        }, 250);
+    };
+    const onMouseLeave = () => {
+        clearShowTimer();
+        clearHideTimer();
+        hideTimer.current = window.setTimeout(() => {
+            setHover(false);
+            hideTimer.current = null;
+        }, 100);
+    };
+
+    return { hover, onFocus, onBlur, onMouseEnter, onMouseLeave };
+}
+
 export const Card: React.FC<CardProps> = ({
     card,
     faceDown,
@@ -13,11 +62,9 @@ export const Card: React.FC<CardProps> = ({
     ariaSelected,
     ariaLabel,
     tabIndex,
-    onFocus,
+    onFocus: onFocusProp,
 }) => {
-    const [hover, setHover] = useState(false);
-    const showTimer = useRef<number | null>(null);
-    const hideTimer = useRef<number | null>(null);
+    const { hover, onFocus, onBlur, onMouseEnter, onMouseLeave } = useCardHoverState(onFocusProp);
     const isRed = card?.suit === '♥' || card?.suit === '♦';
 
     const deckColorMap = {
@@ -73,29 +120,8 @@ export const Card: React.FC<CardProps> = ({
                 aria-selected={role === 'option' ? ariaSelected : undefined}
                 aria-label={ariaLabel}
                 tabIndex={tabIndex}
-                onFocus={(event) => {
-                    if (showTimer.current) {
-                        window.clearTimeout(showTimer.current);
-                        showTimer.current = null;
-                    }
-                    if (hideTimer.current) {
-                        window.clearTimeout(hideTimer.current);
-                        hideTimer.current = null;
-                    }
-                    setHover(true);
-                    onFocus?.(event);
-                }}
-                onBlur={() => {
-                    if (showTimer.current) {
-                        window.clearTimeout(showTimer.current);
-                        showTimer.current = null;
-                    }
-                    if (hideTimer.current) {
-                        window.clearTimeout(hideTimer.current);
-                        hideTimer.current = null;
-                    }
-                    setHover(false);
-                }}
+                onFocus={onFocus}
+                onBlur={onBlur}
                 onClick={onClick}
                 onKeyDown={(event) => {
                     if (event.key === ' ' || event.key === 'Enter') {
@@ -103,36 +129,10 @@ export const Card: React.FC<CardProps> = ({
                         onClick?.();
                     }
                 }}
-                onMouseEnter={() => {
-                    if (hideTimer.current) {
-                        window.clearTimeout(hideTimer.current);
-                        hideTimer.current = null;
-                    }
-                    if (showTimer.current) {
-                        window.clearTimeout(showTimer.current);
-                        showTimer.current = null;
-                    }
-                    showTimer.current = window.setTimeout(() => {
-                        setHover(true);
-                        showTimer.current = null;
-                    }, 250);
-                }}
-                onMouseLeave={() => {
-                    if (showTimer.current) {
-                        window.clearTimeout(showTimer.current);
-                        showTimer.current = null;
-                    }
-                    if (hideTimer.current) {
-                        window.clearTimeout(hideTimer.current);
-                        hideTimer.current = null;
-                    }
-                    hideTimer.current = window.setTimeout(() => {
-                        setHover(false);
-                        hideTimer.current = null;
-                    }, 100);
-                }}
+                onMouseEnter={onMouseEnter}
+                onMouseLeave={onMouseLeave}
                 className={`
-          ${small ? 'w-16 h-24' : 'w-20 h-32'} 
+          ${small ? 'w-16 h-24' : 'w-20 h-32'}
           rounded-lg overflow-hidden
           transition-all cursor-pointer relative
           bg-gradient-to-br ${colorScheme.from} ${colorScheme.via} ${colorScheme.to}
@@ -193,29 +193,8 @@ export const Card: React.FC<CardProps> = ({
             aria-selected={role === 'option' ? ariaSelected : undefined}
             aria-label={ariaLabel}
             tabIndex={tabIndex}
-            onFocus={(event) => {
-                if (showTimer.current) {
-                    window.clearTimeout(showTimer.current);
-                    showTimer.current = null;
-                }
-                if (hideTimer.current) {
-                    window.clearTimeout(hideTimer.current);
-                    hideTimer.current = null;
-                }
-                setHover(true);
-                onFocus?.(event);
-            }}
-            onBlur={() => {
-                if (showTimer.current) {
-                    window.clearTimeout(showTimer.current);
-                    showTimer.current = null;
-                }
-                if (hideTimer.current) {
-                    window.clearTimeout(hideTimer.current);
-                    hideTimer.current = null;
-                }
-                setHover(false);
-            }}
+            onFocus={onFocus}
+            onBlur={onBlur}
             onClick={selectable ? onClick : undefined}
             onKeyDown={(event) => {
                 if (event.key === ' ' || event.key === 'Enter') {
@@ -225,34 +204,8 @@ export const Card: React.FC<CardProps> = ({
                     }
                 }
             }}
-            onMouseEnter={() => {
-                if (hideTimer.current) {
-                    window.clearTimeout(hideTimer.current);
-                    hideTimer.current = null;
-                }
-                if (showTimer.current) {
-                    window.clearTimeout(showTimer.current);
-                    showTimer.current = null;
-                }
-                showTimer.current = window.setTimeout(() => {
-                    setHover(true);
-                    showTimer.current = null;
-                }, 250);
-            }}
-            onMouseLeave={() => {
-                if (showTimer.current) {
-                    window.clearTimeout(showTimer.current);
-                    showTimer.current = null;
-                }
-                if (hideTimer.current) {
-                    window.clearTimeout(hideTimer.current);
-                    hideTimer.current = null;
-                }
-                hideTimer.current = window.setTimeout(() => {
-                    setHover(false);
-                    hideTimer.current = null;
-                }, 100);
-            }}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
             className={`
         ${small ? 'w-16 h-24' : 'w-20 h-32'} 
         rounded-lg overflow-hidden
