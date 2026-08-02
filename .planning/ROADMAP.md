@@ -161,7 +161,7 @@ Plans:
   4. A player can select and play cards using only the keyboard
   5. Turn changes are announced and modals trap focus properly for screen reader/keyboard users
 
-**Plans:** 5/8 plans executed
+**Plans:** 6/8 plans executed
 **UI hint**: yes
 
 Plans:
@@ -178,7 +178,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 03-05-PLAN.md — GameScreen RESP-05: always-mounted turn announcer and the celebration modal as a focus-trapped dialog
+- [x] 03-05-PLAN.md — GameScreen RESP-05: always-mounted turn announcer and the celebration modal as a focus-trapped dialog
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -257,7 +257,7 @@ rework lands).
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
 | 2. Real Cross-Device Multiplayer | 19/19 | Complete    | 2026-08-01 |
-| 3. Responsive UI | 5/8 | In Progress|  |
+| 3. Responsive UI | 6/8 | In Progress|  |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
 | 6. Visual/Gameplay Polish | 0/TBD | Not started | - |
