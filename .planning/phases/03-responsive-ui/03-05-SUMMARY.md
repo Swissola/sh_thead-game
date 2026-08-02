@@ -116,3 +116,7 @@ None - no external service configuration required.
 ---
 *Phase: 03-responsive-ui*
 *Completed: 2026-08-02*
+
+## Self-Check: PASSED
+
+All modified files verified present (`src/screens/GameScreen.tsx`, `src/__tests__/screens/GameScreen.test.tsx`, this SUMMARY.md). All three commit hashes (`85fed69`, `f0ae47f`, `cf1d1c1`) verified present in `git log`.

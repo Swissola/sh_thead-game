@@ -34,7 +34,7 @@ prior staged plan in the repo's `ROADMAP.md` (7 stages), captured as context in
 - [x] **RESP-02**: Card details/tooltips are accessible via touch, not just mouse hover
 - [ ] **RESP-03**: Every interactive control (sort buttons, cards, etc.) meets a minimum 44px touch target
 - [x] **RESP-04**: A player can select and play cards using only the keyboard
-- [ ] **RESP-05**: Turn changes are announced (`aria-live`) and modals have proper dialog semantics with focus trapping
+- [x] **RESP-05**: Turn changes are announced (`aria-live`) and modals have proper dialog semantics with focus trapping
 
 ### Mobile packaging (Capacitor)
 
@@ -106,7 +106,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RESP-02 | Phase 3 | Complete |
 | RESP-03 | Phase 3 | Pending |
 | RESP-04 | Phase 3 | Complete |
-| RESP-05 | Phase 3 | Pending |
+| RESP-05 | Phase 3 | Complete |
 | MOBILE-01 | Phase 4 | Pending |
 | MOBILE-02 | Phase 4 | Pending |
 | MOBILE-03 | Phase 4 | Pending |
