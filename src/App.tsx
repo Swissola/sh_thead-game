@@ -15,7 +15,7 @@ import { usePresence } from './hooks/usePresence';
  * that later re-renders never re-read the URL).
  */
 function parseJoinCode(pathname: string): string {
-    const match = pathname.match(/^\/join\/([^/]+)/);
+    const match = /^\/join\/([^/]+)/.exec(pathname);
     return match ? decodeURIComponent(match[1]).toUpperCase() : '';
 }
 
