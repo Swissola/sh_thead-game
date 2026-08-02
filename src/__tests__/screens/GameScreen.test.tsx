@@ -1088,6 +1088,345 @@ describe('GameScreen', () => {
     });
   });
 
+  describe('phone-width board reflow (RESP-01, D-09, D-10, D-12, plan 03-07)', () => {
+    /** jsdom does not apply Tailwind, so these assert class membership on the
+     * reflow-bearing elements rather than real overflow - real overflow
+     * verification is plan 03-08's manual checkpoint. */
+    function reflowState() {
+      return buildGameState({
+        phase: 'playing',
+        isFirstTurn: false,
+        currentTurn: 0,
+        deck: [buildCard({ id: 'deck-0', rank: '2', suit: '♣' })],
+        discardPile: [buildCard({ id: 'discard-0', rank: '4', suit: '♣' })],
+        players: [
+          buildPlayer({
+            id: 'test-player',
+            name: 'Alice',
+            hand: [buildCard({ id: 'hand-0', rank: '5', suit: '♠' })],
+          }),
+          buildPlayer({
+            id: 'p1',
+            name: 'Bob',
+            hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })],
+          }),
+        ],
+      });
+    }
+
+    it('stacks Table over the pile cluster below sm via max-sm:grid-cols-1', async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const boardGrid = container.querySelector('.grid.grid-cols-\\[auto_1fr\\]');
+      expect(boardGrid?.className).toContain('max-sm:grid-cols-1');
+      expect(boardGrid?.className).toContain('max-sm:gap-4');
+    });
+
+    it('wraps the pile cluster into a flex layout below sm instead of a fixed three-column track', async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const pileCluster = container.querySelector('.grid.grid-cols-\\[160px_100px_1fr\\]');
+      expect(pileCluster?.className).toContain('max-sm:flex');
+      expect(pileCluster?.className).toContain('max-sm:flex-wrap');
+      expect(pileCluster?.className).toContain('max-sm:justify-center');
+    });
+
+    it('gives each player tile a full row below sm via max-sm:grid-cols-1 on the grid-cols-3 track', async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Bob');
+
+      const tileGrid = container.querySelector('.grid.grid-cols-3');
+      expect(tileGrid?.className).toContain('max-sm:grid-cols-1');
+    });
+
+    it('stacks the Play / Pick Up Pile buttons full-width below sm via max-sm:flex-col', async () => {
+      renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const playButton = screen.getByRole('button', { name: /^Play/ });
+      const buttonRow = playButton.closest('.flex.gap-3');
+      expect(buttonRow?.className).toContain('max-sm:flex-col');
+    });
+
+    it("replaces the discard pile's fixed 160px inline width with responsive w-40/max-sm:w-32 classes, keeping the draw-animation selectors", async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const discardCards = container.querySelector('.discard-pile-cards');
+      expect(discardCards).not.toHaveStyle({ width: '160px' });
+      expect(discardCards?.className).toContain('w-40');
+      expect(discardCards?.className).toContain('max-sm:w-32');
+      expect(container.querySelector('.discard-pile-area')).toBeInTheDocument();
+      expect(container.querySelector('.draw-pile-card')).toBeInTheDocument();
+    });
+
+    it('recovers horizontal room at phone width via p-3 sm:p-6 / p-3 sm:p-4 on the header and board containers', async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const boardContainer = screen.getByText("Alice's Cards").closest('.bg-slate-800.rounded-xl');
+      expect(boardContainer?.className).toContain('p-3');
+      expect(boardContainer?.className).toContain('sm:p-6');
+
+      const headerContainer = container.querySelector('.border-purple-500.p-3.sm\\:p-4');
+      expect(headerContainer).toBeInTheDocument();
+    });
+  });
+
+  describe('44px control sizing on the game screen (RESP-03, plan 03-07 Task 2)', () => {
+    it('Test 1: the Rules and Leave Game header buttons both carry min-h-11 and min-w-11', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+      renderGame('test-player', state);
+
+      const rulesButton = await screen.findByTitle('Rules');
+      const leaveButton = screen.getByRole('button', { name: 'Leave Game' });
+      expect(rulesButton.className).toContain('min-h-11');
+      expect(rulesButton.className).toContain('min-w-11');
+      expect(leaveButton.className).toContain('min-h-11');
+      expect(leaveButton.className).toContain('min-w-11');
+    });
+
+    it("Test 2: the celebration modal's aria-label=\"Dismiss\" button carries min-h-11 and min-w-11", async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        deck: [],
+        discardPile: [],
+        players: [
+          buildPlayer({
+            id: 'test-player',
+            name: 'Alice',
+            hand: [buildCard({ id: 'hand-0', rank: '5', suit: '♠' })],
+          }),
+          buildPlayer({
+            id: 'p1',
+            name: 'Bob',
+            hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })],
+          }),
+        ],
+      });
+
+      function TriggerHarness() {
+        const { gameState, setGameState } = useGameContext();
+        return (
+          <button
+            onClick={() => {
+              if (!gameState) return;
+              const players = gameState.players.map((p, i) =>
+                i === 1 ? { ...p, hand: [], faceUp: [], faceDown: [] } : p
+              );
+              void setGameState({ ...gameState, players });
+            }}
+          >
+            Finish player 1
+          </button>
+        );
+      }
+
+      render(
+        <GameProvider playerId="test-player">
+          <SeedGameState state={state} />
+          <GameScreen />
+          <TriggerHarness />
+          <Probe />
+        </GameProvider>
+      );
+
+      await screen.findByText('Hand');
+      fireEvent.click(screen.getByRole('button', { name: 'Finish player 1' }));
+
+      const dismissButton = await screen.findByRole('button', { name: 'Dismiss' });
+      expect(dismissButton.className).toContain('min-h-11');
+      expect(dismissButton.className).toContain('min-w-11');
+    });
+
+    it("Test 3: the celebration modal's Dismiss button is still the element that receives focus when the dialog opens - the resize did not change the focusable order", async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        currentTurn: 0,
+        deck: [],
+        discardPile: [],
+        players: [
+          buildPlayer({
+            id: 'test-player',
+            name: 'Alice',
+            hand: [buildCard({ id: 'hand-0', rank: '5', suit: '♠' })],
+          }),
+          buildPlayer({
+            id: 'p1',
+            name: 'Bob',
+            hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })],
+          }),
+        ],
+      });
+
+      function TriggerHarness() {
+        const { gameState, setGameState } = useGameContext();
+        return (
+          <button
+            onClick={() => {
+              if (!gameState) return;
+              const players = gameState.players.map((p, i) =>
+                i === 1 ? { ...p, hand: [], faceUp: [], faceDown: [] } : p
+              );
+              void setGameState({ ...gameState, players });
+            }}
+          >
+            Finish player 1
+          </button>
+        );
+      }
+
+      render(
+        <GameProvider playerId="test-player">
+          <SeedGameState state={state} />
+          <GameScreen />
+          <TriggerHarness />
+          <Probe />
+        </GameProvider>
+      );
+
+      await screen.findByText('Hand');
+      fireEvent.click(screen.getByRole('button', { name: 'Finish player 1' }));
+
+      await waitFor(() => {
+        expect(document.activeElement).toHaveAttribute('aria-label', 'Dismiss');
+      });
+    });
+
+    it('Test 4: the leave-game confirmation\'s "Keep Playing" and "Leave Game" buttons both carry min-h-11', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+      renderGame('test-player', state);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Leave Game' }));
+      await screen.findByText('Leave game?');
+
+      expect(screen.getByText('Keep Playing').className).toContain('min-h-11');
+      // The dialog's confirm button carries the literal text "Leave Game"
+      // (same copy as the header icon button) - getByText resolves to the
+      // dialog button unambiguously.
+      expect(screen.getByText('Leave Game').className).toContain('min-h-11');
+    });
+
+    it('Test 5: the pick-up confirmation\'s "Cancel" and "Pick Up Anyway" buttons both carry min-h-11', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        isFirstTurn: false,
+        currentTurn: 0,
+        deck: [],
+        discardPile: [buildCard({ id: 'discard-0', rank: '5', suit: '♣' })],
+        players: [
+          buildPlayer({
+            id: 'test-player',
+            name: 'Alice',
+            hand: [buildCard({ id: 'hand-0', rank: '6', suit: '♠' })],
+          }),
+          buildPlayer({
+            id: 'p1',
+            name: 'Bob',
+            hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })],
+          }),
+        ],
+      });
+
+      renderGame('test-player', state);
+
+      const pickUpButton = await screen.findByRole('button', { name: /Pick Up Pile/ });
+      fireEvent.click(pickUpButton);
+
+      await screen.findByText('Confirm Pick Up');
+      expect(screen.getByText('Cancel').className).toContain('min-h-11');
+      expect(screen.getByText('Pick Up Anyway').className).toContain('min-h-11');
+    });
+
+    it('Test 6: the Play and Pick Up Pile buttons carry min-h-11 (already >= 44px via py-3) and their disabled expressions are unchanged', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        isFirstTurn: false,
+        currentTurn: 0,
+        deck: [],
+        discardPile: [buildCard({ id: 'discard-0', rank: '4', suit: '♣' })],
+        players: [
+          buildPlayer({
+            id: 'test-player',
+            name: 'Alice',
+            hand: [buildCard({ id: 'hand-0', rank: '5', suit: '♠' })],
+          }),
+          buildPlayer({
+            id: 'p1',
+            name: 'Bob',
+            hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })],
+          }),
+        ],
+      });
+
+      renderGame('test-player', state);
+      await screen.findByText('Hand');
+
+      const playButton = screen.getByRole('button', { name: /^Play/ });
+      const pickUpButton = screen.getByRole('button', { name: /Pick Up Pile/ });
+      expect(playButton.className).toContain('min-h-11');
+      expect(pickUpButton.className).toContain('min-h-11');
+      // Unchanged disabled expressions: Play starts disabled (nothing
+      // selected yet), Pick Up Pile is enabled while the discard pile has
+      // cards and it's this player's turn.
+      expect(playButton).toBeDisabled();
+      expect(pickUpButton).not.toBeDisabled();
+    });
+
+    it('Test 7: the Test Mode control-player select carries min-h-11', async () => {
+      const state = buildGameState({
+        phase: 'playing',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+
+      renderGame('test-player', state, { testMode: true });
+
+      await screen.findAllByText('Bob');
+      const select = screen.getByDisplayValue('Alice') as HTMLSelectElement;
+      expect(select.className).toContain('min-h-11');
+    });
+
+    it('Test 8: the offline / auto-picking-up badges and player-tile stat lines are unchanged - status text, not controls', async () => {
+      vi.mocked(useTurnTimeoutSweep).mockReturnValue({ graceExpired: false });
+      const state = buildGameState({
+        phase: 'playing',
+        players: [
+          buildPlayer({ id: 'test-player', name: 'Alice' }),
+          buildPlayer({ id: 'p1', name: 'Bob' }),
+        ],
+      });
+      const isPlayerOffline = (id: string) => id === 'p1';
+
+      renderGame('test-player', state, { isPlayerOffline });
+
+      const bobTile = (await screen.findByText('Bob')).closest('div.rounded-lg') as HTMLElement;
+      const badge = within(bobTile).getByText('Offline');
+      expect(badge.className).toContain('text-xs');
+      expect(badge.className).toContain('px-2');
+      expect(badge.className).toContain('py-1');
+      expect(badge.className).not.toContain('min-h-11');
+      expect(within(bobTile).getByText(/^Hand:/).className).not.toContain('min-h-11');
+    });
+  });
+
   describe('celebration modal as a focus-trapped dialog (RESP-05, D-06, D-07)', () => {
     /** Two players, both with cards - finishing player at `playerIndex` via
      * the harness button triggers isGameOver (only one player left with
