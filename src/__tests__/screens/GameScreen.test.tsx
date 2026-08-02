@@ -1088,6 +1088,93 @@ describe('GameScreen', () => {
     });
   });
 
+  describe('phone-width board reflow (RESP-01, D-09, D-10, D-12, plan 03-07)', () => {
+    /** jsdom does not apply Tailwind, so these assert class membership on the
+     * reflow-bearing elements rather than real overflow - real overflow
+     * verification is plan 03-08's manual checkpoint. */
+    function reflowState() {
+      return buildGameState({
+        phase: 'playing',
+        isFirstTurn: false,
+        currentTurn: 0,
+        deck: [buildCard({ id: 'deck-0', rank: '2', suit: '♣' })],
+        discardPile: [buildCard({ id: 'discard-0', rank: '4', suit: '♣' })],
+        players: [
+          buildPlayer({
+            id: 'test-player',
+            name: 'Alice',
+            hand: [buildCard({ id: 'hand-0', rank: '5', suit: '♠' })],
+          }),
+          buildPlayer({
+            id: 'p1',
+            name: 'Bob',
+            hand: [buildCard({ id: 'bob-0', rank: '9', suit: '♦' })],
+          }),
+        ],
+      });
+    }
+
+    it('stacks Table over the pile cluster below sm via max-sm:grid-cols-1', async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const boardGrid = container.querySelector('.grid.grid-cols-\\[auto_1fr\\]');
+      expect(boardGrid?.className).toContain('max-sm:grid-cols-1');
+      expect(boardGrid?.className).toContain('max-sm:gap-4');
+    });
+
+    it('wraps the pile cluster into a flex layout below sm instead of a fixed three-column track', async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const pileCluster = container.querySelector('.grid.grid-cols-\\[160px_100px_1fr\\]');
+      expect(pileCluster?.className).toContain('max-sm:flex');
+      expect(pileCluster?.className).toContain('max-sm:flex-wrap');
+      expect(pileCluster?.className).toContain('max-sm:justify-center');
+    });
+
+    it('gives each player tile a full row below sm via max-sm:grid-cols-1 on the grid-cols-3 track', async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Bob');
+
+      const tileGrid = container.querySelector('.grid.grid-cols-3');
+      expect(tileGrid?.className).toContain('max-sm:grid-cols-1');
+    });
+
+    it('stacks the Play / Pick Up Pile buttons full-width below sm via max-sm:flex-col', async () => {
+      renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const playButton = screen.getByRole('button', { name: /^Play/ });
+      const buttonRow = playButton.closest('.flex.gap-3');
+      expect(buttonRow?.className).toContain('max-sm:flex-col');
+    });
+
+    it("replaces the discard pile's fixed 160px inline width with responsive w-40/max-sm:w-32 classes, keeping the draw-animation selectors", async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const discardCards = container.querySelector('.discard-pile-cards');
+      expect(discardCards).not.toHaveStyle({ width: '160px' });
+      expect(discardCards?.className).toContain('w-40');
+      expect(discardCards?.className).toContain('max-sm:w-32');
+      expect(container.querySelector('.discard-pile-area')).toBeInTheDocument();
+      expect(container.querySelector('.draw-pile-card')).toBeInTheDocument();
+    });
+
+    it('recovers horizontal room at phone width via p-3 sm:p-6 / p-3 sm:p-4 on the header and board containers', async () => {
+      const { container } = renderGame('test-player', reflowState());
+      await screen.findByText('Table');
+
+      const boardContainer = screen.getByText("Alice's Cards").closest('.bg-slate-800.rounded-xl');
+      expect(boardContainer?.className).toContain('p-3');
+      expect(boardContainer?.className).toContain('sm:p-6');
+
+      const headerContainer = container.querySelector('.border-purple-500.p-3.sm\\:p-4');
+      expect(headerContainer).toBeInTheDocument();
+    });
+  });
+
   describe('celebration modal as a focus-trapped dialog (RESP-05, D-06, D-07)', () => {
     /** Two players, both with cards - finishing player at `playerIndex` via
      * the harness button triggers isGameOver (only one player left with

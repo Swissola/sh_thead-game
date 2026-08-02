@@ -16,7 +16,7 @@ const DiscardPile: React.FC<DiscardPileProps> = ({ discardPile }) => {
         <div className="text-center discard-pile-area">
             <p className="text-slate-400 text-sm mb-2 font-bold">Discard Pile</p>
             {hasCards ? (
-                <div className="discard-pile-cards relative h-28" style={{ width: '160px', margin: '0 auto' }}>
+                <div className="discard-pile-cards relative h-28 w-40 mx-auto max-sm:w-32">
                     {recent.map((card, index, array) => {
                         const centerOffset = 48; // Half of (160-64) to center a 64px card
                         const pileOffset = (array.length - 1) * 8; // Shift pile left by half the spacing

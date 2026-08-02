@@ -502,8 +502,8 @@ export function GameScreen({
           <div aria-live="polite" role="status" className="sr-only">
             {turnAnnouncement}
           </div>
-          <div className="bg-slate-800 rounded-xl p-4 mb-4 border-2 border-purple-500">
-            <div className="flex items-center justify-between mb-2">
+          <div className="bg-slate-800 rounded-xl p-3 sm:p-4 mb-4 border-2 border-purple-500">
+            <div className="flex items-center justify-between mb-2 max-sm:flex-wrap max-sm:gap-2">
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">
                   SH!THEAD {testMode && <span className="text-sm text-green-400">[TEST MODE]</span>}
@@ -512,7 +512,7 @@ export function GameScreen({
                   Room: {testMode ? 'TEST' : gameState.roomCode}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 max-sm:flex-wrap max-sm:gap-2">
                 <button
                   onClick={() => setShowRules(!showRules)}
                   className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
@@ -660,7 +660,7 @@ export function GameScreen({
           )}
 
           <div
-            className="bg-slate-800 rounded-xl p-6 mb-4 border-2 border-purple-500"
+            className="bg-slate-800 rounded-xl p-3 sm:p-6 mb-4 border-2 border-purple-500"
             onClick={(e) => {
               // Deselect cards when clicking anywhere on the board background (not on cards/buttons)
               if (
@@ -678,7 +678,7 @@ export function GameScreen({
               <div className="border-t-2 border-slate-700 pt-6">
                 <h3 className="text-white font-bold mb-3">{currentPlayer.name}'s Cards</h3>
 
-                <div className="grid grid-cols-[auto_1fr] gap-8 mb-4">
+                <div className="grid grid-cols-[auto_1fr] gap-8 mb-4 max-sm:grid-cols-1 max-sm:gap-4">
                   <Table
                     gameState={gameState}
                     currentPlayer={currentPlayer}
@@ -690,7 +690,7 @@ export function GameScreen({
                     setRevealedFaceDown={setRevealedFaceDown}
                   />
 
-                  <div className="grid grid-cols-[160px_100px_1fr] gap-12 items-start">
+                  <div className="grid grid-cols-[160px_100px_1fr] gap-12 items-start max-sm:flex max-sm:flex-wrap max-sm:justify-center max-sm:gap-4">
                     <DiscardPile discardPile={gameState.discardPile} />
                     <DrawPile deck={gameState.deck} />
                     <BurnPile burnPile={gameState.burnPile} />
@@ -730,7 +730,7 @@ export function GameScreen({
                         </span>
                       </div>
                     )}
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 max-sm:flex-col">
                       <button
                         onClick={playCards}
                         disabled={(!revealedFaceDown && selectedCards.length === 0) || !isMyTurn}
@@ -760,7 +760,7 @@ export function GameScreen({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 max-sm:grid-cols-1">
           {gameState.players.map((player, index) => {
             const isTheirTurn =
               gameState.phase === 'playing' &&
