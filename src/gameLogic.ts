@@ -120,7 +120,7 @@ export function canPlayMultipleCards(cards: Card[], discardPile: Card[]): boolea
 export function shouldBurnPile(discardPile: Card[]): boolean {
   if (discardPile.length === 0) return false;
 
-  const lastCard = discardPile[discardPile.length - 1];
+  const lastCard = discardPile.at(-1) as Card;
   if (isBurn(lastCard)) return true;
 
   return isFourOfAKind(discardPile);
@@ -318,7 +318,7 @@ export function getStartingPlayer(players: Player[]): number {
   for (const targetCard of startOrder) {
     for (let i = 0; i < players.length; i++) {
       const hasCard = players[i].hand.some(
-        (card) => card != null && card.rank === targetCard.rank && card.suit === targetCard.suit
+        (card) => card?.rank === targetCard.rank && card?.suit === targetCard.suit
       );
       if (hasCard) {
         return i;
@@ -378,10 +378,22 @@ export function createDeck(numDecks = 1): Card[] {
   return deck;
 }
 
+// A card shuffle's fairness matters for real gameplay (the server-side deal
+// in supabase/functions/_shared/startGame.ts uses this same function) - a
+// non-cryptographic PRNG's output is predictable, so this uses the Web
+// Crypto API (available as a global in both the browser and Deno edge
+// functions) rather than Math.random(). Resolves S2245.
+function secureRandomIndex(maxExclusive: number): number {
+  const range = maxExclusive;
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return bytes[0] % range;
+}
+
 export function shuffleDeck(deck: Card[]): Card[] {
   const shuffled = [...deck];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = secureRandomIndex(i + 1);
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
