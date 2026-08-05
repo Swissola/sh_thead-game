@@ -665,7 +665,8 @@ export function GameScreen({
                   </h2>
                   <button
                     onClick={() => setShowRules(false)}
-                    className="p-2 hover:bg-slate-700 rounded-lg"
+                    aria-label="Close rules"
+                    className="min-h-11 min-w-11 inline-flex items-center justify-center p-2 hover:bg-slate-700 rounded-lg"
                   >
                     <X size={24} className="text-white" />
                   </button>

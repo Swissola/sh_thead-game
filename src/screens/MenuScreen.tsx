@@ -251,13 +251,13 @@ export function MenuScreen({ initialRoomCode = '' }: MenuScreenProps = {}) {
                         Test Mode (First Turn Ready)
                     </button>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 max-sm:flex-wrap">
                         <input
                             type="text"
                             placeholder="Room code"
                             value={roomCodeInput}
                             onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-                            className="flex-1 px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                            className="flex-1 min-w-0 px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
                         />
                         <button
                             onClick={joinRoom}
