@@ -176,6 +176,52 @@ function computeTurnAnnouncement(
   };
 }
 
+type CelebrationUpdate =
+  | { kind: 'seed'; finishedIds: string[]; isOver: boolean }
+  | { kind: 'gameOver'; playerName: string; placement: number }
+  | { kind: 'finisher'; playerId: string; playerName: string; placement: number };
+
+// Extracted purely for the same reason as computeTurnAnnouncement above: the
+// project's react-hooks/set-state-in-effect lint rule (plan 02-12) requires
+// celebration state derived from a gameState change to be computed here and
+// applied in the render body, not inside a useEffect - the actual setState
+// calls are left in the component body. celebrationInitialized/
+// celebratedGameOver/celebratedPlayerIds are state, not refs, because the
+// project's react-hooks/refs rule forbids reading/writing ref.current during
+// render (see the lastAnnouncedTurn comment below for the same reasoning).
+function computeCelebrationUpdate(
+  gameState: GameState,
+  celebrationInitialized: boolean,
+  celebratedGameOver: boolean,
+  celebratedPlayerIds: ReadonlySet<string>
+): CelebrationUpdate | null {
+  if (gameState.phase === 'lobby') return null;
+
+  const isOver = GameLogic.isGameOver(gameState.players);
+  const finishedPlayers = GameLogic.getFinishedPlayers(gameState.players);
+
+  if (!celebrationInitialized) {
+    return { kind: 'seed', finishedIds: finishedPlayers.map((p) => p.id), isOver };
+  }
+
+  if (isOver) {
+    if (celebratedGameOver) return null;
+    const losers = gameState.players.filter((p) => !GameLogic.hasPlayerWon(p));
+    if (losers.length === 0) return null;
+    return { kind: 'gameOver', playerName: losers[0].name, placement: gameState.players.length };
+  }
+
+  const newlyFinished = finishedPlayers.filter((p) => !celebratedPlayerIds.has(p.id));
+  if (newlyFinished.length === 0) return null;
+  const finisher = newlyFinished[0];
+  return {
+    kind: 'finisher',
+    playerId: finisher.id,
+    playerName: finisher.name,
+    placement: celebratedPlayerIds.size + 1,
+  };
+}
+
 function computePlayCardCount(
   revealedFaceDown: { card: CardType; index: number } | null,
   selectedCards: CardSelection[]
@@ -239,9 +285,16 @@ export function GameScreen({
     placement: number;
   } | null>(null);
   const celebrationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const celebrationInitializedRef = useRef(false);
-  const celebratedGameOverRef = useRef(false);
-  const celebratedPlayerIdsRef = useRef<Set<string>>(new Set());
+  // GameScreen mounts fresh each time Router switches from Menu/Lobby to
+  // Game (D-09 phase-based routing), so these three starting values already
+  // read as "unset" on every fresh mount - no externally-callable
+  // resetCelebration is needed. State, not refs, for the same reason as
+  // lastAnnouncedTurn above: computeCelebrationUpdate reads them during
+  // render, and the project's react-hooks/refs rule forbids reading/writing
+  // ref.current during render.
+  const [celebrationInitialized, setCelebrationInitialized] = useState(false);
+  const [celebratedGameOver, setCelebratedGameOver] = useState(false);
+  const [celebratedPlayerIds, setCelebratedPlayerIds] = useState<ReadonlySet<string>>(() => new Set());
 
   // useCallback keeps this a stable reference across renders - the focus
   // trap hook's effect depends on [active, onEscape] (Task 2's read_first
@@ -260,59 +313,22 @@ export function GameScreen({
   // the pre-open element on close.
   const celebrationDialogRef = useFocusTrap(celebrationModal?.show === true, dismissCelebration);
 
-  // Derived celebration state from gameState (ported verbatim from
-  // App.tsx:103-143), reading gameState from context instead of local
-  // state. GameScreen mounts fresh each time Router switches from
-  // Menu/Lobby to Game (D-09 phase-based routing), so the refs' useRef
-  // initial values already start "unset" on every fresh mount - no
-  // externally-callable resetCelebration is needed any more.
+  // Starting the auto-dismiss timer is a genuine side effect (unlike the
+  // state derivation above), so it stays in an effect, reacting to the
+  // celebrationModal state that computeCelebrationUpdate produced.
   useEffect(() => {
-    if (!gameState || gameState.phase === 'lobby') return;
-
-    const isOver = GameLogic.isGameOver(gameState.players);
-    const finishedPlayers = GameLogic.getFinishedPlayers(gameState.players);
-
-    if (!celebrationInitializedRef.current) {
-      celebrationInitializedRef.current = true;
-      finishedPlayers.forEach((p) => celebratedPlayerIdsRef.current.add(p.id));
-      celebratedGameOverRef.current = isOver;
-      return;
-    }
-
-    if (isOver) {
-      if (!celebratedGameOverRef.current) {
-        celebratedGameOverRef.current = true;
-        const losers = gameState.players.filter((p) => !GameLogic.hasPlayerWon(p));
-        if (losers.length > 0) {
-          if (celebrationTimeoutRef.current) clearTimeout(celebrationTimeoutRef.current);
-          setCelebrationModal({
-            show: true,
-            playerName: losers[0].name,
-            isShithead: true,
-            placement: gameState.players.length,
-          });
-          celebrationTimeoutRef.current = setTimeout(() => setCelebrationModal(null), 4000);
-        }
-      }
-      return;
-    }
-
-    const newlyFinished = finishedPlayers.filter((p) => !celebratedPlayerIdsRef.current.has(p.id));
-    if (newlyFinished.length > 0) {
-      const finisher = newlyFinished[0];
-      celebratedPlayerIdsRef.current.add(finisher.id);
-      const placement = celebratedPlayerIdsRef.current.size;
-      if (celebrationTimeoutRef.current) clearTimeout(celebrationTimeoutRef.current);
-      setCelebrationModal({ show: true, playerName: finisher.name, isShithead: false, placement });
-      celebrationTimeoutRef.current = setTimeout(() => setCelebrationModal(null), 3000);
-    }
-  }, [gameState]);
-
-  useEffect(() => {
+    if (!celebrationModal?.show) return;
+    celebrationTimeoutRef.current = setTimeout(
+      () => setCelebrationModal(null),
+      celebrationModal.isShithead ? 4000 : 3000
+    );
     return () => {
-      if (celebrationTimeoutRef.current) clearTimeout(celebrationTimeoutRef.current);
+      if (celebrationTimeoutRef.current) {
+        clearTimeout(celebrationTimeoutRef.current);
+        celebrationTimeoutRef.current = null;
+      }
     };
-  }, []);
+  }, [celebrationModal]);
 
   // D-10: tracks each player's last-known offline value so only a genuine
   // true->false transition raises a reconnect toast - not a re-render, and
@@ -414,6 +430,35 @@ export function GameScreen({
   if (turnAnnouncementUpdate) {
     setLastAnnouncedTurn(turnAnnouncementUpdate.turnIndex);
     setTurnAnnouncement(turnAnnouncementUpdate.text);
+  }
+
+  const celebrationUpdate = computeCelebrationUpdate(
+    gameState,
+    celebrationInitialized,
+    celebratedGameOver,
+    celebratedPlayerIds
+  );
+  if (celebrationUpdate?.kind === 'seed') {
+    setCelebrationInitialized(true);
+    setCelebratedPlayerIds(new Set(celebrationUpdate.finishedIds));
+    setCelebratedGameOver(celebrationUpdate.isOver);
+  } else if (celebrationUpdate?.kind === 'gameOver') {
+    setCelebratedGameOver(true);
+    setCelebrationModal({
+      show: true,
+      playerName: celebrationUpdate.playerName,
+      isShithead: true,
+      placement: celebrationUpdate.placement,
+    });
+  } else if (celebrationUpdate?.kind === 'finisher') {
+    const finisherId = celebrationUpdate.playerId;
+    setCelebratedPlayerIds((prev) => new Set(prev).add(finisherId));
+    setCelebrationModal({
+      show: true,
+      playerName: celebrationUpdate.playerName,
+      isShithead: false,
+      placement: celebrationUpdate.placement,
+    });
   }
 
   const currentPlayer = gameState.players.find((p) => p.id === currentPlayerId);
