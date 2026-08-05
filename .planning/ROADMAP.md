@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Rules Engine Refactor** - Extract a single pure `applyMove` reducer and split the 1,500-line `App.tsx`, so client and future server can run identical rules (completed 2026-07-25)
 - [x] **Phase 2: Real Cross-Device Multiplayer** - Supabase-backed rooms with Realtime sync, anonymous identity, and server-validated moves — a friend can actually join and play from another device (completed 2026-08-01)
-- [ ] **Phase 3: Responsive UI** - The game is fully usable on a phone-sized screen and via keyboard, not just desktop mouse
+- [x] **Phase 3: Responsive UI** - The game is fully usable on a phone-sized screen and via keyboard, not just desktop mouse (completed 2026-08-05)
 - [ ] **Phase 4: Mobile Packaging (Capacitor)** - The app installs and runs as a native app on Android and iOS
 - [ ] **Phase 5: Desktop Polish** - A polished, PWA-installable desktop experience with no native wrapper
 - [ ] **Phase 6: Visual/Gameplay Polish** - Animations, sound, and a shared modal make the game feel finished
@@ -161,7 +161,7 @@ Plans:
   4. A player can select and play cards using only the keyboard
   5. Turn changes are announced and modals trap focus properly for screen reader/keyboard users
 
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans complete
 **UI hint**: yes
 
 Plans:
@@ -186,7 +186,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 03-08-PLAN.md — Phase gate plus the blocking human checkpoint: real-device touch, keyboard-only play, screen-reader announcement, VALIDATION.md sign-off
+- [x] 03-08-PLAN.md — Phase gate plus the blocking human checkpoint: real-device touch, keyboard-only play, screen-reader announcement, VALIDATION.md sign-off
 
 ### Phase 4: Mobile Packaging (Capacitor)
 
@@ -257,7 +257,7 @@ rework lands).
 |-------|----------------|--------|-----------|
 | 1. Rules Engine Refactor | 7/7 | Complete    | 2026-07-26 |
 | 2. Real Cross-Device Multiplayer | 19/19 | Complete    | 2026-08-01 |
-| 3. Responsive UI | 7/8 | In Progress|  |
+| 3. Responsive UI | 8/8 | Complete   | 2026-08-05 |
 | 4. Mobile Packaging (Capacitor) | 0/TBD | Not started | - |
 | 5. Desktop Polish | 0/TBD | Not started | - |
 | 6. Visual/Gameplay Polish | 0/TBD | Not started | - |
