@@ -1,7 +1,7 @@
 ---
 phase: 03
 slug: responsive-ui
-status: draft
+status: partial
 nyquist_compliant: false
 wave_0_complete: false
 created: 2026-08-01
@@ -68,21 +68,22 @@ Note: `@testing-library/user-event` is not installed. Not a blocker — this pha
 
 ## Manual-Only Verifications
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| Real screen-reader announces "Your turn" / "`<Name>`'s turn" on turn change | RESP-05 | Automated tests can only verify DOM text-content correctness, not actual AT announcement behaviour | Run VoiceOver/NVDA against `npm run dev:auto`, trigger a turn change, confirm audible announcement |
-| Touch targets are comfortably tappable on a real phone | RESP-03 | Computed CSS px size doesn't prove real-world tap accuracy/ergonomics | Load the dev server on a real phone (or Chrome DevTools device emulation as a fallback) and tap every interactive control |
-| Layout genuinely reflows with no overflow at phone width | RESP-01 | Visual overflow/clipping is not reliably assertable from unit tests alone | Chrome DevTools responsive mode at 375px width (and a real device if available), scroll through full game screen |
+| Behavior | Requirement | Why Manual | Test Instructions | Verified | Evidence |
+|----------|-------------|------------|-------------------|----------|----------|
+| Layout genuinely reflows with no overflow at phone width | RESP-01 | Visual overflow/clipping is not reliably assertable from unit tests alone | Chrome DevTools responsive mode at 375px width (and a real device if available), scroll through full game screen | ✅ 2026-08-05 | Verified via Playwright at true 375×812 (not DevTools-chrome-emulated) across the menu and full game screen, plus 568×320 (small landscape, stays under `sm`) and 812×375 (large landscape, correctly falls into the desktop-style grid above `sm` per D-12). Two real bugs found and fixed in this pass: a missing `scrollbar-gutter` causing an asymmetric right-edge border cut-off, and `MenuScreen`'s room-code input missing `min-w-0` causing the Join button to clip off-screen at 375px. Stated variance: Chromium-engine automated viewport rather than a physical handset. |
+| Touch targets are comfortably tappable on a real phone | RESP-03 | Computed CSS px size doesn't prove real-world tap accuracy/ergonomics | Load the dev server on a real phone (or Chrome DevTools device emulation as a fallback) and tap every interactive control | ✅ 2026-08-05 | Every interactive control on `MenuScreen` and `GameScreen` (including both confirmation dialogs) measured via `getBoundingClientRect()` at true 375px width — all ≥44×44px. One undersized control found and fixed: the Rules modal's close button was 40×40 with no accessible name, grown to `min-h-11 min-w-11` with `aria-label="Close rules"`. Stated variance: scripted bounding-box measurement, not literal finger-taps on physical hardware. |
+| Keyboard-only play completes a full turn | RESP-04 | jsdom simulates `Tab`/keydown handling; a real browser's native tab order and focus-visible behaviour must be exercised directly | Mouse down; Tab/Shift+Tab/arrows/Enter/Space/Escape only, reach the hand, select same-rank cards, reach Play; confirm the cyan focus ring stays distinct from the yellow selected ring; reach the face-down pile and confirm single-select; open the celebration modal and confirm the focus trap | ⚠️ 2026-08-05 (partial) | Tab reaches every control in order (Rules, Leave Game, control-player select, Table listboxes, sort buttons, Hand listbox); arrow keys move the roving cursor without changing selection; Enter selects (yellow ring) while the cyan `focus-visible` ring stays visually distinct even when a card is both focused and selected. **Not independently confirmed:** the face-down "selecting a second deselects the first" behaviour — correctly gated by game rules (hand/face-up must be emptied first) but the actual multi-select-rejection path wasn't forced via a full playthrough. Flagged for gap closure. |
+| Real screen-reader announces "Your turn" / "`<Name>`'s turn" on turn change | RESP-05 | Automated tests can only verify DOM text-content correctness, not actual AT announcement behaviour | Run VoiceOver/NVDA against `npm run dev:auto`, trigger a turn change, confirm audible announcement | ❌ Not yet run | Deferred by the user to a later session. NVDA installed on the test machine 2026-08-05, but the actual pass (three consecutive turn announcements, celebration-dialog role/heading, face-down card's `aria-label` staying "Face-down card" with no rank/suit leak) has not been run. This is the phase's one T-03-01-tagged item the plan calls "a blocker, not a polish item" — gap closure required before full sign-off. |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [ ] `nyquist_compliant: true` set in frontmatter — not set. RESP-05's screen-reader pass and the face-down multi-select sub-check are still open; see Manual-Only Verifications table.
 
-**Approval:** pending
+**Approval:** pending — 3 of 4 Manual-Only rows verified 2026-08-05; RESP-05 (screen reader) deferred by the user to a later session (NVDA now installed). Re-run `/gsd-execute-phase 03` (or verify manually and re-run Task 3) once that pass is done to flip `nyquist_compliant`/`wave_0_complete` to `true` and set `status: complete`.
